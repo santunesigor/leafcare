@@ -35,7 +35,8 @@ fun percent(value: Float) = String.format(Locale.forLanguageTag("pt-BR"), "%.0f%
 fun HistoryScreen(vm: LeafCareViewModel, onCamera: () -> Unit, onResult: (String) -> Unit) {
     val rows by vm.analyses.collectAsStateWithLifecycle()
     val threshold by vm.threshold.collectAsStateWithLifecycle()
-    HistoryContent(rows, threshold, onCamera, onResult, { vm.repository.photo(it) }, vm.repository.modelError(), vm::setThreshold)
+    val modelError = vm.getModelError()
+    HistoryContent(rows, threshold, onCamera, onResult, { vm.getPhoto(it) }, modelError, vm::setThreshold)
 }
 
 @Composable

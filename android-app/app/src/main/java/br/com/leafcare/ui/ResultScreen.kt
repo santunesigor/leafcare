@@ -23,14 +23,14 @@ import java.util.Locale
 
 @Composable
 fun ResultScreen(id: String, vm: LeafCareViewModel, onBack: () -> Unit, onCamera: () -> Unit) {
-    val flow = remember(id) { vm.repository.observe(id) }
+    val flow = remember(id) { vm.observeAnalysis(id) }
     val row by flow.collectAsStateWithLifecycle(initialValue = null)
     var confirmDelete by remember { mutableStateOf(false) }
     val analysis = row
     if (analysis == null) Column(Modifier.padding(24.dp)) {
         Text("Carregando análise. Se ela foi excluída, retorne ao histórico.")
         TextButton(onClick = onBack) { Text("Voltar ao histórico") }
-    } else ResultContent(analysis, vm.catalog.get(analysis.classId), vm.repository.photo(analysis.photoName), onBack, onCamera, { confirmDelete = true })
+    } else ResultContent(analysis, vm.getDiseaseInfo(analysis.classId), vm.getPhoto(analysis.photoName), onBack, onCamera, { confirmDelete = true })
     if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Excluir esta análise?") },
         text = { Text("O registro e sua foto serão removidos deste aparelho.") },
         confirmButton = { TextButton(onClick = { confirmDelete = false; vm.delete(id, onBack) }) { Text("Excluir") } },
