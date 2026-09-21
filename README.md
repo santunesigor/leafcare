@@ -33,7 +33,7 @@ The completed experiment uses 696 raw TLA/TV3 images distributed across 16 class
 
 The ensemble combines the previous MobileNetV3Small, a MobileNetV3Small trained with RMSprop and a MobileNetV3Large. The application intentionally retains the single-model baseline until the ensemble is profiled and validated on real Android devices.
 
-See [the model benchmark](docs/BENCHMARK_MODELOS.md), [the extensive comparison](docs/RELATORIO_COMPARATIVO_MODELOS_LEAFCARE.md) and [the project roadmap](ROADMAP.md).
+See [the model benchmark](docs/BENCHMARK_MODELOS.md), [the extensive comparison](docs/RELATORIO_COMPARATIVO_MODELOS_LEAFCARE.md) and [the project roadmap in Portuguese](docs/ROADMAP_PT_BR.md).
 
 ## Features
 
