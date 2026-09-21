@@ -179,6 +179,8 @@ The pipeline audits invalid files and duplicates, keeps related source groups in
 - [Ensemble Android integration](docs/ENSEMBLE_ANDROID_INTEGRATION.md)
 - [Manual device tests](docs/MANUAL_TESTS.md)
 - [Third-party notices](docs/THIRD_PARTY.md)
+- [Technical decisions](docs/TECHNICAL_DECISIONS.md)
+- [Presentation guide (PT-BR)](docs/PRESENTATION_GUIDE_PT_BR.md)
 
 ## License and data
 
