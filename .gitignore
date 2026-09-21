@@ -45,3 +45,4 @@ key.properties
 *.hprof
 .DS_Store
 Thumbs.db
+/project-source/
