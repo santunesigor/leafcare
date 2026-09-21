@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="br.com.leafcare.VisualV3Test" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-10T22:54:18" hostname="localhost" time="7.959">
+  <properties/>
+  <testcase name="cameraControls" classname="br.com.leafcare.VisualV3Test" time="6.139"/>
+  <testcase name="resultDetailsAndNavigation" classname="br.com.leafcare.VisualV3Test" time="1.003"/>
+  <testcase name="historySearchAndNavigation" classname="br.com.leafcare.VisualV3Test" time="0.458"/>
+  <testcase name="helpExamplesAndDismiss" classname="br.com.leafcare.VisualV3Test" time="0.358"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

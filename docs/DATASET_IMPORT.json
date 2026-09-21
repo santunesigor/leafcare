@@ -1,0 +1,29 @@
+{
+  "sources": {
+    "TLA-20260813T224834Z-1-001.zip": "1cd9e9f23f73a455feee48622184c025d679409ba07f36508dbed43c04b3f933",
+    "TTDD.zip": "9b2579c02d6e350f64933009ed9bbf41f46314989fed3d336e2046beb50ddcd5"
+  },
+  "selection": "Somente TV3 bruto. TV6 e TTDD derivados excluídos para reduzir vazamento.",
+  "counts": {
+    "wildfire": 89,
+    "tswv": 9,
+    "weather_fleck": 59,
+    "sunscald": 68,
+    "genetic_abnormality": 9,
+    "potato_tuber_moth": 50,
+    "nematodes": 41,
+    "healthy": 50,
+    "brown_spot": 50,
+    "frog_eye": 50,
+    "anthracnose": 8,
+    "target_spot": 50,
+    "black_shank": 11,
+    "tmv": 66,
+    "cmv": 51,
+    "pvy": 35
+  },
+  "total": 696,
+  "ttdd_images_audited": 1571,
+  "ttdd_synthetic": 173,
+  "limitations": "Grupos por classe + IMG de origem, complementados por dHash. Sem identificação de planta/propriedade; não comprova independência de campo."
+}

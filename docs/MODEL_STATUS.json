@@ -1,0 +1,9 @@
+{
+  "status": "trained",
+  "disease_model_included": true,
+  "n_test": 103,
+  "accuracy": 0.7766990291262136,
+  "macro_f1": 0.7157422438672438,
+  "model_sha256": "d0447e6f3cbd62318e9d9b7cbac5fbf6038df74001fe3aeb3c467e4c7cb6090b",
+  "limitations": "Teste interno pequeno; sem validação de campo; confiança não calibrada."
+}
