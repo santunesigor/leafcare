@@ -4,6 +4,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import br.com.leafcare.R
@@ -46,27 +47,27 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
     var filter by rememberSaveable { mutableStateOf("Todas") }
     var showFilter by remember { mutableStateOf(false) }
     val filtered = rows.filter { row ->
-        val title = if (row.inconclusive) "Resultado inconclusivo" else row.displayName
+        val title = if (row.inconclusive) stringResource(R.string.result_inconclusive_title) else row.displayName
         (title.contains(query, true) || row.classId.contains(query, true) || row.scientificName.contains(query, true)) &&
-            (filter == "Todas" || (filter == "Inconclusivas") == row.inconclusive)
+            (filter == stringResource(R.string.filter_all) || (filter == stringResource(R.string.filter_inconclusive)) == row.inconclusive)
     }
     val grouped = filtered.groupBy { Instant.ofEpochMilli(it.createdAt).atZone(ZoneId.systemDefault()).toLocalDate() }
     val formatter = remember { DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("pt-BR")) }
     Scaffold(floatingActionButtonPosition = FabPosition.Center,
         floatingActionButton = { Surface(onClick = onCamera, shape = CircleShape, shadowElevation = 12.dp, color = LeafColors.Green,
             modifier = Modifier.padding(bottom = 6.dp).size(68.dp), border = BorderStroke(6.dp, Color.White)) {
-            Box(contentAlignment = Alignment.Center) { FigmaIcon(R.drawable.v3_camera, "Abrir câmera", 28) }
+            Box(contentAlignment = Alignment.Center) { FigmaIcon(R.drawable.v3_camera, stringResource(R.string.camera_button_desc), 28) }
         } }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(24.dp, 28.dp, 24.dp, 110.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        Text("LEAFCARE", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.04.sp, color = LeafColors.Green)
+                        Text(stringResource(R.string.history_title), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.04.sp, color = LeafColors.Green)
                         Spacer(Modifier.height(4.dp))
-                        Text("Olá, Produtor", fontSize = 27.sp, letterSpacing = (-0.945).sp)
+                        Text(stringResource(R.string.history_greeting), fontSize = 27.sp, letterSpacing = (-0.945).sp)
                         Spacer(Modifier.height(4.dp))
-                        Text("Suas análises recentes", fontSize = 14.sp, color = LeafColors.Muted)
+                        Text(stringResource(R.string.history_subtitle), fontSize = 14.sp, color = LeafColors.Muted)
                     }
                     FigmaIcon(R.drawable.v3_logo, null, 42)
                 }
@@ -79,39 +80,39 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                         FigmaIcon(R.drawable.v3_search, null, 19)
                         BasicTextField(value = query, onValueChange = { query = it }, singleLine = true, modifier = Modifier.weight(1f),
                             textStyle = MaterialTheme.typography.bodyLarge.copy(color = LeafColors.Text), decorationBox = { inner ->
-                                if (query.isEmpty()) Text("Pesquisar análise", fontSize = 15.sp, color = LeafColors.Muted)
+                                if (query.isEmpty()) Text(stringResource(R.string.search_hint), fontSize = 15.sp, color = LeafColors.Muted)
                                 inner()
                             })
                     }
                     Spacer(Modifier.width(10.dp))
                     Box {
-                        IconButton(onClick = { showFilter = true }, modifier = Modifier.size(46.dp).border(1.dp, LeafColors.Border, RoundedCornerShape(14.dp))) { FigmaIcon(R.drawable.v3_filter, "Filtrar análises", 20) }
+                        IconButton(onClick = { showFilter = true }, modifier = Modifier.size(46.dp).border(1.dp, LeafColors.Border, RoundedCornerShape(14.dp))) { FigmaIcon(R.drawable.v3_filter, stringResource(R.string.filter_button_desc), 20) }
                         DropdownMenu(expanded = showFilter, onDismissRequest = { showFilter = false }) {
-                            DropdownMenuItem(text = { Text("Confiança mínima: ${percent(threshold)} (definida pelo modelo)") }, onClick = { })
-                            listOf("Todas", "Identificadas", "Inconclusivas").forEach { option ->
+                            DropdownMenuItem(text = { Text(stringResource(R.string.confidence_threshold_label, percent(threshold))) }, onClick = { })
+                            listOf(stringResource(R.string.filter_all), stringResource(R.string.filter_identified), stringResource(R.string.filter_inconclusive)).forEach { option ->
                                 DropdownMenuItem(text = { Text(option) }, onClick = { filter = option; showFilter = false })
                             }
                         }
                     }
                 }
-                if (filter != "Todas") Text("Filtro: $filter", style = MaterialTheme.typography.labelMedium)
+                if (filter != stringResource(R.string.filter_all)) Text("${stringResource(R.string.filter_prefix)}$filter", style = MaterialTheme.typography.labelMedium)
             }
             item {
                 modelError?.let { message ->
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                         Column(Modifier.padding(16.dp)) {
-                            Text("Preparação do modelo pendente", style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.model_error_title), style = MaterialTheme.typography.titleMedium)
                             Text(message, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
-                
+
             }
             if (filtered.isEmpty()) item {
                 Column(Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Eco, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text(if (rows.isEmpty()) "Seu histórico começa aqui" else "Nenhuma análise encontrada", style = MaterialTheme.typography.titleLarge)
-                    Text(if (rows.isEmpty()) "Fotografe uma folha ou escolha uma imagem da galeria." else "Experimente outra pesquisa ou filtro.")
+                    Text(if (rows.isEmpty()) stringResource(R.string.empty_history_title) else stringResource(R.string.empty_search_title), style = MaterialTheme.typography.titleLarge)
+                    Text(if (rows.isEmpty()) stringResource(R.string.empty_history_subtitle) else stringResource(R.string.empty_search_subtitle))
                 }
             }
             grouped.forEach { (date, records) ->
@@ -120,13 +121,13 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                     OutlinedCard(Modifier.fillMaxWidth().clickable { onResult(row.id) }, shape = RoundedCornerShape(16.dp), colors = CardDefaults.outlinedCardColors(containerColor = Color.White)) {
                         Row(Modifier.padding(10.dp).heightIn(min = 66.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            AsyncImage(model = photo(row.photoName), contentDescription = "Foto da folha analisada",
+                            AsyncImage(model = photo(row.photoName), contentDescription = stringResource(R.string.cd_photo_history),
                                 modifier = Modifier.size(72.dp, 66.dp).clip(RoundedCornerShape(11.dp)), contentScale = ContentScale.Crop)
                             Column(Modifier.weight(1f)) {
-                                Text(if (row.inconclusive) "Resultado inconclusivo" else row.displayName, style = MaterialTheme.typography.titleSmall)
+                                Text(if (row.inconclusive) stringResource(R.string.result_inconclusive_title) else row.displayName, style = MaterialTheme.typography.titleSmall)
                                 if (!row.inconclusive) Text(row.scientificName, fontStyle = FontStyle.Italic, style = MaterialTheme.typography.bodySmall)
                                 Spacer(Modifier.height(5.dp))
-                                Text("${percent(row.confidence)} de confiança", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+                                Text("${percent(row.confidence)} ${stringResource(R.string.confidence_label)}", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
                             }
                             FigmaIcon(R.drawable.v3_chevron, null, 20)
                         }

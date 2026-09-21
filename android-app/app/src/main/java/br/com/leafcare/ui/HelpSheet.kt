@@ -1,4 +1,5 @@
 package br.com.leafcare.ui
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,6 +11,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,33 +25,40 @@ fun HelpSheet(onDismiss: () -> Unit) {
         Surface(Modifier.padding(15.dp).widthIn(max = 390.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White) { HelpContent(onDismiss) }
     }
 }
+
 @Composable
 fun HelpContent(onDismiss: () -> Unit) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Como tirar a foto", fontSize = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.46).sp)
-        Text("Uma boa imagem ajuda o LeafCare a comparar os sintomas.", fontSize = 14.sp, lineHeight = 21.sp, color = LeafColors.Muted)
+        Text(stringResource(R.string.help_title), fontSize = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.46).sp)
+        Text(stringResource(R.string.help_subtitle), fontSize = 14.sp, lineHeight = 21.sp, color = LeafColors.Muted)
         Column(Modifier.fillMaxWidth().background(Color(0xFFF3F7F2), RoundedCornerShape(14.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            listOf("Fotografe uma folha por vez.", "Use boa iluminação.", "Deixe a mancha visível e em foco.", "Evite sombras e fundos confusos.").forEach {
+            listOf(
+                stringResource(R.string.help_tip_1),
+                stringResource(R.string.help_tip_2),
+                stringResource(R.string.help_tip_3),
+                stringResource(R.string.help_tip_4)
+            ).forEach { tip ->
                 Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
                     FigmaIcon(R.drawable.v3_check, null, 16)
-                    Text(it, fontSize = 14.sp, lineHeight = 21.sp, color = Color(0xFF344036))
+                    Text(tip, fontSize = 14.sp, lineHeight = 21.sp, color = Color(0xFF344036))
                 }
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Exemplos", fontSize = 15.sp)
+            Text(stringResource(R.string.help_examples_title), fontSize = 15.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                CaptureExample(R.drawable.v3_example_correct, "Correta", true, Modifier.weight(1f))
-                CaptureExample(R.drawable.v3_example_blur, "Desfocada", false, Modifier.weight(1f))
+                CaptureExample(R.drawable.v3_example_correct, stringResource(R.string.example_correct), true, Modifier.weight(1f))
+                CaptureExample(R.drawable.v3_example_blur, stringResource(R.string.example_blur), false, Modifier.weight(1f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                CaptureExample(R.drawable.v3_example_far, "Distante", false, Modifier.weight(1f))
-                CaptureExample(R.drawable.v3_example_dark, "Pouca luz", false, Modifier.weight(1f))
+                CaptureExample(R.drawable.v3_example_far, stringResource(R.string.example_far), false, Modifier.weight(1f))
+                CaptureExample(R.drawable.v3_example_dark, stringResource(R.string.example_dark), false, Modifier.weight(1f))
             }
         }
-        LeafButton("Entendi", onDismiss)
+        LeafButton(stringResource(R.string.help_button), onDismiss)
     }
 }
+
 @Composable
 private fun CaptureExample(image: Int, label: String, correct: Boolean, modifier: Modifier) {
     val color = if (correct) LeafColors.Green else Color(0xFFD35B52)

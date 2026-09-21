@@ -1,0 +1,110 @@
+<resources>
+    <string name="app_name">LeafCare</string>
+
+    <!-- History Screen -->
+    <string name="history_title">LEAFCARE</string>
+    <string name="history_greeting">Olá, Produtor</string>
+    <string name="history_subtitle">Suas análises recentes</string>
+    <string name="search_hint">Pesquisar análise</string>
+    <string name="filter_button_desc">Filtrar análises</string>
+    <string name="filter_all">Todas</string>
+    <string name="filter_identified">Identificadas</string>
+    <string name="filter_inconclusive">Inconclusivas</string>
+    <string name="filter_prefix">Filtro: </string>
+    <string name="empty_history_title">Seu histórico começa aqui</string>
+    <string name="empty_history_subtitle">Fotografe uma folha ou escolha uma imagem da galeria.</string>
+    <string name="empty_search_title">Nenhuma análise encontrada</string>
+    <string name="empty_search_subtitle">Experimente outra pesquisa ou filtro.</string>
+    <string name="camera_button_desc">Abrir câmera</string>
+    <string name="gallery_button_desc">Abrir galeria</string>
+
+    <!-- Threshold (read-only display) -->
+    <string name="confidence_threshold_label">Confiança mínima: %1$s (definida pelo modelo)</string>
+
+    <!-- Model Error -->
+    <string name="model_error_title">Preparação do modelo pendente</string>
+
+    <!-- Result Screen -->
+    <string name="result_inconclusive_title">RESULTADO INCONCLUSIVO</string>
+    <string name="result_identified_title">POSSÍVEL IDENTIFICAÇÃO</string>
+    <string name="result_inconclusive_message">Não foi possível identificar com confiança suficiente.</string>
+    <string name="result_retake_message">Fotografe novamente</string>
+    <string name="confidence_label">de confiança</string>
+    <string name="disclaimer_title">Triagem visual</string>
+    <string name="disclaimer_message">Confirme a identificação com um profissional.</string>
+    <string name="top3_show">Ver as 3 possibilidades</string>
+    <string name="top3_hide">Ocultar possibilidades</string>
+    <string name="top3_disclaimer">Confiança do modelo não é probabilidade comprovada de doença.</string>
+    <string name="section_similar_images">Imagens semelhantes</string>
+    <string name="section_description">Descrição</string>
+    <string name="section_symptoms">Principais sintomas</string>
+    <string name="section_conditions">Condições favoráveis</string>
+    <string name="section_guidance">Orientação ao produtor</string>
+    <string name="guidance_inconclusive">Registre outras folhas afetadas e observe se há sintomas em outras plantas. Procure assistência técnica para confirmar a causa.</string>
+    <string name="symptom_appearance">APARÊNCIA</string>
+    <string name="symptom_region">REGIÃO AFETADA</string>
+    <string name="symptom_evolution">EVOLUÇÃO DOS SINTOMAS</string>
+    <string name="unreviewed_notice">Conteúdo informativo: revisão agronômica pendente.</string>
+    <string name="saved_at_format">Salva neste aparelho em %1$s</string>
+    <string name="inference_info_format">Inferência: %.1f ms • Limite: %1$s</string>
+    <string name="button_back">Voltar ao histórico</string>
+    <string name="button_retake">Fotografar novamente</string>
+    <string name="button_delete">Excluir análise</string>
+    <string name="button_close">Fechar</string>
+    <string name="delete_dialog_title">Excluir esta análise?</string>
+    <string name="delete_dialog_message">O registro e sua foto serão removidos deste aparelho.</string>
+    <string name="button_confirm_delete">Excluir</string>
+    <string name="button_cancel">Cancelar</string>
+
+    <!-- Camera Screen -->
+    <string name="camera_title">Fotografar folha</string>
+    <string name="camera_back_desc">Voltar</string>
+    <string name="camera_help_desc">Como tirar a foto</string>
+    <string name="camera_guide_title">Coloque a folha em foco</string>
+    <string name="camera_guide_subtitle">Mantenha a região afetada dentro da moldura</string>
+    <string name="flash_on_desc">Desligar flash</string>
+    <string name="flash_off_desc">Ligar flash</string>
+    <string name="switch_camera_desc">Alternar câmera</string>
+    <string name="gallery_button_desc_camera">Abrir galeria</string>
+    <string name="capture_button_desc">Fotografar</string>
+    <string name="camera_tip">Use boa iluminação e evite sombras</string>
+    <string name="camera_error_open">Não foi possível abrir a câmera. Você pode escolher uma foto da galeria.</string>
+    <string name="permission_denied_title">Autorize a câmera para fotografar.</string>
+    <string name="permission_allow_button">Permitir câmera</string>
+    <string name="permission_settings_button">Abrir permissões</string>
+
+    <!-- Help Sheet -->
+    <string name="help_title">Como tirar a foto</string>
+    <string name="help_subtitle">Uma boa imagem ajuda o LeafCare a comparar os sintomas.</string>
+    <string name="help_tip_1">Fotografe uma folha por vez.</string>
+    <string name="help_tip_2">Use boa iluminação.</string>
+    <string name="help_tip_3">Deixe a mancha visível e em foco.</string>
+    <string name="help_tip_4">Evite sombras e fundos confusos.</string>
+    <string name="help_examples_title">Exemplos</string>
+    <string name="example_correct">Correta</string>
+    <string name="example_blur">Desfocada</string>
+    <string name="example_far">Distante</string>
+    <string name="example_dark">Pouca luz</string>
+    <string name="help_button">Entendi</string>
+
+    <!-- Error Dialog -->
+    <string name="error_dialog_title">Não foi possível concluir</string>
+    <string name="error_button">Entendi</string>
+
+    <!-- Loading -->
+    <string name="loading_analysis">Carregando análise. Se ela foi excluída, retorne ao histórico.</string>
+
+    <!-- Analysis Dialog -->
+    <string name="analyzing_title">Analisando no celular</string>
+    <string name="analyzing_message">Aguarde. A foto permanece neste aparelho.</string>
+
+    <!-- Result Screen - Symptom fallbacks -->
+    <string name="symptom_region_fallback">Observe as áreas alteradas da folha e compare com outras plantas.</string>
+    <string name="symptom_evolution_fallback">Registre novas fotos para acompanhar as alterações ao longo do tempo.</string>
+
+    <!-- Content Descriptions -->
+    <string name="cd_photo_analyzed">Foto analisada</string>
+    <string name="cd_photo_history">Foto da folha analisada</string>
+    <string name="cd_reference_image">Referência de %1$s</string>
+    <string name="cd_enlarged_reference">Imagem de referência ampliada</string>
+</resources>

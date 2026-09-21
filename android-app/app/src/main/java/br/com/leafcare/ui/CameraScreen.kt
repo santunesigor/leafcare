@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.sp
 import br.com.leafcare.R
@@ -89,7 +90,7 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                         canSwitch = available.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) && available.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
                         if (!hasFlash) flash = false
                         ready = true
-                    } catch (error: Exception) { vm.error("Não foi possível abrir a câmera. Você pode escolher uma foto da galeria. ${error.message.orEmpty()}") }
+                    } catch (error: Exception) { vm.error(stringResource(R.string.camera_error_open) + " ${error.message.orEmpty()}") }
                 }
             }, executor)
         }
@@ -117,9 +118,9 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
         }) {
         if (permitted) AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
         else Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Autorize a câmera para fotografar.", color = Color.White)
-            Button(onClick = { permission.launch(Manifest.permission.CAMERA) }) { Text("Permitir câmera") }
-            TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) }) { Text("Abrir permissões", color = Color.White) }
+            Text(stringResource(R.string.permission_denied_title), color = Color.White)
+            Button(onClick = { permission.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.permission_allow_button)) }
+            TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) }) { Text(stringResource(R.string.permission_settings_button), color = Color.White) }
         }
     }
     if (help) HelpSheet(onDismiss = { help = false })
@@ -135,9 +136,9 @@ fun CameraContent(onBack: () -> Unit, onHelp: () -> Unit, onGallery: () -> Unit,
         Column(Modifier.fillMaxSize().then(if (compact) Modifier.verticalScroll(rememberScrollState()) else Modifier)) {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 11.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                RoundIconButton(R.drawable.v3_back, "Voltar", onBack)
-                Text("Fotografar folha", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-                RoundIconButton(R.drawable.v3_help, "Como tirar a foto", onHelp)
+                RoundIconButton(R.drawable.v3_back, stringResource(R.string.camera_back_desc), onBack)
+                Text(stringResource(R.string.camera_title), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                RoundIconButton(R.drawable.v3_help, stringResource(R.string.camera_help_desc), onHelp)
             }
             Box(Modifier.padding(horizontal = 20.dp).fillMaxWidth().then(if (compact) Modifier.height(320.dp) else Modifier.weight(1f))
                 .clip(RoundedCornerShape(24.dp)).background(Color(0xFF1D2B1E))) {
@@ -157,26 +158,26 @@ fun CameraContent(onBack: () -> Unit, onHelp: () -> Unit, onGallery: () -> Unit,
                         drawPath(path, Color.White, style = Stroke(5.dp.toPx()))
                     }
                     Column(Modifier.align(Alignment.Center).padding(horizontal = 35.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Coloque a folha em foco", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                        Text("Mantenha a região afetada dentro da moldura", color = Color.White, fontSize = 13.sp, lineHeight = 18.sp, textAlign = TextAlign.Center)
+                        Text(stringResource(R.string.camera_guide_title), color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        Text(stringResource(R.string.camera_guide_subtitle), color = Color.White, fontSize = 13.sp, lineHeight = 18.sp, textAlign = TextAlign.Center)
                     }
                     Column(Modifier.align(Alignment.TopEnd).padding(10.dp)) {
-                        RoundIconButton(R.drawable.v3_flash, if (flashOn) "Desligar flash" else "Ligar flash", onFlash, flashAvailable, true)
-                        RoundIconButton(R.drawable.v3_switch_camera, "Alternar câmera", onSwitch, switchAvailable, true)
+                        RoundIconButton(R.drawable.v3_flash, if (flashOn) stringResource(R.string.flash_on_desc) else stringResource(R.string.flash_off_desc), onFlash, flashAvailable, true)
+                        RoundIconButton(R.drawable.v3_switch_camera, stringResource(R.string.switch_camera_desc), onSwitch, switchAvailable, true)
                     }
                 }
             }
             Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
                 Surface(onClick = onGallery, enabled = galleryEnabled, modifier = Modifier.align(Alignment.CenterStart).padding(start = 59.dp).size(48.dp),
                     shape = RoundedCornerShape(14.dp), color = LeafColors.Pale, border = BorderStroke(1.dp, LeafColors.Border)) {
-                    Box(contentAlignment = Alignment.Center) { FigmaIcon(R.drawable.v3_gallery, "Abrir galeria", 26) }
+                    Box(contentAlignment = Alignment.Center) { FigmaIcon(R.drawable.v3_gallery, stringResource(R.string.gallery_button_desc_camera), 26) }
                 }
-                Surface(onClick = onCapture, enabled = enabled, modifier = Modifier.size(74.dp).semantics { contentDescription = "Fotografar" },
+                Surface(onClick = onCapture, enabled = enabled, modifier = Modifier.size(74.dp).semantics { contentDescription = stringResource(R.string.capture_button_desc) },
                     shape = CircleShape, color = Color.White, border = BorderStroke(3.dp, LeafColors.Green)) {
                     Box(contentAlignment = Alignment.Center) { Box(Modifier.size(57.dp).background(if (enabled) LeafColors.Green else LeafColors.Green.copy(alpha = .4f), CircleShape)) }
                 }
             }
-            Text("Use boa iluminação e evite sombras", Modifier.fillMaxWidth().padding(bottom = 20.dp), textAlign = TextAlign.Center, fontSize = 13.sp, color = LeafColors.Muted)
+            Text(stringResource(R.string.camera_tip), Modifier.fillMaxWidth().padding(bottom = 20.dp), textAlign = TextAlign.Center, fontSize = 13.sp, color = LeafColors.Muted)
         }
     }
 }
