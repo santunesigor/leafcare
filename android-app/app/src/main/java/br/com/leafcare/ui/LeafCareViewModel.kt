@@ -27,7 +27,6 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
     val results = navigation.receiveAsFlow()
     val threshold = MutableStateFlow(repository.threshold())
 
-    fun setThreshold(value: Float) { repository.setThreshold(value); threshold.value = value }
     fun error(message: String) { _ui.update { it.copy(error = message) } }
     fun clearError() { _ui.update { it.copy(error = null) } }
 

@@ -36,16 +36,15 @@ fun HistoryScreen(vm: LeafCareViewModel, onCamera: () -> Unit, onResult: (String
     val rows by vm.analyses.collectAsStateWithLifecycle()
     val threshold by vm.threshold.collectAsStateWithLifecycle()
     val modelError = vm.getModelError()
-    HistoryContent(rows, threshold, onCamera, onResult, { vm.getPhoto(it) }, modelError, vm::setThreshold)
+    HistoryContent(rows, threshold, onCamera, onResult, { vm.getPhoto(it) }, modelError)
 }
 
 @Composable
 fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: Float, onCamera: () -> Unit, onResult: (String) -> Unit,
-    photo: (String) -> Any, modelError: String?, onThreshold: (Float) -> Unit) {
+    photo: (String) -> Any, modelError: String?) {
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("Todas") }
     var showFilter by remember { mutableStateOf(false) }
-    var showThreshold by remember { mutableStateOf(false) }
     val filtered = rows.filter { row ->
         val title = if (row.inconclusive) "Resultado inconclusivo" else row.displayName
         (title.contains(query, true) || row.classId.contains(query, true) || row.scientificName.contains(query, true)) &&
@@ -88,7 +87,7 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                     Box {
                         IconButton(onClick = { showFilter = true }, modifier = Modifier.size(46.dp).border(1.dp, LeafColors.Border, RoundedCornerShape(14.dp))) { FigmaIcon(R.drawable.v3_filter, "Filtrar análises", 20) }
                         DropdownMenu(expanded = showFilter, onDismissRequest = { showFilter = false }) {
-                            DropdownMenuItem(text = { Text("Confiança mínima: ${percent(threshold)}") }, onClick = { showFilter = false; showThreshold = true })
+                            DropdownMenuItem(text = { Text("Confiança mínima: ${percent(threshold)} (definida pelo modelo)") }, onClick = { })
                             listOf("Todas", "Identificadas", "Inconclusivas").forEach { option ->
                                 DropdownMenuItem(text = { Text(option) }, onClick = { filter = option; showFilter = false })
                             }
@@ -135,17 +134,5 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                 }
             }
         }
-    }
-    if (showThreshold) {
-        var value by remember { mutableFloatStateOf(threshold) }
-        AlertDialog(onDismissRequest = { showThreshold = false }, title = { Text("Confiança mínima") }, text = {
-            Column {
-                Text("Abaixo deste valor, as próximas análises serão inconclusivas. Este limite ainda precisa ser validado em campo.")
-                Text(percent(value), style = MaterialTheme.typography.headlineSmall)
-                Slider(value = value, onValueChange = { value = it }, valueRange = 0.5f..0.95f, steps = 8)
-                Text("As análises anteriores mantêm o limite usado na captura.", style = MaterialTheme.typography.bodySmall)
-            }
-        }, confirmButton = { TextButton(onClick = { onThreshold(value); showThreshold = false }) { Text("Salvar") } },
-            dismissButton = { TextButton(onClick = { showThreshold = false }) { Text("Cancelar") } })
     }
 }
