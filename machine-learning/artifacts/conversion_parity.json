@@ -1,0 +1,128 @@
+{
+  "split": "validation",
+  "n_images": 20,
+  "images": [
+    {
+      "path": "anthracnose/IMG_1658.JPG",
+      "max_abs_error": 2.849847078323364e-07,
+      "top1_agrees": true,
+      "inference_ms": 1.901458000020284
+    },
+    {
+      "path": "healthy/IMG_1567.JPG",
+      "max_abs_error": 2.384185791015625e-07,
+      "top1_agrees": true,
+      "inference_ms": 1.1273850000179664
+    },
+    {
+      "path": "potato_tuber_moth/IMG_0530.JPG",
+      "max_abs_error": 1.1920928955078125e-07,
+      "top1_agrees": true,
+      "inference_ms": 1.1725420000630038
+    },
+    {
+      "path": "sunscald/IMG_5011.JPG",
+      "max_abs_error": 6.798654794692993e-08,
+      "top1_agrees": true,
+      "inference_ms": 1.5924840000707263
+    },
+    {
+      "path": "weather_fleck/IMG_0008.JPG",
+      "max_abs_error": 8.940696716308594e-07,
+      "top1_agrees": true,
+      "inference_ms": 1.3802250000480853
+    },
+    {
+      "path": "cmv/IMG_9716.JPG",
+      "max_abs_error": 1.5497207641601562e-06,
+      "top1_agrees": true,
+      "inference_ms": 2.100767999991149
+    },
+    {
+      "path": "wildfire/IMG_8410.JPG",
+      "max_abs_error": 3.7550926208496094e-06,
+      "top1_agrees": true,
+      "inference_ms": 1.3506709999546729
+    },
+    {
+      "path": "healthy/IMG_0357.JPG",
+      "max_abs_error": 1.1324882507324219e-06,
+      "top1_agrees": true,
+      "inference_ms": 1.2390930000947264
+    },
+    {
+      "path": "sunscald/IMG_1274.JPG",
+      "max_abs_error": 7.718801498413086e-06,
+      "top1_agrees": true,
+      "inference_ms": 1.8564410000863063
+    },
+    {
+      "path": "healthy/IMG_0360.JPG",
+      "max_abs_error": 1.0579824447631836e-06,
+      "top1_agrees": true,
+      "inference_ms": 1.438673000052404
+    },
+    {
+      "path": "black_shank/IMG_8407.JPG",
+      "max_abs_error": 1.424923539161682e-07,
+      "top1_agrees": true,
+      "inference_ms": 1.1206550000224524
+    },
+    {
+      "path": "frog_eye/IMG_8296.JPG",
+      "max_abs_error": 3.3974647521972656e-06,
+      "top1_agrees": true,
+      "inference_ms": 1.1421369999879971
+    },
+    {
+      "path": "tmv/IMG_6031.JPG",
+      "max_abs_error": 1.7285346984863281e-06,
+      "top1_agrees": true,
+      "inference_ms": 1.1184109999931025
+    },
+    {
+      "path": "frog_eye/IMG_9071.JPG",
+      "max_abs_error": 3.3974647521972656e-06,
+      "top1_agrees": true,
+      "inference_ms": 1.640616000031514
+    },
+    {
+      "path": "frog_eye/IMG_0621.JPG",
+      "max_abs_error": 1.996755599975586e-06,
+      "top1_agrees": true,
+      "inference_ms": 1.254086000017196
+    },
+    {
+      "path": "weather_fleck/IMG_0059.JPG",
+      "max_abs_error": 5.471520125865936e-09,
+      "top1_agrees": true,
+      "inference_ms": 1.1458929999434986
+    },
+    {
+      "path": "wildfire/IMG_9493.JPG",
+      "max_abs_error": 1.1771917343139648e-06,
+      "top1_agrees": true,
+      "inference_ms": 1.1956879999388548
+    },
+    {
+      "path": "weather_fleck/IMG_0006.JPG",
+      "max_abs_error": 2.980232238769531e-07,
+      "top1_agrees": true,
+      "inference_ms": 1.1091179999311862
+    },
+    {
+      "path": "wildfire/IMG_9460.JPG",
+      "max_abs_error": 7.748603820800781e-07,
+      "top1_agrees": true,
+      "inference_ms": 1.136759000019083
+    },
+    {
+      "path": "brown_spot/IMG_0879.JPG",
+      "max_abs_error": 4.172325134277344e-07,
+      "top1_agrees": true,
+      "inference_ms": 1.3136050000639443
+    }
+  ],
+  "max_abs_error": 7.718801498413086e-06,
+  "top1_agreement": 1.0
+}

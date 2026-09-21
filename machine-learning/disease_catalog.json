@@ -1,0 +1,199 @@
+{
+  "classes": {
+    "wildfire": {
+      "name": "Mancha bacteriana (wildfire)",
+      "scientific_name": "Pseudomonas syringae pv. tabaci",
+      "description": "Categoria de alteração bacteriana do conjunto de referência. A fotografia isolada não confirma a causa.",
+      "symptoms": [
+        "Manchas necróticas que podem apresentar halo amarelado."
+      ],
+      "favorable_conditions": "Ambiente úmido pode favorecer alterações bacterianas; as condições devem ser verificadas no campo.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "brown_spot": {
+      "name": "Mancha-marrom",
+      "scientific_name": "Alternaria spp.",
+      "description": "Manchas foliares associadas à categoria brown spot no conjunto de referência.",
+      "symptoms": [
+        "Áreas castanhas ou secas na folha.",
+        "Os sintomas podem se parecer com outras manchas foliares."
+      ],
+      "favorable_conditions": "Umidade e estado da folha podem influenciar os sintomas; confirme o contexto com um técnico.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "frog_eye": {
+      "name": "Olho-de-rã",
+      "scientific_name": "Cercospora nicotianae",
+      "description": "Doença fúngica que provoca pequenas manchas circulares nas folhas do fumo. As lesões costumam ter o centro claro e as bordas mais escuras.",
+      "symptoms": [
+        "Pequenas lesões com centro mais claro e borda escura.",
+        "Manchas podem crescer e se unir."
+      ],
+      "favorable_conditions": "Condições úmidas favorecem várias manchas foliares. A avaliação local é necessária.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false,
+      "appearance": "Manchas pequenas e circulares, com centro claro e bordas escuras.",
+      "affected_region": "Pode aparecer em diferentes áreas das folhas mais desenvolvidas.",
+      "symptom_evolution": "As manchas podem aumentar, unir-se e formar áreas secas."
+    },
+    "anthracnose": {
+      "name": "Antracnose do tabaco",
+      "scientific_name": "Colletotrichum spp.",
+      "description": "Categoria de antracnose presente no conjunto de referência. A espécie não pode ser estabelecida pela foto.",
+      "symptoms": [
+        "Manchas ou áreas necrosadas.",
+        "É necessário examinar outras partes da planta para diferenciar causas."
+      ],
+      "favorable_conditions": "Condições favoráveis específicas dependem do agente e devem ser verificadas por um profissional.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "target_spot": {
+      "name": "Mancha-alvo",
+      "scientific_name": "Rhizoctonia solani",
+      "description": "Categoria target spot do conjunto de referência.",
+      "symptoms": [
+        "Manchas que podem apresentar anéis ou aspecto de alvo."
+      ],
+      "favorable_conditions": "Umidade e condições do dossel devem ser consideradas na avaliação técnica.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "black_shank": {
+      "name": "Podridão-negra-do-pé",
+      "scientific_name": "Phytophthora nicotianae",
+      "description": "Problema que envolve também colo e raízes. Sinais nas folhas isoladas são inespecíficos.",
+      "symptoms": [
+        "Amarelecimento e murcha podem ocorrer.",
+        "A avaliação requer observar a base da planta e as raízes."
+      ],
+      "favorable_conditions": "Condições do solo e presença de água são relevantes; uma imagem foliar não confirma o problema.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "tmv": {
+      "name": "Mosaico do tabaco",
+      "scientific_name": "Tobacco mosaic virus (TMV)",
+      "description": "Categoria de virose do conjunto. A imagem não confirma qual vírus está presente.",
+      "symptoms": [
+        "Mosaico com áreas verdes de tonalidades distintas.",
+        "Podem ocorrer deformações."
+      ],
+      "favorable_conditions": "A disseminação depende do agente e do manejo; não pode ser inferida somente pela foto.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "cmv": {
+      "name": "Mosaico do pepino em tabaco",
+      "scientific_name": "Cucumber mosaic virus (CMV)",
+      "description": "Categoria de sintomas associados a CMV, com semelhança visual com outras viroses.",
+      "symptoms": [
+        "Mosaico e possíveis deformações foliares."
+      ],
+      "favorable_conditions": "Depende da presença do agente, hospedeiros e vetores; necessita de avaliação em campo.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "pvy": {
+      "name": "Sintomas associados a PVY",
+      "scientific_name": "Potato virus Y (PVY)",
+      "description": "Categoria de virose presente no conjunto de referência.",
+      "symptoms": [
+        "Alterações de cor e possíveis áreas necróticas."
+      ],
+      "favorable_conditions": "Condições epidemiológicas devem ser avaliadas por assistência técnica.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "tswv": {
+      "name": "Vira-cabeça (TSWV)",
+      "scientific_name": "Tomato spotted wilt virus (TSWV)",
+      "description": "Categoria de virose; o aspecto visual pode ser confundido com outros problemas.",
+      "symptoms": [
+        "Manchas, anéis ou áreas necróticas podem ocorrer."
+      ],
+      "favorable_conditions": "A presença de vetores e plantas hospedeiras é relevante; não é comprovada pela fotografia.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "weather_fleck": {
+      "name": "Pontuações ambientais",
+      "scientific_name": "Não se aplica — alteração não infecciosa",
+      "description": "Categoria weather fleck do conjunto, associada a alterações ambientais.",
+      "symptoms": [
+        "Pequenas pontuações ou áreas de tecido danificado."
+      ],
+      "favorable_conditions": "Histórico ambiental e exposição precisam ser investigados; não é possível atribuir a causa só pela foto.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "sunscald": {
+      "name": "Queimadura solar",
+      "scientific_name": "Não se aplica — alteração não infecciosa",
+      "description": "Categoria sunscald, compatível com danos associados à exposição solar.",
+      "symptoms": [
+        "Regiões descoloridas ou secas na superfície exposta."
+      ],
+      "favorable_conditions": "Exposição intensa ao sol é um fator a investigar, juntamente com outras possíveis causas.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "genetic_abnormality": {
+      "name": "Anormalidade genética",
+      "scientific_name": "Não se aplica — categoria do dataset",
+      "description": "Categoria de alteração genética no conjunto de referência; imagem isolada não comprova origem genética.",
+      "symptoms": [
+        "Diferenças de formato ou coloração em relação às demais folhas."
+      ],
+      "favorable_conditions": "Não é possível estabelecer condições favoráveis por uma fotografia.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "potato_tuber_moth": {
+      "name": "Dano atribuído à traça",
+      "scientific_name": "Phthorimaea operculella",
+      "description": "Categoria de dano por inseto do conjunto de referência. A classificação não confirma a presença atual da praga.",
+      "symptoms": [
+        "Áreas de tecido danificado, galerias ou perfurações."
+      ],
+      "favorable_conditions": "É necessário procurar sinais e agentes na planta e considerar o histórico da área.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "nematodes": {
+      "name": "Sintomas associados a nematoides",
+      "scientific_name": "Nematoides — espécie não definida",
+      "description": "Danos nas raízes podem produzir sintomas inespecíficos nas folhas. A foto foliar tem forte limitação para esta categoria.",
+      "symptoms": [
+        "Amarelecimento e desenvolvimento irregular podem ocorrer."
+      ],
+      "favorable_conditions": "Exige avaliação do solo, das raízes e das condições da lavoura.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    },
+    "healthy": {
+      "name": "Folha sem alteração aparente",
+      "scientific_name": "Nicotiana tabacum",
+      "description": "Categoria healthy do conjunto. Não observar sintomas na imagem não garante que a planta esteja livre de problemas.",
+      "symptoms": [
+        "Ausência de alteração evidente no campo fotografado."
+      ],
+      "favorable_conditions": "Não se aplica. Continue observando a planta e o talhão.",
+      "guidance": "Fotografe outras folhas, observe se há sinais em outras plantas e registre a ocorrência. Procure um técnico agrícola ou agrônomo para confirmar a causa. Não escolha produtos ou tratamentos com base somente neste resultado.",
+      "reviewed": false
+    }
+  },
+  "sources": [
+    {
+      "title": "Lin et al. (2024) — categorias do TLA",
+      "url": "https://doi.org/10.3389/fpls.2024.1333236"
+    },
+    {
+      "title": "Zou et al. (2025) — imagens de referência",
+      "url": "https://doi.org/10.3390/agronomy15081825"
+    }
+  ],
+  "review_status": "Texto preliminar: revisão agronômica necessária; nomes de referência, sem confirmação por imagem."
+}

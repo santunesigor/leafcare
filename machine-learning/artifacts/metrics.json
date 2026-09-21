@@ -1,0 +1,143 @@
+{
+  "status": "evaluated",
+  "split": "test",
+  "n_images": 103,
+  "classes": [
+    "anthracnose",
+    "black_shank",
+    "brown_spot",
+    "cmv",
+    "frog_eye",
+    "genetic_abnormality",
+    "healthy",
+    "nematodes",
+    "potato_tuber_moth",
+    "pvy",
+    "sunscald",
+    "target_spot",
+    "tmv",
+    "tswv",
+    "weather_fleck",
+    "wildfire"
+  ],
+  "accuracy": 0.7766990291262136,
+  "macro_f1": 0.7157422438672438,
+  "top3_accuracy": 0.970873786407767,
+  "threshold": 0.7,
+  "threshold_calibrated": false,
+  "coverage": 0.7669902912621359,
+  "accepted_accuracy": 0.8987341772151899,
+  "classification_report": {
+    "anthracnose": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1-score": 0.0,
+      "support": 1.0
+    },
+    "black_shank": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 2.0
+    },
+    "brown_spot": {
+      "precision": 0.75,
+      "recall": 0.8571428571428571,
+      "f1-score": 0.8,
+      "support": 7.0
+    },
+    "cmv": {
+      "precision": 0.75,
+      "recall": 0.75,
+      "f1-score": 0.75,
+      "support": 8.0
+    },
+    "frog_eye": {
+      "precision": 0.5,
+      "recall": 0.625,
+      "f1-score": 0.5555555555555556,
+      "support": 8.0
+    },
+    "genetic_abnormality": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 1.0
+    },
+    "healthy": {
+      "precision": 0.75,
+      "recall": 0.8571428571428571,
+      "f1-score": 0.8,
+      "support": 7.0
+    },
+    "nematodes": {
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.8,
+      "support": 6.0
+    },
+    "potato_tuber_moth": {
+      "precision": 0.875,
+      "recall": 1.0,
+      "f1-score": 0.9333333333333333,
+      "support": 7.0
+    },
+    "pvy": {
+      "precision": 0.6666666666666666,
+      "recall": 0.8,
+      "f1-score": 0.7272727272727273,
+      "support": 5.0
+    },
+    "sunscald": {
+      "precision": 0.9090909090909091,
+      "recall": 1.0,
+      "f1-score": 0.9523809523809523,
+      "support": 10.0
+    },
+    "target_spot": {
+      "precision": 0.7,
+      "recall": 0.875,
+      "f1-score": 0.7777777777777778,
+      "support": 8.0
+    },
+    "tmv": {
+      "precision": 1.0,
+      "recall": 0.8,
+      "f1-score": 0.8888888888888888,
+      "support": 10.0
+    },
+    "tswv": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1-score": 0.0,
+      "support": 1.0
+    },
+    "weather_fleck": {
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.8,
+      "support": 9.0
+    },
+    "wildfire": {
+      "precision": 0.7272727272727273,
+      "recall": 0.6153846153846154,
+      "f1-score": 0.6666666666666666,
+      "support": 13.0
+    },
+    "accuracy": 0.7766990291262136,
+    "macro avg": {
+      "precision": 0.726751893939394,
+      "recall": 0.7195627289377289,
+      "f1-score": 0.7157422438672438,
+      "support": 103.0
+    },
+    "weighted avg": {
+      "precision": 0.797124154162989,
+      "recall": 0.7766990291262136,
+      "f1-score": 0.7778226088905701,
+      "support": 103.0
+    }
+  },
+  "model_sha256": "1534a86d8b5448d0d068b7a426584bbd8b82d6cc9d0cb16c735d4b176812e333",
+  "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e"
+}

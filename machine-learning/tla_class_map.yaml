@@ -1,0 +1,39 @@
+# =============================================================================
+# class_map.yaml  —  SOURCE OF TRUTH for the TLA tobacco-leaf-disease taxonomy
+# =============================================================================
+# Dataset : TLA (Tobacco Leaf Abnormality) — the 16-class refinement of TPDD.
+# Authors : Hong Lin, Rita Tse, Su-Kit Tang et al., Macao Polytechnic University.
+# Refs    : TPDD  — SPIE ICDIP 2022, DOI 10.1117/12.2644288
+#           FREN  — Frontiers in Plant Science 2024, 10.3389/fpls.2024.1333236
+#
+# Raw layout:
+#   TV3 = "Whole Leaf Section"      folders 1..16  -> map 1:1 to class id
+#   TV6 = "Disease Fragment Section" folders 1..20 -> 1..5 collapse to wildfire,
+#                                                     folder f -> class (f-4) for 6..20
+#
+# tv6_renumbered: folders 8 (anthracnose), 14 (tswv), 17 (genetic) were given
+# extra lesion crops with SEQUENTIAL renaming (12.jpg, 1.JPG ...), so the
+# source leaf is NOT recoverable from the filename -> those files are forced
+# train-only in the group-aware split.
+# =============================================================================
+
+dataset_name: TLA (Tobacco Leaf Abnormality)
+seed: 42
+
+classes:
+  - {id: 1,  slug: wildfire,             super_category: Bacteria,           tv3_folder: 1,  tv6_folders: [1, 2, 3, 4, 5], tv6_renumbered: false}
+  - {id: 2,  slug: brown_spot,           super_category: Airborne fungi,     tv3_folder: 2,  tv6_folders: [6],            tv6_renumbered: false}
+  - {id: 3,  slug: frog_eye,             super_category: Airborne fungi,     tv3_folder: 3,  tv6_folders: [7],            tv6_renumbered: false}
+  - {id: 4,  slug: anthracnose,          super_category: Airborne fungi,     tv3_folder: 4,  tv6_folders: [8],            tv6_renumbered: true}
+  - {id: 5,  slug: target_spot,          super_category: Soil-borne fungi,   tv3_folder: 5,  tv6_folders: [9],            tv6_renumbered: false}
+  - {id: 6,  slug: black_shank,          super_category: Soil-borne fungi,   tv3_folder: 6,  tv6_folders: [10],           tv6_renumbered: false}
+  - {id: 7,  slug: tmv,                  super_category: Virus,              tv3_folder: 7,  tv6_folders: [11],           tv6_renumbered: false}
+  - {id: 8,  slug: cmv,                  super_category: Virus,              tv3_folder: 8,  tv6_folders: [12],           tv6_renumbered: false}
+  - {id: 9,  slug: pvy,                  super_category: Virus,              tv3_folder: 9,  tv6_folders: [13],           tv6_renumbered: false}
+  - {id: 10, slug: tswv,                 super_category: Virus,              tv3_folder: 10, tv6_folders: [14],           tv6_renumbered: true}
+  - {id: 11, slug: weather_fleck,        super_category: Nonparasitic,       tv3_folder: 11, tv6_folders: [15],           tv6_renumbered: false}
+  - {id: 12, slug: sunscald,             super_category: Nonparasitic,       tv3_folder: 12, tv6_folders: [16],           tv6_renumbered: false}
+  - {id: 13, slug: genetic_abnormality,  super_category: Nonparasitic,       tv3_folder: 13, tv6_folders: [17],           tv6_renumbered: true}
+  - {id: 14, slug: potato_tuber_moth,    super_category: Pest-trace,         tv3_folder: 14, tv6_folders: [18],           tv6_renumbered: false}
+  - {id: 15, slug: nematodes,            super_category: Pest-trace,         tv3_folder: 15, tv6_folders: [19],           tv6_renumbered: false}
+  - {id: 16, slug: healthy,              super_category: Others,             tv3_folder: 16, tv6_folders: [20],           tv6_renumbered: false}
