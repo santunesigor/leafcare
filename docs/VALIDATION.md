@@ -28,13 +28,13 @@ As métricas completas e curvas estão em machine-learning/artifacts. Os resulta
 
 ## Android V3
 
-- Compilação Kotlin/Java/recursos e assembleDebug aprovados; APK V3 incluído em android-app/apk/LeafCare-V3-debug.apk.
+- Compilação Kotlin/Java/recursos e assembleDebug aprovados; APK gerado localmente.
 - verifyModelAssets aprovado. O modelo dentro do APK é idêntico ao artefato Python; as classes também estão incluídas.
 - Oito testes Android aprovados: quatro de política/pré-processamento e quatro de interface. Junto aos 26 Python, são **34 testes aprovados**.
 - Capturas das quatro telas renderizadas no Robolectric e inspecionadas visualmente: docs/screenshots. A ajuda contém exatamente as quatro fotos enviadas. Os registros e resultados nessas capturas são fixtures de teste, não métricas do modelo nem histórico inserido no app.
 - Pesquisa, navegação, captura/galeria/ajuda por callbacks, fechamento da ajuda e expansão das possibilidades foram exercitados nos testes de interface.
 - Manifesto mesclado sem permissão INTERNET.
-- APK SHA-256: 8797b6fd79d6eb2dbc053f79950390d92d5f01c4d602f34fe82e449f48b3d66d.
+- Binários de distribuição devem ser publicados em GitHub Releases, não versionados no Git.
 
 A captura inicial com PixelCopy expirou no ambiente sem janela gráfica física. O teste foi ajustado para desenhar a hierarquia real da Activity em Canvas e aguardar a carga da foto; os oito testes passaram após essa correção. Os XMLs finais estão em docs/android-tests.
 
