@@ -1,0 +1,20 @@
+{
+  "id": "effb0_base",
+  "arch": "EfficientNetB0",
+  "drop": 0.3,
+  "aug": "standard",
+  "ft": 40,
+  "lr": 0.0007,
+  "accuracy": 0.7980769230769231,
+  "macro_f1": 0.713001749282709,
+  "top3_accuracy": 0.9711538461538461,
+  "mean_confidence": 0.6778656840324402,
+  "selected_stage": "finetune",
+  "frozen_val_loss": 0.8496370315551758,
+  "finetune_val_loss": 0.6190532445907593,
+  "epochs_frozen": 12,
+  "epochs_finetune": 12,
+  "seconds": 384.83122849464417,
+  "parameters": 4070067,
+  "keras_bytes": 33541604
+}

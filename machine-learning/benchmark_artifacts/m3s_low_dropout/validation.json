@@ -1,0 +1,20 @@
+{
+  "id": "m3s_low_dropout",
+  "arch": "MobileNetV3Small",
+  "drop": 0.15,
+  "aug": "standard",
+  "ft": 45,
+  "lr": 0.0007,
+  "accuracy": 0.8269230769230769,
+  "macro_f1": 0.7784932306255835,
+  "top3_accuracy": 0.9903846153846154,
+  "mean_confidence": 0.7253940105438232,
+  "selected_stage": "finetune",
+  "frozen_val_loss": 0.8407555818557739,
+  "finetune_val_loss": 0.6311549544334412,
+  "epochs_frozen": 12,
+  "epochs_finetune": 12,
+  "seconds": 209.04647755622864,
+  "parameters": 948352,
+  "keras_bytes": 10132854
+}

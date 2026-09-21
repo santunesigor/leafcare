@@ -1,0 +1,20 @@
+{
+  "id": "nasnet_base",
+  "arch": "NASNetMobile",
+  "drop": 0.35,
+  "aug": "standard",
+  "ft": 50,
+  "lr": 0.0005,
+  "accuracy": 0.6826923076923077,
+  "macro_f1": 0.6514868097588686,
+  "top3_accuracy": 0.9230769230769231,
+  "mean_confidence": 0.5466989278793335,
+  "selected_stage": "finetune",
+  "frozen_val_loss": 1.2079497575759888,
+  "finetune_val_loss": 1.015465497970581,
+  "epochs_frozen": 12,
+  "epochs_finetune": 12,
+  "seconds": 365.2071373462677,
+  "parameters": 4286628,
+  "keras_bytes": 25511096
+}

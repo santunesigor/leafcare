@@ -1,0 +1,21 @@
+{
+  "id": "m3s_rmsprop",
+  "arch": "MobileNetV3Small",
+  "drop": 0.25,
+  "aug": "standard",
+  "ft": 30,
+  "lr": 0.0007,
+  "optimizer": "rmsprop",
+  "accuracy": 0.8269230769230769,
+  "macro_f1": 0.7676849906629318,
+  "top3_accuracy": 0.9903846153846154,
+  "mean_confidence": 0.8926548361778259,
+  "selected_stage": "finetune",
+  "frozen_val_loss": 0.5712404847145081,
+  "finetune_val_loss": 0.5512521266937256,
+  "epochs_frozen": 12,
+  "epochs_finetune": 6,
+  "seconds": 172.56317925453186,
+  "parameters": 948352,
+  "keras_bytes": 8955759
+}

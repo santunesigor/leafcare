@@ -1,0 +1,20 @@
+{
+  "id": "effv2b0_base",
+  "arch": "EfficientNetV2B0",
+  "drop": 0.3,
+  "aug": "standard",
+  "ft": 40,
+  "lr": 0.0007,
+  "accuracy": 0.7692307692307693,
+  "macro_f1": 0.6805666495900713,
+  "top3_accuracy": 0.9423076923076923,
+  "mean_confidence": 0.6683177947998047,
+  "selected_stage": "finetune",
+  "frozen_val_loss": 0.9403679966926575,
+  "finetune_val_loss": 0.7522926330566406,
+  "epochs_frozen": 12,
+  "epochs_finetune": 12,
+  "seconds": 328.53135204315186,
+  "parameters": 5939808,
+  "keras_bytes": 38044410
+}

@@ -1,0 +1,20 @@
+{
+  "id": "m3l_base",
+  "arch": "MobileNetV3Large",
+  "drop": 0.3,
+  "aug": "standard",
+  "ft": 40,
+  "lr": 0.0007,
+  "accuracy": 0.8557692307692307,
+  "macro_f1": 0.7592207611789654,
+  "top3_accuracy": 0.9903846153846154,
+  "mean_confidence": 0.796071469783783,
+  "selected_stage": "finetune",
+  "frozen_val_loss": 0.6629663109779358,
+  "finetune_val_loss": 0.4735572934150696,
+  "epochs_frozen": 12,
+  "epochs_finetune": 12,
+  "seconds": 239.66345071792603,
+  "parameters": 3011728,
+  "keras_bytes": 28508009
+}
