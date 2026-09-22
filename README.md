@@ -28,9 +28,9 @@ Doenças foliares no fumo causam perdas significativas. O diagnóstico precoce d
 
 Um aplicativo que o produtor leva no bolso:
 
-1. Abre o app (modo avião funciona)
+1. Abre o app (projetado para operar sem conectividade; validação manual em modo avião pendente)
 2. Fotografa a folha ou escolhe da galeria
-3. O modelo classifica **offline** em milissegundos
+3. O modelo executa a classificação **localmente/offline** no dispositivo
 4. Mostra as **3 classes mais prováveis** com confiança
 5. Se a confiança for baixa, devolve **inconclusivo** — não força diagnóstico
 6. Salva tudo no histórico local para consulta posterior
@@ -46,7 +46,7 @@ Um aplicativo que o produtor leva no bolso:
 | **Top-3 + threshold** | Mostra 3 hipóteses; abaixo do limiar → "Inconclusivo" |
 | **Orientação fotográfica** | Tela de ajuda com 4 exemplos (correta, desfocada, distante, pouca luz) |
 | **Histórico Room** | Busca, filtros (data, classe, inconclusivas), exclusão com confirmação |
-| **Persistência real** | Fotos e registros sobrevivem a reinício do app e do celular |
+| **Persistência** | Análises e fotos armazenadas localmente (Room + armazenamento privado); validação completa em dispositivo físico pendente |
 | **Privacidade** | Zero permissão `INTERNET`; backup automático desativado |
 
 ---
@@ -97,7 +97,7 @@ Compose UI → ViewModel → Repository → Room / arquivos privados
 | Camada | Tecnologia |
 |---|---|
 | **Android** | Kotlin, Jetpack Compose, CameraX, Navigation Compose, Material3 |
-| **Persistência** | Room / SQLite (Flow reativo, migrações explícitas) |
+| **Persistência** | Room / SQLite (Flow reativo, schema exportado/versionado) |
 | **Machine Learning (treino)** | Python 3.12, TensorFlow/Keras 3, MobileNetV3Small (ImageNet) |
 | **Inferência móvel** | TensorFlow Lite / LiteRT 1.4.0 (API Interpreter, float32) |
 | **Build** | Gradle 8.9, AGP 8.7.3, JDK 17, compile/target SDK 35 |
@@ -113,7 +113,7 @@ Compose UI → ViewModel → Repository → Room / arquivos privados
 - **Transfer learning** em duas etapas:
   1. Backbone congelado — só cabeça nova (GlobalPooling + Dropout 0,25 + Dense 16 softmax)
   2. Fine-tuning últimas 30 camadas, LR 1e-5, BatchNorm em `training=False`
-- **Otimizador:** AdamW com pesos de classe inversamente proporcionais à frequência de treino (razão ≥ 1,5)
+- **Otimizador:** Adam com pesos de classe inversamente proporcionais à frequência de treino (razão ≥ 1,5)
 - **Early stopping** + `ReduceLROnPlateau` por fase; melhor fase escolhida por validação
 
 ### Ensemble experimental (ainda NÃO integrado no Android)
@@ -151,7 +151,7 @@ Compose UI → ViewModel → Repository → Room / arquivos privados
 | **Acurácia entre aceitos** | 89,87% | 92,31% (72/78) |
 | **Tamanho do modelo** | ~3,8 MB | ~19,5 MB (3 modelos) |
 | **Inferências por imagem** | 1 | 3 |
-| **Status no Android** | ✅ Integrado e validado no fluxo completo | ❌ Não integrado — pendente validação móvel |
+| **Status no Android** | ✅ Integrado; unit tests, assets e build aprovados; validação física pendente | ❌ Não integrado — pendente validação móvel |
 
 > **Nunca diga que o Android atual possui 80,58%.** O app roda o baseline (77,67%). O ensemble é recomendação para próxima versão **após** validação em device real.
 
