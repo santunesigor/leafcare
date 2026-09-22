@@ -46,7 +46,7 @@
     <string name="symptom_evolution">EVOLUÇÃO DOS SINTOMAS</string>
     <string name="unreviewed_notice">Conteúdo informativo: revisão agronômica pendente.</string>
     <string name="saved_at_format">Salva neste aparelho em %1$s</string>
-    <string name="inference_info_format">Inferência: %.1f ms • Limite: %1$s</string>
+    <string name="inference_info_format">Inferência: %1$.1f ms • Limite: %2$s</string>
     <string name="button_back">Voltar ao histórico</string>
     <string name="button_retake">Fotografar novamente</string>
     <string name="button_delete">Excluir análise</string>

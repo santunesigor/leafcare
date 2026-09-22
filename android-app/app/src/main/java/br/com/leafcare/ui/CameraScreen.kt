@@ -51,6 +51,7 @@ import java.io.File
 fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
+    val cameraErrorOpen = stringResource(R.string.camera_error_open)
     var permitted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     var help by remember { mutableStateOf(false) }
     var flash by remember { mutableStateOf(false) }
@@ -90,7 +91,7 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                         canSwitch = available.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) && available.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
                         if (!hasFlash) flash = false
                         ready = true
-                    } catch (error: Exception) { vm.error(stringResource(R.string.camera_error_open) + " ${error.message.orEmpty()}") }
+                    } catch (error: Exception) { vm.error(cameraErrorOpen + " ${error.message.orEmpty()}") }
                 }
             }, executor)
         }
@@ -131,6 +132,7 @@ fun CameraContent(onBack: () -> Unit, onHelp: () -> Unit, onGallery: () -> Unit,
     onFlash: () -> Unit, onSwitch: () -> Unit, enabled: Boolean, galleryEnabled: Boolean,
     flashAvailable: Boolean, switchAvailable: Boolean, flashOn: Boolean, showGuide: Boolean,
     preview: @Composable BoxScope.() -> Unit) {
+    val captureButtonDesc = stringResource(R.string.capture_button_desc)
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.White)) {
         val compact = maxHeight < 520.dp
         Column(Modifier.fillMaxSize().then(if (compact) Modifier.verticalScroll(rememberScrollState()) else Modifier)) {
@@ -172,7 +174,7 @@ fun CameraContent(onBack: () -> Unit, onHelp: () -> Unit, onGallery: () -> Unit,
                     shape = RoundedCornerShape(14.dp), color = LeafColors.Pale, border = BorderStroke(1.dp, LeafColors.Border)) {
                     Box(contentAlignment = Alignment.Center) { FigmaIcon(R.drawable.v3_gallery, stringResource(R.string.gallery_button_desc_camera), 26) }
                 }
-                Surface(onClick = onCapture, enabled = enabled, modifier = Modifier.size(74.dp).semantics { contentDescription = stringResource(R.string.capture_button_desc) },
+                Surface(onClick = onCapture, enabled = enabled, modifier = Modifier.size(74.dp).semantics { contentDescription = captureButtonDesc },
                     shape = CircleShape, color = Color.White, border = BorderStroke(3.dp, LeafColors.Green)) {
                     Box(contentAlignment = Alignment.Center) { Box(Modifier.size(57.dp).background(if (enabled) LeafColors.Green else LeafColors.Green.copy(alpha = .4f), CircleShape)) }
                 }

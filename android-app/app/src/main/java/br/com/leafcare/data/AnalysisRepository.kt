@@ -26,7 +26,7 @@ class AnalysisRepository(
         require(File(name).name == name)
         return File(photos, name)
     }
-    fun modelError() = classifier.availabilityError()
+    fun modelError() = classifier.availabilityError
     fun threshold(): Float = preferences.getFloat("threshold", classifier.defaultThreshold).coerceIn(0f, 1f)
     fun setThreshold(value: Float) {
         require(value in 0.5f..0.95f)
@@ -35,7 +35,7 @@ class AnalysisRepository(
 
     suspend fun analyze(uri: Uri): String = mutex.withLock {
         withContext(Dispatchers.IO) {
-            modelError()?.let { error(it) }
+            classifier.availabilityError?.let { throw IllegalStateException(it) }
             val id = UUID.randomUUID().toString()
             val file = photo("$id.img")
             var committed = false

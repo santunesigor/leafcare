@@ -24,15 +24,15 @@ data class ClassifierResult(
  */
 class LeafClassifier(private val context: Context) {
 
-    private val metadata: JSONObject
-    private val classes: List<String>
-    private val modelHash: String
-    private val interpreter: Interpreter
-    private val inputBuffer: ByteBuffer
-    private val outputArray: Array<FloatArray>
+    private lateinit var metadata: JSONObject
+    private lateinit var classes: List<String>
+    private lateinit var modelHash: String
+    private lateinit var interpreter: Interpreter
+    private lateinit var inputBuffer: ByteBuffer
+    private lateinit var outputArray: Array<FloatArray>
 
-    val defaultThreshold: Float
-    val availabilityError: String?
+    var defaultThreshold: Float = 0.70f
+    var availabilityError: String? = null
 
     init {
         var meta: JSONObject? = null
