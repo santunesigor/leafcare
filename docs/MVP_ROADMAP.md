@@ -61,16 +61,16 @@ Objetivo: garantir que o aplicativo atual funciona corretamente antes de adicion
 
 Escopo:
 
-- [ ] revisar débitos técnicos que afetam o fluxo principal;
-- [ ] remover comportamento obsoleto de threshold, se confirmado;
-- [ ] confirmar classificação local;
-- [ ] confirmar histórico Room;
-- [ ] confirmar armazenamento/exclusão de fotos;
-- [ ] confirmar câmera;
-- [ ] confirmar galeria;
-- [ ] testar resultado inconclusivo;
-- [ ] executar testes Android;
-- [ ] executar testes ML;
+- [x] revisar débitos técnicos que afetam o fluxo principal;
+- [x] remover comportamento obsoleto de threshold, se confirmado;
+- [x] confirmar classificação local;
+- [x] confirmar histórico Room;
+- [x] confirmar armazenamento/exclusão de fotos;
+- [x] confirmar câmera;
+- [x] confirmar galeria;
+- [x] testar resultado inconclusivo;
+- [x] executar testes Android;
+- [!] executar testes ML (bloqueado: Python 3.14/TensorFlow);
 - [ ] testar em celular físico.
 
 Não fazer:
