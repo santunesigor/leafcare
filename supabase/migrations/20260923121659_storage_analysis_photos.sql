@@ -1,15 +1,15 @@
 -- LeafCare MVP - Private Storage for Analysis Photos
--- This migration documents the storage bucket and policies needed.
--- Note: Storage buckets are created via Supabase Dashboard or API, not standard SQL.
--- The following shows the equivalent configuration for documentation and reproducibility.
+-- This migration creates the storage bucket and policies for analysis photos.
+-- The bucket creation is idempotent to allow reproducible installations.
 
 -- ============================================
--- STORAGE BUCKET: analysis-photos
+-- STORAGE BUCKET: analysis-photos (PRIVATE)
 -- ============================================
--- Bucket must be created as PRIVATE via:
--- 1. Supabase Dashboard → Storage → Create bucket "analysis-photos" (Private)
--- 2. Or via Supabase CLI: supabase storage create analysis-photos --private
--- 3. Or via Management API
+-- Create bucket if not exists, ensure it remains private
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('analysis-photos', 'analysis-photos', false)
+ON CONFLICT (id)
+DO UPDATE SET public = false;
 
 -- ============================================
 -- STORAGE POLICIES
@@ -22,6 +22,7 @@
 CREATE POLICY "Users can upload own analysis photos"
     ON storage.objects
     FOR INSERT
+    TO authenticated
     WITH CHECK (
         bucket_id = 'analysis-photos'
         AND auth.uid()::text = (storage.foldername(name))[1]
@@ -31,6 +32,7 @@ CREATE POLICY "Users can upload own analysis photos"
 CREATE POLICY "Users can view own analysis photos"
     ON storage.objects
     FOR SELECT
+    TO authenticated
     USING (
         bucket_id = 'analysis-photos'
         AND auth.uid()::text = (storage.foldername(name))[1]
@@ -40,6 +42,7 @@ CREATE POLICY "Users can view own analysis photos"
 CREATE POLICY "Users can update own analysis photos"
     ON storage.objects
     FOR UPDATE
+    TO authenticated
     USING (
         bucket_id = 'analysis-photos'
         AND auth.uid()::text = (storage.foldername(name))[1]
@@ -53,6 +56,7 @@ CREATE POLICY "Users can update own analysis photos"
 CREATE POLICY "Users can delete own analysis photos"
     ON storage.objects
     FOR DELETE
+    TO authenticated
     USING (
         bucket_id = 'analysis-photos'
         AND auth.uid()::text = (storage.foldername(name))[1]

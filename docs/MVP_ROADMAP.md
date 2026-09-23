@@ -135,7 +135,7 @@ bucket privado
 migrations reproduzíveis
 ```
 
-**Status**: Concluído localmente. Migrations criadas em `supabase/migrations/`. Próximo passo: aplicar em projeto Supabase remoto quando credenciais estiverem disponíveis.
+**Status**: Concluído. Projeto remoto `leafcare` (ref: `nhkqfanjfcivcbndivav`, region: `sa-east-1`) criado e configurado. Schema aplicado, RLS ativa, bucket `analysis-photos` privado criado, Security Advisor sem alertas. Migrations locais alinhadas com timestamps do remoto. Configuração Android preparada via `local.properties` → `BuildConfig`.
 
 ---
 

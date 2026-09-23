@@ -4,22 +4,16 @@ This document describes how to create/connect the Supabase project and apply the
 
 ---
 
-## 1. Create / Connect Supabase Project
+## 1. Real Supabase Project (leafcare)
 
-### Option A: New Project (Recommended for MVP)
+**Project Name:** `leafcare`
+**Project Ref:** `nhkqfanjfcivcbndivav`
+**Region:** `sa-east-1`
+**URL:** `https://nhkqfanjfcivcbndivav.supabase.co`
 
-1. Go to https://supabase.com/dashboard
-2. Click **New Project**
-3. Choose organization
-4. Enter:
-   - **Name**: `leafcare-mvp` (or your preference)
-   - **Database Password**: Generate strong password, save securely
-   - **Region**: Choose closest to your users
-5. Wait for project to be ready (~2 minutes)
-
-### Option B: Existing Project
-
-If you already have a project, ensure it's on the `feature/mvp-cloud` branch equivalent.
+> ⚠️ **CRITICAL:** This is the **only** Supabase project for LeafCare.
+> The `nossoduo` project is **completely separate** and must **never** be connected to LeafCare.
+> Do not use credentials from `nossoduo` for LeafCare development.
 
 ---
 
@@ -29,7 +23,7 @@ The Android app will need these **public** values (safe to include in build conf
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `SUPABASE_URL` | Project REST API URL | `https://xxxxxxxx.supabase.co` |
+| `SUPABASE_URL` | Project REST API URL | `https://nhkqfanjfcivcbndivav.supabase.co` |
 | `SUPABASE_ANON_KEY` | Anonymous public key (JWT) | `eyJhbGciOiJIUzI1NiIs...` |
 
 **Where to find them:**
@@ -43,9 +37,20 @@ The Android app will need these **public** values (safe to include in build conf
 
 ---
 
-## 3. Apply Migrations
+## 3. Migrations (Aligned with Remote)
 
-### Using Supabase CLI (Recommended)
+The following migrations are already applied to the remote project and must match locally:
+
+| Migration File | Description |
+|----------------|-------------|
+| `20260923121620_initial_schema.sql` | Creates `profiles` and `analyses` tables with RLS |
+| `20260923121632_auto_profile_creation.sql` | Creates trigger for automatic profile on signup |
+| `20260923121659_storage_analysis_photos.sql` | Creates private `analysis-photos` bucket and storage policies |
+| `20260923121807_security_hardening.sql` | Revokes function execution from PUBLIC/anon/authenticated; recreates policies with `TO authenticated` and `(select auth.uid())` |
+
+### Applying Migrations (if setting up a new project)
+
+#### Using Supabase CLI (Recommended)
 
 ```bash
 # Install CLI if not present
@@ -55,49 +60,53 @@ The Android app will need these **public** values (safe to include in build conf
 supabase login
 
 # Link to your project (get Project Ref from Dashboard URL)
-supabase link --project-ref YOUR_PROJECT_REF
+supabase link --project-ref nhkqfanjfcivcbndivav
 
 # Push migrations
 supabase db push
 ```
 
-### Using Dashboard SQL Editor
+#### Using Dashboard SQL Editor
 
 If CLI is not available, apply migrations manually in order:
 
 1. Dashboard → SQL Editor → New Query
 2. Copy contents of each migration file in order:
-   - `20250923000001_initial_schema.sql`
-   - `20250923000002_auto_profile_creation.sql`
-   - `20250923000003_storage_analysis_photos.sql` (policies only)
+   - `20260923121620_initial_schema.sql`
+   - `20260923121632_auto_profile_creation.sql`
+   - `20260923121659_storage_analysis_photos.sql` (includes bucket creation + policies)
+   - `20260923121807_security_hardening.sql`
 3. Run each separately
 4. Verify no errors
 
 ---
 
-## 4. Create Storage Bucket
+## 4. Storage Bucket
 
-The `analysis-photos` bucket **cannot be created via SQL migration**. Create it via:
+The `analysis-photos` bucket **already exists** on the remote project as PRIVATE.
 
-### Dashboard
-1. Storage → Create bucket
-2. Name: `analysis-photos`
-3. **Private** bucket (not public)
-4. Save
+The migration `20260923121659_storage_analysis_photos.sql` includes idempotent bucket creation:
 
-### CLI
-```bash
-supabase storage create analysis-photos --private
+```sql
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('analysis-photos', 'analysis-photos', false)
+ON CONFLICT (id)
+DO UPDATE SET public = false;
 ```
 
-### Management API
-POST to `/storage/v1/bucket` with `{ "name": "analysis-photos", "public": false }`
+This ensures reproducible installations.
+
+**Policies** (in the same migration) enforce:
+- Path pattern: `analysis-photos/{user_id}/{analysis_id}.jpg`
+- Only authenticated users can INSERT/SELECT/UPDATE/DELETE in their own folder
+- All policies use `TO authenticated`
 
 ---
 
 ## 5. Verify RLS and Bucket
 
 ### Verify RLS is Enabled
+
 ```sql
 -- Run in SQL Editor
 SELECT schemaname, tablename, rowsecurity
@@ -108,14 +117,17 @@ AND tablename IN ('profiles', 'analyses');
 ```
 
 ### Verify Policies
+
 ```sql
 SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual
 FROM pg_policies
 WHERE schemaname = 'public'
 AND tablename IN ('profiles', 'analyses');
+-- Policies should show roles = {authenticated} and qual using (select auth.uid())
 ```
 
 ### Verify Storage Bucket
+
 ```sql
 SELECT id, name, public
 FROM storage.buckets
@@ -124,37 +136,56 @@ WHERE name = 'analysis-photos';
 ```
 
 ### Verify Storage Policies
+
 ```sql
 SELECT bucket_id, name, definition
 FROM storage.policies
 WHERE bucket_id = 'analysis-photos';
+-- Should show 4 policies for INSERT/SELECT/UPDATE/DELETE with TO authenticated
 ```
 
 ---
 
-## 6. Test User Isolation (Conceptual)
+## 6. Security Hardening (Already Applied)
 
-Create two test users (User A, User B) via Dashboard Auth or signup flow.
+The migration `20260923121807_security_hardening.sql` enforces:
 
-**As User A:**
-```sql
--- Should succeed
-INSERT INTO profiles (id, display_name) VALUES (auth.uid(), 'User A');
-INSERT INTO analyses (id, user_id, class_id, display_name, scientific_name, confidence, top3, inconclusive, threshold, inference_ms, model_sha256, app_version)
-VALUES (uuid_generate_v4(), auth.uid(), 'test', 'Test', 'Test', 0.9, '[]', false, 0.7, 100, 'sha256', '1.0');
+- `handle_new_user()` - REVOKED from PUBLIC, anon, authenticated; GRANTED to `supabase_auth_admin` only
+- `handle_updated_at()` - REVOKED from PUBLIC, anon, authenticated
+- All profiles/analyses policies use `TO authenticated` and `(select auth.uid())`
 
--- Should return User A's data only
-SELECT * FROM profiles;
-SELECT * FROM analyses;
-```
-
-**As User B:**
-- Same queries should return only User B's data (empty initially)
-- Attempting to INSERT with `user_id = User A's ID` should fail (policy violation)
+This prevents direct function execution by client roles while allowing triggers to work.
 
 ---
 
-## 7. Secrets That Never Enter the Android App
+## 7. Android Configuration
+
+### local.properties (not versioned)
+
+The Android app reads Supabase configuration from `local.properties` → `BuildConfig`:
+
+```properties
+# local.properties (create from local.properties.example)
+SUPABASE_ANON_KEY=your_actual_anon_key_here
+```
+
+`SUPABASE_URL` is hardcoded in BuildConfig as `https://nhkqfanjfcivcbndivav.supabase.co` since it's fixed for this project.
+
+### Accessing in Code
+
+```kotlin
+// In Kotlin code
+val url = BuildConfig.SUPABASE_URL
+val anonKey = BuildConfig.SUPABASE_ANON_KEY
+```
+
+### local.properties.example
+
+See `android-app/local.properties.example` for the template.
+
+---
+
+## 8. Secrets That Never Enter the Android App
 
 | Secret | Where Used | Never In App |
 |--------|------------|--------------|
@@ -163,11 +194,11 @@ SELECT * FROM analyses;
 | JWT secret | Supabase internal | ✅ |
 | Dashboard access tokens | Personal/CI only | ✅ |
 
-Only `SUPABASE_URL` and `SUPABASE_ANON_KEY` go into the Android app (via `local.properties` or BuildConfig, not hardcoded).
+Only `SUPABASE_URL` and `SUPABASE_ANON_KEY` go into the Android app (via `local.properties` → `BuildConfig`, not hardcoded).
 
 ---
 
-## 8. Next Steps After Setup
+## 9. Next Steps After Setup
 
 1. Verify all migrations applied successfully
 2. Verify RLS policies work with two test users

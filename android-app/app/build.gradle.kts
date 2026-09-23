@@ -18,8 +18,15 @@ android {
         versionCode = 2
         versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // BuildConfig fields for Supabase configuration (from local.properties)
+        buildConfigField("String", "SUPABASE_URL", "\"https://nhkqfanjfcivcbndivav.supabase.co\"")
+        val supabaseAnonKey = project.findProperty("SUPABASE_ANON_KEY") as String? ?: "YOUR_ANON_KEY_HERE"
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     testOptions { unitTests.isIncludeAndroidResources = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -57,6 +64,14 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert:1.4.0")
     implementation("com.google.ai.edge.litert:litert-api:1.4.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Supabase dependencies for Auth (Phase 3)
+    implementation("io.github.jan-tennert.supabase:supabase-kt:2.1.0")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:2.1.0")
+    implementation("io.github.jan-tennert.supabase:gotrue-kt:2.1.0")
+    implementation("io.github.jan-tennert.supabase:realtime-kt:2.1.0")
+    implementation("io.github.jan-tennert.supabase:storage-kt:2.1.0")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation(composeBom)
     testImplementation("org.robolectric:robolectric:4.14.1")

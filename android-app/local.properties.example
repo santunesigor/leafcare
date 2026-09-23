@@ -1,0 +1,16 @@
+# LeafCare Android - Local Configuration
+# Copy this file to local.properties and fill in your values
+# NEVER commit local.properties with real credentials!
+
+# Android SDK path (auto-generated)
+sdk.dir=C:/Users/igors/AppData/Local/Android/Sdk
+
+# Supabase Configuration
+# Project: leafcare (nhkqfanjfcivcbndivav)
+# Region: sa-east-1
+# URL: https://nhkqfanjfcivcbndivav.supabase.co
+#
+# Get your anon key from: Dashboard → Settings → API → Project API keys → anon public
+# This is a PUBLIC key (JWT) - safe to include in the app
+# NEVER use the service_role key here!
+SUPABASE_ANON_KEY=your_anon_key_here
