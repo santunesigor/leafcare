@@ -147,12 +147,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 Result.failure(EmailConfirmationRequiredException())
             }
         } catch (e: Exception) {
-            val message = when {
-                e.message?.contains("already registered", true) == true -> "Este e-mail já está cadastrado"
-                e.message?.contains("weak password", true) == true -> "Senha muito fraca. Use pelo menos 6 caracteres."
-                e.message?.contains("invalid email", true) == true -> "E-mail inválido"
-                else -> "Erro ao criar conta: ${e.message ?: "tente novamente"}"
-            }
+            val message = sanitizeError(AuthOperation.SIGN_UP, e)
             _error.value = message
             Result.failure(AuthException(message, e))
         } finally {
@@ -188,13 +183,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 Result.failure(AuthException(message))
             }
         } catch (e: Exception) {
-            val message = when {
-                e.message?.contains("invalid credentials", true) == true ||
-                e.message?.contains("invalid login", true) == true -> "E-mail ou senha incorretos"
-                e.message?.contains("email not confirmed", true) == true -> "Confirme seu e-mail antes de entrar"
-                e.message?.contains("network", true) == true -> "Sem conexão. Verifique sua internet."
-                else -> "Erro ao entrar: ${e.message ?: "tente novamente"}"
-            }
+            val message = sanitizeError(AuthOperation.SIGN_IN, e)
             _error.value = message
             Result.failure(AuthException(message, e))
         } finally {
@@ -216,7 +205,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             _user.value = null
             Result.success(Unit)
         } catch (e: Exception) {
-            val message = "Erro ao sair: ${e.message ?: "tente novamente"}"
+            val message = sanitizeError(AuthOperation.SIGN_OUT, e)
             _error.value = message
             Result.failure(AuthException(message, e))
         } finally {
@@ -247,10 +236,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             _infoMessage.value = "Se o e-mail estiver cadastrado, você receberá as instruções de recuperação."
             Result.success(Unit)
         } catch (e: Exception) {
-            val message = when {
-                e.message?.contains("network", true) == true -> "Sem conexão. Verifique sua internet."
-                else -> "Erro ao solicitar recuperação: ${e.message ?: "tente novamente"}"
-            }
+            val message = sanitizeError(AuthOperation.PASSWORD_RESET, e)
             _error.value = message
             Result.failure(AuthException(message, e))
         } finally {
@@ -305,7 +291,50 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             if (password.isBlank()) return "Senha não pode ser vazia"
             return null
         }
+
+        /**
+         * Converts backend exceptions into short user-facing messages.
+         * The raw error (URL, headers, tokens, HTTP body) is NEVER included:
+         * supabase-kt error messages embed the full request/response dump.
+         */
+        internal fun sanitizeError(operation: AuthOperation, e: Exception): String {
+            val raw = e.message.orEmpty().lowercase().replace('_', ' ')
+            if (raw.contains("already registered")) return "Este e-mail já está cadastrado"
+            if (raw.contains("weak password")) return "Senha muito fraca. Use pelo menos 6 caracteres."
+            if (raw.contains("invalid email")) return "E-mail inválido"
+            if (raw.contains("invalid credentials") || raw.contains("invalid login")) {
+                return "E-mail ou senha incorretos"
+            }
+            if (raw.contains("email not confirmed")) return "Confirme seu e-mail antes de entrar"
+            if (raw.contains("invalid api key")) {
+                return "Não foi possível conectar ao serviço. Verifique a configuração do aplicativo."
+            }
+            if (isNetworkError(raw)) return "Sem conexão. Verifique sua internet."
+            return when (operation) {
+                AuthOperation.SIGN_UP -> "Não foi possível criar sua conta. Tente novamente."
+                AuthOperation.SIGN_IN -> "Não foi possível entrar. Tente novamente."
+                AuthOperation.SIGN_OUT -> "Não foi possível sair. Tente novamente."
+                AuthOperation.PASSWORD_RESET -> "Não foi possível enviar a recuperação. Tente novamente."
+            }
+        }
+
+        private fun isNetworkError(raw: String): Boolean {
+            return raw.contains("network") ||
+                raw.contains("unable to resolve host") ||
+                raw.contains("failed to connect") ||
+                raw.contains("connection refused") ||
+                raw.contains("timeout") ||
+                raw.contains("unknownhost")
+        }
     }
+}
+
+/** Auth operations that need user-facing error messages. */
+internal enum class AuthOperation {
+    SIGN_UP,
+    SIGN_IN,
+    SIGN_OUT,
+    PASSWORD_RESET
 }
 
 /** Custom exception for auth errors */

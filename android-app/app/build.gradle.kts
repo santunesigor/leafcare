@@ -1,5 +1,6 @@
 import groovy.json.JsonSlurper
 import java.security.MessageDigest
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -7,6 +8,20 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+
+// Supabase publishable key comes from android-app/local.properties (never committed),
+// with environment fallback for CI. project.findProperty does NOT read local.properties,
+// so the file is loaded explicitly here.
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+val supabasePublishableKey =
+    localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY")
+        ?: System.getenv("SUPABASE_PUBLISHABLE_KEY")
+        ?: "YOUR_PUBLISHABLE_KEY_HERE"
 
 android {
     namespace = "br.com.leafcare"
@@ -20,7 +35,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // BuildConfig fields for Supabase configuration (from local.properties)
         buildConfigField("String", "SUPABASE_URL", "\"https://nhkqfanjfcivcbndivav.supabase.co\"")
-        val supabasePublishableKey = project.findProperty("SUPABASE_PUBLISHABLE_KEY") as String? ?: "YOUR_PUBLISHABLE_KEY_HERE"
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
         // Legacy alias for backward compatibility
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabasePublishableKey\"")
@@ -87,6 +101,17 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+val verifySupabaseConfig by tasks.registering {
+    group = "verification"
+    description = "Impede gerar APK com placeholder de chave Supabase."
+    doLast {
+        check(supabasePublishableKey.isNotBlank() && supabasePublishableKey != "YOUR_PUBLISHABLE_KEY_HERE") {
+            "SUPABASE_PUBLISHABLE_KEY não configurada em local.properties"
+        }
+    }
+}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(verifySupabaseConfig) }
 
 val verifyModelAssets by tasks.registering {
     group = "verification"
