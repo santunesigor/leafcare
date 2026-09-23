@@ -145,6 +145,7 @@ fun SignUpScreen(viewModel: AuthViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -202,6 +203,13 @@ fun SignUpScreen(viewModel: AuthViewModel) {
             )
         }
 
+        infoMessage?.let { msg ->
+            Text(msg, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall, modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+            )
+        }
+
         Spacer(Modifier.height(24.dp))
 
         Button(
@@ -241,6 +249,7 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -271,6 +280,13 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
 
         error?.let { msg ->
             Text(msg, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+            )
+        }
+
+        infoMessage?.let { msg ->
+            Text(msg, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall, modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp)
             )

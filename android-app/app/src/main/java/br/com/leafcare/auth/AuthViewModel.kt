@@ -26,6 +26,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     val user = authRepository.user
     val isLoading = authRepository.isLoading
     val error = authRepository.error
+    val infoMessage = authRepository.infoMessage
 
     // UI state for different screens
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -81,9 +82,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 password = state.password,
                 displayName = state.displayName.trim()
             )
-            if (result.isSuccess) {
+            // Confirmation-required failures deliberately stay in the Auth flow:
+            // the info message is shown, no navigation is sent.
+            val destination = navigationForAuthResult(result.isSuccess)
+            if (destination != null) {
                 clearForms()
-                _navigation.send(AuthNavigationEvent.NavigateToApp)
+                _navigation.send(destination)
             }
         }
     }
@@ -96,9 +100,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 email = state.email.trim(),
                 password = state.password
             )
-            if (result.isSuccess) {
+            val destination = navigationForAuthResult(result.isSuccess)
+            if (destination != null) {
                 clearForms()
-                _navigation.send(AuthNavigationEvent.NavigateToApp)
+                _navigation.send(destination)
             }
         }
     }
@@ -107,7 +112,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun signOut() {
         viewModelScope.launch {
             authRepository.signOut()
-            _navigation.send(AuthNavigationEvent.NavigateToAuth())
+            _navigation.send(navigationAfterSignOut())
         }
     }
 
@@ -124,16 +129,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         authRepository.clearError()
     }
 
+    /** Clear informational message */
+    fun clearInfo() {
+        authRepository.clearInfo()
+    }
+
     /** Called when session is restored on app start */
     fun onSessionRestored() {
-        if (authRepository.hasPersistedSession()) {
-            viewModelScope.launch {
-                _navigation.send(AuthNavigationEvent.NavigateToApp)
-            }
-        } else {
-            viewModelScope.launch {
-                _navigation.send(AuthNavigationEvent.NavigateToAuth())
-            }
+        viewModelScope.launch {
+            _navigation.send(navigationForSessionRestore(authRepository.hasPersistedSession()))
         }
     }
 
@@ -175,3 +179,21 @@ sealed interface AuthNavigationEvent {
     data class NavigateToAuth(val initialScreen: AuthScreen = AuthScreen.Login) : AuthNavigationEvent
     object NavigateToApp : AuthNavigationEvent
 }
+
+/**
+ * Pure navigation decisions for the auth flow (unit-testable, no Android dependencies).
+ * Awaiting email confirmation is intentionally *not* a navigation: the user stays
+ * in the Auth flow while [br.com.leafcare.auth.AuthRepository.infoMessage] is shown.
+ */
+
+/** After sign-up/sign-in: go to App only when authenticated, otherwise stay. */
+internal fun navigationForAuthResult(authenticated: Boolean): AuthNavigationEvent? =
+    if (authenticated) AuthNavigationEvent.NavigateToApp else null
+
+/** After startup restore: existing session goes to App, otherwise to Auth. */
+internal fun navigationForSessionRestore(hasSession: Boolean): AuthNavigationEvent =
+    if (hasSession) AuthNavigationEvent.NavigateToApp else AuthNavigationEvent.NavigateToAuth()
+
+/** After sign-out: always back to Auth. */
+internal fun navigationAfterSignOut(): AuthNavigationEvent =
+    AuthNavigationEvent.NavigateToAuth()
