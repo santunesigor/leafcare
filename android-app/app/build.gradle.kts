@@ -71,6 +71,9 @@ dependencies {
     // Using supabase-kt 2.1.0 with gotrue-kt (compatible with Kotlin 2.0.21)
     implementation("io.github.jan-tennert.supabase:supabase-kt:2.1.0")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.1.0")
+    // Ktor client engine required by supabase-kt 2.1.0 (Ktor 2.3.7).
+    // Without an engine, HttpClient creation crashes the app at startup.
+    implementation("io.ktor:ktor-client-okhttp:2.3.7")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")

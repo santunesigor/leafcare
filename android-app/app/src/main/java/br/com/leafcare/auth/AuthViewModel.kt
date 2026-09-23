@@ -17,9 +17,13 @@ import kotlinx.serialization.json.jsonPrimitive
  * ViewModel for authentication flow.
  * Handles UI state for login, signup, password reset, and profile screens.
  */
-class AuthViewModel(application: Application) : AndroidViewModel(application) {
+class AuthViewModel(
+    application: Application,
+    private val authRepository: AuthRepository
+) : AndroidViewModel(application) {
 
-    private val authRepository = AuthRepository(application)
+    /** Production entry point used by `by viewModels()` in MainActivity. */
+    constructor(application: Application) : this(application, AuthRepository(application))
 
     // Current authentication state
     val session = authRepository.session
@@ -76,6 +80,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     /** Sign up action */
     fun signUp() {
         val state = _uiState.value
+        if (state.password != state.confirmPassword) {
+            authRepository.setError("As senhas não coincidem")
+            return
+        }
         viewModelScope.launch {
             val result = authRepository.signUp(
                 email = state.email.trim(),

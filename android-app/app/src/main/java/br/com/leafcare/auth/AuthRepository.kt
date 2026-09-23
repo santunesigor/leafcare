@@ -131,6 +131,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         return try {
             val validationError = validateSignUpInput(displayName, email, password)
             if (validationError != null) {
+                _error.value = validationError
                 return Result.failure(IllegalArgumentException(validationError))
             }
 
@@ -170,6 +171,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         return try {
             val validationError = validateSignInInput(email, password)
             if (validationError != null) {
+                _error.value = validationError
                 return Result.failure(IllegalArgumentException(validationError))
             }
 
@@ -236,6 +238,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
 
         return try {
             if (email.isNullOrBlank()) {
+                _error.value = "E-mail inválido"
                 return Result.failure(IllegalArgumentException("E-mail inválido"))
             }
 
@@ -258,6 +261,12 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
     /** Clears the current error state */
     fun clearError() {
         _error.value = null
+    }
+
+    /** Shows a validation error without a backend call (e.g. mismatched passwords). */
+    fun setError(message: String) {
+        _infoMessage.value = null
+        _error.value = message
     }
 
     /** Clears the current informational message */

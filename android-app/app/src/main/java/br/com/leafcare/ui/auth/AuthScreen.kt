@@ -1,64 +1,228 @@
 package br.com.leafcare.ui.auth
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import br.com.leafcare.auth.AuthNavigationEvent
+import br.com.leafcare.R
 import br.com.leafcare.auth.AuthScreen
 import br.com.leafcare.auth.AuthViewModel
-import br.com.leafcare.ui.LeafCareTheme
+import br.com.leafcare.ui.FigmaIcon
+import br.com.leafcare.ui.LeafColors
 
+/**
+ * Auth flow host. MainActivity is the auth gate (session != null -> app),
+ * so this host simply renders the screen selected in [AuthViewModel.uiState].
+ * No nested NavHost: the previous route-based host ignored uiState.currentScreen,
+ * which made the SignUp/ForgotPassword buttons appear dead.
+ */
 @Composable
 fun AuthNavHost(viewModel: AuthViewModel) {
-    val navController = rememberNavController()
-    val navigation by viewModel.navigation.collectAsStateWithLifecycle(
-        lifecycle = LocalLifecycleOwner.current.lifecycle,
-        initialValue = null
-    )
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    when (uiState.currentScreen) {
+        AuthScreen.Login -> LoginScreen(viewModel)
+        AuthScreen.SignUp -> SignUpScreen(viewModel)
+        AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
+        AuthScreen.Profile -> ProfileScreen(viewModel)
+    }
+}
 
-    // Handle navigation events
-    navigation?.let { event ->
-        when (event) {
-            is AuthNavigationEvent.NavigateToAuth -> {
-                navController.navigate("auth/${event.initialScreen.name}") {
-                    popUpTo("auth") { inclusive = true }
-                }
-            }
-            is AuthNavigationEvent.NavigateToApp -> {
-                navController.navigate("app") {
-                    popUpTo("auth") { inclusive = true }
-                }
-            }
+/** White V3 scaffold: centered when content fits, scrollable with ime padding otherwise. */
+@Composable
+private fun AuthScaffold(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .verticalScroll(rememberScrollState())
+            .imePadding()
+            .padding(horizontal = 24.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.weight(1f))
+        content()
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun AuthHeader(logoSize: Int, title: String, subtitle: String) {
+    FigmaIcon(R.drawable.v3_logo, "LeafCare", logoSize)
+    Spacer(Modifier.height(20.dp))
+    Text(
+        title,
+        style = MaterialTheme.typography.headlineSmall,
+        color = LeafColors.Text,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(Modifier.height(8.dp))
+    Text(
+        subtitle,
+        style = MaterialTheme.typography.bodyMedium,
+        color = LeafColors.Muted,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(Modifier.height(28.dp))
+}
+
+@Composable
+private fun AuthField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    password: Boolean = false,
+    imeAction: ImeAction = ImeAction.Next,
+    onImeDone: () -> Unit = {}
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = LeafColors.Muted)
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 54.dp),
+            singleLine = true,
+            shape = RoundedCornerShape(14.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = LeafColors.Pale,
+                unfocusedContainerColor = LeafColors.Pale,
+                disabledContainerColor = LeafColors.Pale,
+                focusedBorderColor = LeafColors.Green,
+                unfocusedBorderColor = LeafColors.Border,
+                focusedTextColor = LeafColors.Text,
+                unfocusedTextColor = LeafColors.Text,
+                cursorColor = LeafColors.Green
+            ),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+            keyboardActions = KeyboardActions(onDone = { onImeDone() }),
+            visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None
+        )
+    }
+}
+
+/** Primary green button in the LeafButton style, with loading/disabled state. */
+@Composable
+private fun AuthButton(label: String, loading: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = { if (!loading) onClick() },
+        enabled = !loading,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = LeafColors.Green,
+            contentColor = Color.White,
+            disabledContainerColor = LeafColors.Pale,
+            disabledContentColor = LeafColors.Muted
+        )
+    ) {
+        if (loading) {
+            CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.5.dp)
+        } else {
+            Text(label)
         }
     }
+}
 
-    NavHost(navController, startDestination = "auth/Login") {
-        composable("auth/Login") {
-            LoginScreen(viewModel)
+@Composable
+private fun AuthMessages(error: String?, infoMessage: String?) {
+    error?.let { msg ->
+        Text(
+            msg,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+        )
+    }
+    infoMessage?.let { msg ->
+        Text(
+            msg,
+            color = LeafColors.Green,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+        )
+    }
+}
+
+@Composable
+private fun AuthLinkButton(label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Text(label, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun AuthLinkedRow(prefix: String, link: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(prefix, color = LeafColors.Muted, style = MaterialTheme.typography.bodyMedium)
+        TextButton(onClick = onClick) {
+            Text(link, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
         }
-        composable("auth/SignUp") {
-            SignUpScreen(viewModel)
-        }
-        composable("auth/ForgotPassword") {
-            ForgotPasswordScreen(viewModel)
-        }
-        composable("auth/Profile") {
-            ProfileScreen(viewModel)
-        }
-        composable("app") {
-            // This destination signals MainActivity to show main app
+    }
+}
+
+@Composable
+private fun AuthBackButton(onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+        IconButton(onClick = onClick) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = LeafColors.Text)
         }
     }
 }
@@ -68,75 +232,40 @@ fun LoginScreen(viewModel: AuthViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("LeafCare", style = MaterialTheme.typography.headlineLarge)
-        Text("Entre na sua conta", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(32.dp))
+    AuthScaffold {
+        AuthHeader(
+            logoSize = 64,
+            title = "Bem-vindo ao LeafCare",
+            subtitle = "Entre para acessar seu histórico e suas análises."
+        )
 
-        OutlinedTextField(
+        AuthField(
             value = uiState.email,
             onValueChange = { viewModel.setEmail(it) },
-            label = { Text("E-mail") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            label = "E-mail",
+            keyboardType = KeyboardType.Email
         )
         Spacer(Modifier.height(16.dp))
-
-        OutlinedTextField(
+        AuthField(
             value = uiState.password,
             onValueChange = { viewModel.setPassword(it) },
-            label = { Text("Senha") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            label = "Senha",
+            keyboardType = KeyboardType.Password,
+            password = true,
+            imeAction = ImeAction.Done,
+            onImeDone = { viewModel.signIn() }
         )
 
-        error?.let { msg ->
-            Text(msg, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-            )
-        }
-
+        AuthMessages(error, infoMessage)
         Spacer(Modifier.height(24.dp))
 
-        Button(
-            onClick = { viewModel.signIn() },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(Modifier.size(24.dp))
-            } else {
-                Text("Entrar")
-            }
-        }
+        AuthButton(label = "Entrar", loading = isLoading, onClick = { viewModel.signIn() })
+        Spacer(Modifier.height(12.dp))
 
-        Spacer(Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text("Não tem conta? ")
-            TextButton(onClick = { viewModel.setScreen(AuthScreen.SignUp) }) {
-                Text("Criar conta")
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        TextButton(onClick = { viewModel.setScreen(AuthScreen.ForgotPassword) }) {
-            Text("Esqueci minha senha")
-        }
+        AuthLinkButton("Esqueceu sua senha?") { viewModel.setScreen(AuthScreen.ForgotPassword) }
+        AuthLinkedRow("Não tem uma conta?", "Criar conta") { viewModel.setScreen(AuthScreen.SignUp) }
     }
 }
 
@@ -147,100 +276,52 @@ fun SignUpScreen(viewModel: AuthViewModel) {
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("LeafCare", style = MaterialTheme.typography.headlineLarge)
-        Text("Crie sua conta", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(32.dp))
+    AuthScaffold {
+        AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
+        AuthHeader(
+            logoSize = 48,
+            title = "Crie sua conta",
+            subtitle = "Seus registros ficam disponíveis nos seus dispositivos."
+        )
 
-        OutlinedTextField(
+        AuthField(
             value = uiState.displayName,
             onValueChange = { viewModel.setDisplayName(it) },
-            label = { Text("Nome") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            label = "Nome"
         )
         Spacer(Modifier.height(16.dp))
-
-        OutlinedTextField(
+        AuthField(
             value = uiState.email,
             onValueChange = { viewModel.setEmail(it) },
-            label = { Text("E-mail") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            label = "E-mail",
+            keyboardType = KeyboardType.Email
         )
         Spacer(Modifier.height(16.dp))
-
-        OutlinedTextField(
+        AuthField(
             value = uiState.password,
             onValueChange = { viewModel.setPassword(it) },
-            label = { Text("Senha (mín. 6 caracteres)") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            label = "Senha (mín. 6 caracteres)",
+            keyboardType = KeyboardType.Password,
+            password = true
         )
         Spacer(Modifier.height(16.dp))
-
-        OutlinedTextField(
+        AuthField(
             value = uiState.confirmPassword,
             onValueChange = { viewModel.setConfirmPassword(it) },
-            label = { Text("Confirmar senha") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            label = "Confirmar senha",
+            keyboardType = KeyboardType.Password,
+            password = true,
+            imeAction = ImeAction.Done,
+            onImeDone = { viewModel.signUp() }
         )
 
-        error?.let { msg ->
-            Text(msg, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-            )
-        }
-
-        infoMessage?.let { msg ->
-            Text(msg, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall, modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-            )
-        }
-
+        AuthMessages(error, infoMessage)
         Spacer(Modifier.height(24.dp))
 
-        Button(
-            onClick = {
-                if (uiState.password == uiState.confirmPassword) {
-                    viewModel.signUp()
-                } else {
-                    viewModel.clearError()
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(Modifier.size(24.dp))
-            } else {
-                Text("Criar conta")
-            }
-        }
+        AuthButton(label = "Criar conta", loading = isLoading, onClick = { viewModel.signUp() })
+        Spacer(Modifier.height(12.dp))
 
-        Spacer(Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text("Já tem conta? ")
-            TextButton(onClick = { viewModel.setScreen(AuthScreen.Login) }) {
-                Text("Entrar")
-            }
-        }
+        AuthLinkedRow("Já tem uma conta?", "Entrar") { viewModel.setScreen(AuthScreen.Login) }
     }
 }
 
@@ -251,66 +332,30 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("LeafCare", style = MaterialTheme.typography.headlineLarge)
-        Text("Recuperar senha", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(16.dp))
-
-        Text(
-            "Digite seu e-mail para receber instruções de recuperação de senha.",
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)
+    AuthScaffold {
+        AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
+        AuthHeader(
+            logoSize = 56,
+            title = "Recuperar senha",
+            subtitle = "Informe seu e-mail e enviaremos as instruções de recuperação."
         )
 
-        OutlinedTextField(
+        AuthField(
             value = uiState.email,
             onValueChange = { viewModel.setEmail(it) },
-            label = { Text("E-mail") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            label = "E-mail",
+            keyboardType = KeyboardType.Email,
+            imeAction = ImeAction.Done,
+            onImeDone = { viewModel.requestPasswordReset() }
         )
 
-        error?.let { msg ->
-            Text(msg, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-            )
-        }
-
-        infoMessage?.let { msg ->
-            Text(msg, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall, modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-            )
-        }
-
+        AuthMessages(error, infoMessage)
         Spacer(Modifier.height(24.dp))
 
-        Button(
-            onClick = { viewModel.requestPasswordReset() },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(Modifier.size(24.dp))
-            } else {
-                Text("Enviar e-mail de recuperação")
-            }
-        }
+        AuthButton(label = "Enviar instruções", loading = isLoading, onClick = { viewModel.requestPasswordReset() })
+        Spacer(Modifier.height(12.dp))
 
-        Spacer(Modifier.height(16.dp))
-
-        TextButton(onClick = { viewModel.setScreen(AuthScreen.Login) }) {
-            Text("Voltar para login")
-        }
+        AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }
     }
 }
 
