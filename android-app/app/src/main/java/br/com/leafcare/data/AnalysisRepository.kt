@@ -19,7 +19,6 @@ class AnalysisRepository(
 ) {
     private val photos = File(context.filesDir, "photos").apply { mkdirs() }
     private val mutex = Mutex()
-    private val preferences = context.getSharedPreferences("leafcare", Context.MODE_PRIVATE)
     val all = dao.observeAll()
     fun observe(id: String) = dao.observe(id)
     fun photo(name: String): File {
@@ -27,11 +26,7 @@ class AnalysisRepository(
         return File(photos, name)
     }
     fun modelError() = classifier.availabilityError
-    fun threshold(): Float = preferences.getFloat("threshold", classifier.defaultThreshold).coerceIn(0f, 1f)
-    fun setThreshold(value: Float) {
-        require(value in 0.5f..0.95f)
-        preferences.edit().putFloat("threshold", value).apply()
-    }
+    fun threshold(): Float = classifier.defaultThreshold
 
     suspend fun analyze(uri: Uri): String = mutex.withLock {
         withContext(Dispatchers.IO) {
