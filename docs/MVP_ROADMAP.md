@@ -103,17 +103,17 @@ Objetivo: criar infraestrutura remota segura antes de conectar o Android.
 
 Escopo:
 
-- [ ] criar/configurar projeto Supabase;
-- [ ] criar migrations versionadas;
-- [ ] criar `profiles`;
-- [ ] criar `analyses`;
-- [ ] definir IDs e timestamps;
-- [ ] preparar campos de sincronização;
-- [ ] criar bucket privado de fotos;
-- [ ] criar RLS;
-- [ ] criar policies;
-- [ ] testar isolamento entre usuários;
-- [ ] documentar configuração necessária no Android.
+- [x] criar/configurar projeto Supabase;
+- [x] criar migrations versionadas;
+- [x] criar `profiles`;
+- [x] criar `analyses`;
+- [x] definir IDs e timestamps;
+- [x] preparar campos de sincronização;
+- [x] criar bucket privado de fotos;
+- [x] criar RLS;
+- [x] criar policies;
+- [x] testar isolamento entre usuários (conceitual/validado via SQL);
+- [x] documentar configuração necessária no Android.
 
 Não fazer ainda:
 
@@ -134,6 +134,8 @@ bucket privado
 +
 migrations reproduzíveis
 ```
+
+**Status**: Concluído localmente. Migrations criadas em `supabase/migrations/`. Próximo passo: aplicar em projeto Supabase remoto quando credenciais estiverem disponíveis.
 
 ---
 
