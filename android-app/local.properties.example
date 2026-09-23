@@ -10,7 +10,7 @@ sdk.dir=C:/Users/igors/AppData/Local/Android/Sdk
 # Region: sa-east-1
 # URL: https://nhkqfanjfcivcbndivav.supabase.co
 #
-# Get your anon key from: Dashboard → Settings → API → Project API keys → anon public
-# This is a PUBLIC key (JWT) - safe to include in the app
-# NEVER use the service_role key here!
-SUPABASE_ANON_KEY=your_anon_key_here
+# Get your publishable key from: Dashboard → Settings → API → Project API keys → anon public
+# This is a PUBLIC key (JWT) - safe to include in the app build
+# NEVER use the service_role key!
+SUPABASE_PUBLISHABLE_KEY=your_publishable_key_here

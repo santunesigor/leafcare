@@ -2,6 +2,7 @@ package br.com.leafcare
 
 import android.app.Application
 import androidx.room.Room
+import br.com.leafcare.auth.SupabaseClientHolder
 import br.com.leafcare.data.AnalysisRepository
 import br.com.leafcare.data.AppDatabase
 import br.com.leafcare.data.DiseaseCatalog
@@ -13,4 +14,7 @@ class LeafCareApplication : Application() {
     }
     val catalog by lazy { DiseaseCatalog(this) }
     val repository by lazy { AnalysisRepository(this, database.analysisDao(), catalog, LeafClassifier(this)) }
+
+    // Supabase client initialized once for the application lifecycle
+    val supabaseClientHolder by lazy { SupabaseClientHolder(this) }
 }
