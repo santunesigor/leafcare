@@ -66,6 +66,8 @@ fun AuthNavHost(viewModel: AuthViewModel) {
         AuthScreen.Login -> LoginScreen(viewModel)
         AuthScreen.SignUp -> SignUpScreen(viewModel)
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
+        AuthScreen.RecoveryCode -> RecoveryCodeScreen(viewModel)
+        AuthScreen.NewPassword -> NewPasswordScreen(viewModel)
         AuthScreen.Profile -> ProfileScreen(viewModel)
     }
 }
@@ -337,7 +339,7 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
         AuthHeader(
             logoSize = 56,
             title = "Recuperar senha",
-            subtitle = "Informe seu e-mail e enviaremos as instruções de recuperação."
+            subtitle = "Informe seu e-mail e enviaremos um código de confirmação."
         )
 
         AuthField(
@@ -352,7 +354,84 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
         AuthMessages(error, infoMessage)
         Spacer(Modifier.height(24.dp))
 
-        AuthButton(label = "Enviar instruções", loading = isLoading, onClick = { viewModel.requestPasswordReset() })
+        AuthButton(label = "Enviar código", loading = isLoading, onClick = { viewModel.requestPasswordReset() })
+        Spacer(Modifier.height(12.dp))
+
+        AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }
+    }
+}
+
+@Composable
+fun RecoveryCodeScreen(viewModel: AuthViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+
+    AuthScaffold {
+        AuthBackButton { viewModel.setScreen(AuthScreen.ForgotPassword) }
+        AuthHeader(
+            logoSize = 56,
+            title = "Digite o código",
+            subtitle = "Enviamos um código de 6 dígitos para o seu e-mail."
+        )
+
+        AuthField(
+            value = uiState.recoveryCode,
+            onValueChange = { viewModel.setRecoveryCode(it) },
+            label = "Código",
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done,
+            onImeDone = { viewModel.verifyRecoveryCode() }
+        )
+
+        AuthMessages(error, infoMessage)
+        Spacer(Modifier.height(24.dp))
+
+        AuthButton(label = "Confirmar código", loading = isLoading, onClick = { viewModel.verifyRecoveryCode() })
+        Spacer(Modifier.height(12.dp))
+
+        AuthLinkButton("Reenviar código") { viewModel.requestPasswordReset() }
+    }
+}
+
+@Composable
+fun NewPasswordScreen(viewModel: AuthViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+
+    AuthScaffold {
+        AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
+        AuthHeader(
+            logoSize = 56,
+            title = "Nova senha",
+            subtitle = "Defina uma nova senha para a sua conta."
+        )
+
+        AuthField(
+            value = uiState.newPassword,
+            onValueChange = { viewModel.setNewPassword(it) },
+            label = "Nova senha (mín. 6 caracteres)",
+            keyboardType = KeyboardType.Password,
+            password = true
+        )
+        Spacer(Modifier.height(16.dp))
+        AuthField(
+            value = uiState.confirmNewPassword,
+            onValueChange = { viewModel.setConfirmNewPassword(it) },
+            label = "Confirmar nova senha",
+            keyboardType = KeyboardType.Password,
+            password = true,
+            imeAction = ImeAction.Done,
+            onImeDone = { viewModel.updatePassword() }
+        )
+
+        AuthMessages(error, infoMessage)
+        Spacer(Modifier.height(24.dp))
+
+        AuthButton(label = "Salvar nova senha", loading = isLoading, onClick = { viewModel.updatePassword() })
         Spacer(Modifier.height(12.dp))
 
         AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }

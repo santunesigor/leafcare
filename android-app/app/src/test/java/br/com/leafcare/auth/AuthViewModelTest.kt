@@ -102,7 +102,7 @@ class AuthViewModelTest {
         assertEquals(0, backend.signUpCalls)
     }
 
-    @Test fun confirmationRequired_staysInAuthWithoutAppNavigation() = runTest(dispatcher) {
+    @Test fun signupWithoutSession_goesToLoginWithoutAppNavigation() = runTest(dispatcher) {
         backend.session = null
         viewModel.setDisplayName("Nome Teste")
         viewModel.setEmail("a@b.com")
@@ -119,9 +119,59 @@ class AuthViewModelTest {
 
         assertTrue(events.none { it is AuthNavigationEvent.NavigateToApp })
         assertEquals(
-            "Confira seu e-mail para confirmar a conta.",
+            "Cadastro concluído. Entre com seu e-mail e senha.",
             viewModel.infoMessage.value
         )
+        assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
+        job.cancel()
+    }
+
+    @Test fun requestPasswordResetSuccess_goesToRecoveryCode() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+
+        assertEquals(listOf("a@b.com"), backend.resetEmails)
+        assertEquals(AuthScreen.RecoveryCode, viewModel.uiState.value.currentScreen)
+    }
+
+    @Test fun verifyRecoveryCodeSuccess_goesToNewPassword() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+        viewModel.setRecoveryCode("123456")
+
+        viewModel.verifyRecoveryCode()
+        advanceUntilIdle()
+
+        assertEquals(1, backend.verifyRecoveryCalls)
+        assertEquals(AuthScreen.NewPassword, viewModel.uiState.value.currentScreen)
+    }
+
+    @Test fun mismatchedNewPasswords_blockUpdateWithVisibleError() = runTest(dispatcher) {
+        viewModel.setNewPassword("nova-senha-123")
+        viewModel.setConfirmNewPassword("outra-senha")
+
+        viewModel.updatePassword()
+        advanceUntilIdle()
+
+        assertEquals(0, backend.updatePasswordCalls)
+        assertEquals("As senhas não coincidem", viewModel.error.value)
+    }
+
+    @Test fun matchingNewPasswords_updateAndNavigateToApp() = runTest(dispatcher) {
+        viewModel.setNewPassword("nova-senha-123")
+        viewModel.setConfirmNewPassword("nova-senha-123")
+
+        val events = mutableListOf<AuthNavigationEvent>()
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.navigation.collect { events.add(it) }
+        }
+
+        viewModel.updatePassword()
+        advanceUntilIdle()
+
+        assertEquals(1, backend.updatePasswordCalls)
+        assertTrue(events.any { it is AuthNavigationEvent.NavigateToApp })
         job.cancel()
     }
 }

@@ -67,13 +67,31 @@ class AuthViewModel(
         _uiState.value = _uiState.value.copy(displayName = displayName)
     }
 
+    /** Updates recovery code field */
+    fun setRecoveryCode(recoveryCode: String) {
+        _uiState.value = _uiState.value.copy(recoveryCode = recoveryCode)
+    }
+
+    /** Updates new password field */
+    fun setNewPassword(newPassword: String) {
+        _uiState.value = _uiState.value.copy(newPassword = newPassword)
+    }
+
+    /** Updates new password confirmation field */
+    fun setConfirmNewPassword(confirmNewPassword: String) {
+        _uiState.value = _uiState.value.copy(confirmNewPassword = confirmNewPassword)
+    }
+
     /** Clears all form fields */
     fun clearForms() {
         _uiState.value = _uiState.value.copy(
             email = "",
             password = "",
             confirmPassword = "",
-            displayName = ""
+            displayName = "",
+            recoveryCode = "",
+            newPassword = "",
+            confirmNewPassword = ""
         )
     }
 
@@ -90,8 +108,13 @@ class AuthViewModel(
                 password = state.password,
                 displayName = state.displayName.trim()
             )
-            // Confirmation-required failures deliberately stay in the Auth flow:
-            // the info message is shown, no navigation is sent.
+            // Signup without session is defensive-only (email confirmation is
+            // disabled on the hosted project): stay in Auth on the Login
+            // screen so the user can sign in. No web/browser involved.
+            if (result.exceptionOrNull() is SignupWithoutSessionException) {
+                setScreen(AuthScreen.Login)
+                return@launch
+            }
             val destination = navigationForAuthResult(result.isSuccess)
             if (destination != null) {
                 clearForms()
@@ -124,11 +147,44 @@ class AuthViewModel(
         }
     }
 
-    /** Request password reset */
+    /** Request password-reset code (in-app OTP, no browser) */
     fun requestPasswordReset() {
         val state = _uiState.value
         viewModelScope.launch {
-            authRepository.requestPasswordReset(email = state.email.trim())
+            val result = authRepository.requestPasswordReset(email = state.email.trim())
+            if (result.isSuccess) {
+                setScreen(AuthScreen.RecoveryCode)
+            }
+        }
+    }
+
+    /** Verify the recovery code received by email (in-app, no browser) */
+    fun verifyRecoveryCode() {
+        val state = _uiState.value
+        viewModelScope.launch {
+            val result = authRepository.verifyRecoveryCode(
+                email = state.email.trim(),
+                code = state.recoveryCode.trim()
+            )
+            if (result.isSuccess) {
+                setScreen(AuthScreen.NewPassword)
+            }
+        }
+    }
+
+    /** Define a new password on the recovery session (in-app, no browser) */
+    fun updatePassword() {
+        val state = _uiState.value
+        if (state.newPassword != state.confirmNewPassword) {
+            authRepository.setError("As senhas não coincidem")
+            return
+        }
+        viewModelScope.launch {
+            val result = authRepository.updatePassword(password = state.newPassword)
+            if (result.isSuccess) {
+                clearForms()
+                _navigation.send(AuthNavigationEvent.NavigateToApp)
+            }
         }
     }
 
@@ -171,7 +227,10 @@ data class AuthUiState(
     val email: String = "",
     val password: String = "",
     val confirmPassword: String = "",
-    val displayName: String = ""
+    val displayName: String = "",
+    val recoveryCode: String = "",
+    val newPassword: String = "",
+    val confirmNewPassword: String = ""
 )
 
 /** Auth screen types */
@@ -179,6 +238,8 @@ enum class AuthScreen {
     Login,
     SignUp,
     ForgotPassword,
+    RecoveryCode,
+    NewPassword,
     Profile
 }
 
@@ -190,8 +251,8 @@ sealed interface AuthNavigationEvent {
 
 /**
  * Pure navigation decisions for the auth flow (unit-testable, no Android dependencies).
- * Awaiting email confirmation is intentionally *not* a navigation: the user stays
- * in the Auth flow while [br.com.leafcare.auth.AuthRepository.infoMessage] is shown.
+ * A failed sign-up/sign-in is intentionally *not* a navigation: the user stays
+ * in the Auth flow while the error or info message is shown.
  */
 
 /** After sign-up/sign-in: go to App only when authenticated, otherwise stay. */

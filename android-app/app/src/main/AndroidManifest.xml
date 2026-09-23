@@ -16,16 +16,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Password-recovery return link (declarative step only).
-                 Requires the Supabase dashboard redirect allowlist to include
-                 leafcare://auth/reset-password. Exchanging the recovery token
-                 for a session is pending a real-backend round trip. -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="leafcare" android:host="auth" android:path="/reset-password" />
-            </intent-filter>
         </activity>
     </application>
 </manifest>

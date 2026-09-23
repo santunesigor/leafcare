@@ -44,6 +44,17 @@ class AuthValidationTest {
         assertNull(AuthRepository.validateSignUpInput("Nome Teste", "user@leafcare.test", "senha-segura"))
     }
 
+    @Test fun newPassword_shortFails() {
+        assertEquals(
+            "A senha deve ter pelo menos 6 caracteres",
+            AuthRepository.validatePasswordInput("12345")
+        )
+    }
+
+    @Test fun newPassword_minimumPasses() {
+        assertNull(AuthRepository.validatePasswordInput("123456"))
+    }
+
     @Test fun signIn_blankEmailFails() {
         assertEquals(
             "E-mail inválido",
