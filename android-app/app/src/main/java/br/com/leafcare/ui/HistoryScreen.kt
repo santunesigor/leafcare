@@ -33,16 +33,16 @@ import java.util.Locale
 fun percent(value: Float) = String.format(Locale.forLanguageTag("pt-BR"), "%.0f%%", value * 100)
 
 @Composable
-fun HistoryScreen(vm: LeafCareViewModel, onCamera: () -> Unit, onResult: (String) -> Unit) {
+fun HistoryScreen(vm: LeafCareViewModel, onCamera: () -> Unit, onResult: (String) -> Unit, onProfile: () -> Unit = {}) {
     val rows by vm.analyses.collectAsStateWithLifecycle()
     val threshold by vm.threshold.collectAsStateWithLifecycle()
     val modelError = vm.getModelError()
-    HistoryContent(rows, threshold, onCamera, onResult, { vm.getPhoto(it) }, modelError)
+    HistoryContent(rows, threshold, onCamera, onResult, { vm.getPhoto(it) }, modelError, onProfile)
 }
 
 @Composable
 fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: Float, onCamera: () -> Unit, onResult: (String) -> Unit,
-    photo: (String) -> Any, modelError: String?) {
+    photo: (String) -> Any, modelError: String?, onProfile: () -> Unit = {}) {
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("Todas") }
     var showFilter by remember { mutableStateOf(false) }
@@ -62,14 +62,23 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column {
-                        Text(stringResource(R.string.history_title), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.04.sp, color = LeafColors.Green)
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FigmaIcon(R.drawable.v3_logo, null, 16)
+                            Text(stringResource(R.string.history_title), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.04.sp, color = LeafColors.Green)
+                        }
                         Spacer(Modifier.height(4.dp))
                         Text(stringResource(R.string.history_greeting), fontSize = 27.sp, letterSpacing = (-0.945).sp)
                         Spacer(Modifier.height(4.dp))
                         Text(stringResource(R.string.history_subtitle), fontSize = 14.sp, color = LeafColors.Muted)
                     }
-                    FigmaIcon(R.drawable.v3_logo, null, 42)
+                    Spacer(Modifier.width(12.dp))
+                    Surface(onClick = onProfile, shape = CircleShape, color = LeafColors.Pale,
+                        border = BorderStroke(1.dp, LeafColors.Border), modifier = Modifier.size(48.dp)) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            FigmaIcon(R.drawable.v3_logo, "Abrir perfil", 26)
+                        }
+                    }
                 }
                 Spacer(Modifier.height(10.dp))
             }

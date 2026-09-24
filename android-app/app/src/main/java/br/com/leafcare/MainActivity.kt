@@ -16,7 +16,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import br.com.leafcare.auth.AuthViewModel
 import br.com.leafcare.ui.auth.AuthNavHost
+import br.com.leafcare.ui.auth.ProfileScreen
 import br.com.leafcare.ui.*
+import io.github.jan.supabase.gotrue.user.UserSession
 
 class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
@@ -40,15 +42,11 @@ fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
         authViewModel.onSessionRestored()
     }
 
-    // Show loading while restoring session
-    if (isLoading && session == null) {
-        LoadingScreen()
-    } else if (session != null) {
-        // User is authenticated - show main app
-        MainAppNavHost()
-    } else {
-        // No session - show auth flow
-        AuthNavHost(authViewModel)
+    // Auth gate: a single auth state decides which flow is visible.
+    when (appGateDestination(session, isLoading)) {
+        AppGate.Loading -> LoadingScreen()
+        AppGate.Main -> MainAppNavHost(authViewModel)
+        AppGate.Auth -> AuthNavHost(authViewModel)
     }
 }
 
@@ -70,7 +68,7 @@ fun LoadingScreen() {
 }
 
 @Composable
-fun MainAppNavHost() {
+fun MainAppNavHost(authViewModel: AuthViewModel) {
     val nav = rememberNavController()
     val vm: LeafCareViewModel = viewModel()
     val state by vm.ui.collectAsStateWithLifecycle()
@@ -80,7 +78,13 @@ fun MainAppNavHost() {
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
             NavHost(nav, startDestination = "history") {
                 composable("history") {
-                    HistoryScreen(vm, { nav.navigate("camera") }, { nav.navigate("result/$it") })
+                    HistoryScreen(vm, { nav.navigate("camera") }, { nav.navigate("result/$it") }, { nav.navigate("profile") })
+                }
+                composable("profile") {
+                    // Same AuthViewModel instance: logout clears the session and the
+                    // auth gate above switches back to Auth, disposing this NavHost,
+                    // so Back can never return to an authenticated screen.
+                    ProfileScreen(authViewModel, onBack = { nav.popBackStack() })
                 }
                 composable("camera") {
                     CameraScreen(vm, onBack = { nav.popBackStack() })
@@ -104,3 +108,23 @@ fun MainAppNavHost() {
         }
     }
 }
+
+/** Visible root decided by the single auth state. */
+internal enum class AppGate {
+    Loading,
+    Main,
+    Auth
+}
+
+/**
+ * Pure auth-gate decision (unit-testable): restoring without a session shows
+ * loading, a session shows the app, otherwise the auth flow.
+ */
+internal fun appGateDestination(session: UserSession?, isLoading: Boolean): AppGate =
+    if (isLoading && session == null) {
+        AppGate.Loading
+    } else if (session != null) {
+        AppGate.Main
+    } else {
+        AppGate.Auth
+    }

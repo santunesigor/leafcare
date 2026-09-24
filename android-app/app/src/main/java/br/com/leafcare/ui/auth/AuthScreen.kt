@@ -1,5 +1,6 @@
 package br.com.leafcare.ui.auth
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -23,8 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,7 +67,7 @@ fun AuthNavHost(viewModel: AuthViewModel) {
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
         AuthScreen.RecoveryCode -> RecoveryCodeScreen(viewModel)
         AuthScreen.NewPassword -> NewPasswordScreen(viewModel)
-        AuthScreen.Profile -> ProfileScreen(viewModel)
+        AuthScreen.Profile -> ProfileScreen(viewModel, onBack = { viewModel.setScreen(AuthScreen.Login) })
     }
 }
 
@@ -221,7 +220,7 @@ private fun AuthLinkedRow(prefix: String, link: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AuthBackButton(onClick: () -> Unit) {
+internal fun AuthBackButton(onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
         IconButton(onClick = onClick) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = LeafColors.Text)
@@ -439,46 +438,69 @@ fun NewPasswordScreen(viewModel: AuthViewModel) {
 }
 
 @Composable
-fun ProfileScreen(viewModel: AuthViewModel) {
+fun ProfileScreen(viewModel: AuthViewModel, onBack: () -> Unit) {
     val displayName = viewModel.getDisplayName()
     val email = viewModel.getEmail()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
+            .background(Color.White)
+            .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Perfil", style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(24.dp))
+        AuthBackButton(onBack)
+        Spacer(Modifier.weight(1f))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(displayName ?: "Usuário", style = MaterialTheme.typography.headlineSmall)
-                        Text(email ?: "", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
+        FigmaIcon(R.drawable.v3_logo, "LeafCare", 64)
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "CONTA LEAFCARE",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 2.04.sp,
+            color = LeafColors.Green
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            displayName ?: "Usuário",
+            style = MaterialTheme.typography.headlineSmall,
+            color = LeafColors.Text,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            email ?: "",
+            style = MaterialTheme.typography.bodyMedium,
+            color = LeafColors.Muted,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(32.dp))
 
         Button(
             onClick = { viewModel.signOut() },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            enabled = !isLoading,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, LeafColors.Border),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = LeafColors.Pale,
+                contentColor = MaterialTheme.colorScheme.error,
+                disabledContainerColor = LeafColors.Pale,
+                disabledContentColor = LeafColors.Muted
+            )
         ) {
-            Text("Sair da conta", color = MaterialTheme.colorScheme.onErrorContainer)
+            if (isLoading) {
+                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp)
+            } else {
+                Text("Sair da conta", fontWeight = FontWeight.SemiBold)
+            }
         }
+        Spacer(Modifier.weight(1f))
     }
 }

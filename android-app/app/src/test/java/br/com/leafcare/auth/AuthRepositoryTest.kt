@@ -179,6 +179,7 @@ class AuthRepositoryTest {
         assertTrue(result.isSuccess)
         assertEquals(1, backend.signOutCalls)
         assertNull(repository.session.value)
+        assertNull(repository.user.value)
         assertFalse(repository.hasPersistedSession())
     }
 
