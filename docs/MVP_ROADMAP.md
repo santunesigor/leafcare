@@ -410,14 +410,14 @@ Somente depois do código estabilizado.
 
 Atualizar:
 
-- [ ] README.md;
-- [ ] ARCHITECTURE.md;
-- [ ] TECHNICAL_DECISIONS.md;
-- [ ] MODEL_CARD.md;
-- [ ] INSTALL.md;
-- [ ] CHANGELOG.md;
-- [ ] documentação Supabase;
-- [ ] checklist de testes.
+- [x] README.md;
+- [x] ARCHITECTURE.md;
+- [x] TECHNICAL_DECISIONS.md;
+- [x] MODEL_CARD.md;
+- [x] INSTALL.md;
+- [x] CHANGELOG.md;
+- [x] documentação Supabase;
+- [x] checklist de testes.
 
 Opcional:
 
@@ -425,10 +425,17 @@ Opcional:
 
 Depois:
 
-- [ ] rodar todos os testes;
-- [ ] gerar build final;
+- [x] rodar todos os testes;
+- [x] gerar build final;
 - [ ] registrar versão;
 - [ ] preparar demonstração.
+
+**Status Fase 8 (técnico)**: documentação finalizada (README, ARCHITECTURE,
+TECHNICAL_DECISIONS, MODEL_CARD, INSTALL, SUPABASE_SETUP, CHANGELOG,
+FINAL_QA_CHECKLIST), lint verde (115 testes, 0 erros, 28 warnings só de
+versões pinadas), APK debug gerado (`versionCode 2`, `versionName 0.3.0` —
+manter; sem tag/release). **Falta só a bateria física final antes de
+qualquer release.**
 
 ---
 
