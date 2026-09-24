@@ -138,16 +138,9 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                                     color = Color.White,
                                     border = BorderStroke(1.dp, LeafColors.Border),
                                     shadowElevation = 8.dp,
-                                    modifier = Modifier.widthIn(min = 180.dp)
+                                    modifier = Modifier.width(200.dp)
                                 ) {
                                     Column(Modifier.padding(8.dp)) {
-                                        Text(
-                                            stringResource(R.string.confidence_threshold_label, percent(threshold)),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = LeafColors.Muted,
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-                                        )
-                                        HorizontalDivider(color = LeafColors.Border, thickness = 1.dp)
                                         listOf(stringResource(R.string.filter_all), stringResource(R.string.filter_identified), stringResource(R.string.filter_inconclusive)).forEach { option ->
                                             val selected = filter == option
                                             Row(
@@ -228,6 +221,17 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                         }
                     }
                 }
+            }
+            if (rows.isNotEmpty()) item {
+                Text(
+                    stringResource(R.string.confidence_threshold_label, percent(threshold)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LeafColors.Muted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 4.dp)
+                )
             }
         }
     }
