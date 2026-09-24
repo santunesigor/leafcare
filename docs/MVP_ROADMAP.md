@@ -346,51 +346,59 @@ Objetivo: validar o sistema completo.
 
 ## Autenticação
 
-- [ ] cadastro;
-- [ ] login correto;
-- [ ] senha errada;
-- [ ] recuperação;
-- [ ] logout;
-- [ ] sessão persistida;
-- [ ] início offline.
+- [x] cadastro;
+- [x] login correto;
+- [x] senha errada;
+- [x] recuperação;
+- [x] logout;
+- [x] sessão persistida;
+- [x] início offline.
 
 ## Offline
 
-- [ ] classificação sem internet;
-- [ ] criação de análise sem internet;
-- [ ] histórico local;
+- [x] classificação sem internet;
+- [x] criação de análise sem internet;
+- [x] histórico local;
 - [ ] várias análises offline;
 - [ ] retorno da conexão;
 - [ ] retry automático.
 
 ## Sincronização
 
-- [ ] análise;
-- [ ] foto;
-- [ ] exclusão;
-- [ ] retry;
+- [x] análise;
+- [x] foto;
+- [x] exclusão;
+- [x] retry;
 - [ ] app fechado durante sync;
 - [ ] conexão instável;
 - [ ] mesmo usuário em dois aparelhos.
 
 ## Segurança
 
-- [ ] usuário A não lê dados de B;
-- [ ] usuário A não lê fotos de B;
-- [ ] RLS ativa;
-- [ ] bucket privado;
-- [ ] nenhuma service role key no app;
-- [ ] nenhum secret versionado.
+- [x] usuário A não lê dados de B;
+- [x] usuário A não lê fotos de B;
+- [x] RLS ativa;
+- [x] bucket privado;
+- [x] nenhuma service role key no app;
+- [x] nenhum secret versionado.
 
 ## Android
 
-- [ ] câmera;
-- [ ] galeria;
+- [x] câmera;
+- [x] galeria;
 - [ ] permissões;
-- [ ] histórico;
-- [ ] reinício;
-- [ ] modo avião;
+- [x] histórico;
+- [x] reinício;
+- [x] modo avião;
 - [ ] device físico.
+
+**Status QA técnico**: auditado por código/testes em 24/09/2026 (115 testes, lint
+executado). Achado crítico corrigido: Room sem `user_id` permitia vazar dados
+entre contas no mesmo aparelho — isolamento por wipe na troca de conta +
+aborte do worker em troca/logout + `WorkManagerInitializer` padrão removido
+(evita double-init). Itens acima marcados [x] = validados por código/testes;
+físicos (device, permissões, 2 usuários reais, conexão instável, reinstalação)
+permanecem pendentes.
 
 Critério de saída: nenhum bug crítico conhecido no fluxo principal.
 
