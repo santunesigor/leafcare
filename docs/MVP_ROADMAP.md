@@ -311,12 +311,12 @@ Celular B
 
 Escopo:
 
-- [ ] download de análises;
-- [ ] merge com Room;
+- [x] download de análises;
+- [x] merge com Room;
 - [ ] download/cache de fotos;
-- [ ] deduplicação;
+- [x] deduplicação;
 - [ ] conflitos;
-- [ ] exclusões;
+- [x] exclusões;
 - [ ] estado de carregamento;
 - [ ] tratamento de conexão instável.
 
@@ -329,6 +329,13 @@ histórico consistente
 +
 sem duplicações
 ```
+
+**Status**: Restauração de análises implementada (aguardando teste físico): `fetch`
+via RLS + merge por UUID no mesmo worker da Fase 4/5 (após o push), importados
+como SYNCED/REMOTE_ONLY, tombstones remotos nunca importados e aplicados sobre
+linhas SYNCED locais, pendentes locais e tombstones locais nunca sobrescritos,
+restore no login/cadastro e no boot com internet, app sempre abre offline.
+Fotos: sem download nesta unidade (próxima).
 
 ---
 
