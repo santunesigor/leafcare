@@ -20,8 +20,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
@@ -106,13 +112,33 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                     Box {
                         IconButton(onClick = { showFilter = true }, modifier = Modifier.size(46.dp).border(1.dp, LeafColors.Border, RoundedCornerShape(14.dp))) { FigmaIcon(R.drawable.v3_filter, stringResource(R.string.filter_button_desc), 20) }
                         if (showFilter) {
-                            Popup(alignment = Alignment.TopEnd, onDismissRequest = { showFilter = false }) {
+                            // Compact menu anchored below the filter button, right-aligned,
+                            // sized to its content. Explicit position provider: the default
+                            // popup alignment opened away from the button.
+                            val density = LocalDensity.current
+                            val menuOffset = remember(density) {
+                                object : PopupPositionProvider {
+                                    override fun calculatePosition(
+                                        anchorBounds: IntRect,
+                                        windowSize: IntSize,
+                                        layoutDirection: LayoutDirection,
+                                        popupContentSize: IntSize
+                                    ): IntOffset {
+                                        val x = (anchorBounds.right - popupContentSize.width)
+                                            .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                                        val y = (anchorBounds.bottom + with(density) { 4.dp.roundToPx() })
+                                            .coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0))
+                                        return IntOffset(x, y)
+                                    }
+                                }
+                            }
+                            Popup(popupPositionProvider = menuOffset, onDismissRequest = { showFilter = false }) {
                                 Surface(
                                     shape = RoundedCornerShape(14.dp),
                                     color = Color.White,
                                     border = BorderStroke(1.dp, LeafColors.Border),
                                     shadowElevation = 8.dp,
-                                    modifier = Modifier.widthIn(min = 220.dp).padding(top = 4.dp)
+                                    modifier = Modifier.widthIn(min = 180.dp)
                                 ) {
                                     Column(Modifier.padding(8.dp)) {
                                         Text(

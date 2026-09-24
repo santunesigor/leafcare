@@ -1,9 +1,10 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Real V3 two-leaf asset, uniformly scaled to 78dp and centered so the
-         artwork stays inside the 66dp safe circle of every launcher mask. -->
+    <!-- Real V3 two-leaf asset, uniformly scaled to 66dp and centered: the
+         artwork rests well inside the 66dp safe circle with margin for all
+         launcher masks (circle, rounded-square, squircle). -->
     <item
-        android:width="78dp"
-        android:height="78dp"
+        android:width="66dp"
+        android:height="66dp"
         android:gravity="center"
         android:drawable="@drawable/v3_logo" />
 </layer-list>
