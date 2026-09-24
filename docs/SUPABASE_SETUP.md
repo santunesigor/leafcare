@@ -208,3 +208,56 @@ Only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` go into the Android app (via 
 3. Verify storage bucket is private and policies work
 4. Document the `SUPABASE_URL` and `SUPABASE_ANON_KEY` for Android integration (Phase 3)
 5. Proceed to Phase 3: Authentication & Profile
+
+---
+
+## 10. OTP Email Templates (in-app codes, no web links)
+
+The Android app verifies email confirmation and password recovery with
+6-digit codes typed **inside the app**. The hosted email templates must
+therefore send a **code**, not a link. This is a manual dashboard step;
+no SQL or code change does it.
+
+Dashboard → **Authentication → Email Templates**:
+
+### Confirm signup
+
+- Replace the default template body (which uses `{{ .ConfirmationURL }}`)
+  with plain LeafCare text containing the code placeholder, e.g.:
+
+```text
+Bem-vindo ao LeafCare!
+
+Use o código abaixo para confirmar sua conta:
+
+{{ .Token }}
+
+Se você não criou esta conta, ignore este e-mail.
+```
+
+- The template must NOT depend on `ConfirmationURL`.
+
+### Recovery / Reset password
+
+- Replace the default template body the same way, e.g.:
+
+```text
+LeafCare — recuperação de senha
+
+Use o código abaixo para definir uma nova senha:
+
+{{ .Token }}
+
+Se você não pediu isso, ignore este e-mail.
+```
+
+- The template must NOT depend on `ConfirmationURL`.
+
+### Enable confirmation for signups
+
+Dashboard → **Authentication → Providers → Email**:
+**Confirm email must be ON** so new signups require the OTP code.
+
+No secrets go into templates or docs. Only the `{{ .Token }}`
+placeholder is needed; the app calls `verifyEmailOtp` with
+`OtpType.Email.SIGNUP` / `OtpType.Email.RECOVERY` on supabase-kt 2.1.0.
