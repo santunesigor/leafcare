@@ -313,7 +313,7 @@ Escopo:
 
 - [x] download de análises;
 - [x] merge com Room;
-- [ ] download/cache de fotos;
+- [x] download/cache de fotos;
 - [x] deduplicação;
 - [ ] conflitos;
 - [x] exclusões;
@@ -335,7 +335,8 @@ via RLS + merge por UUID no mesmo worker da Fase 4/5 (após o push), importados
 como SYNCED/REMOTE_ONLY, tombstones remotos nunca importados e aplicados sobre
 linhas SYNCED locais, pendentes locais e tombstones locais nunca sobrescritos,
 restore no login/cadastro e no boot com internet, app sempre abre offline.
-Fotos: sem download nesta unidade (próxima).
+Fotos: download e cache local implementados (aguardando teste físico); sem
+conflitos avançados ainda.
 
 ---
 
