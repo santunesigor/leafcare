@@ -79,4 +79,29 @@ class AnalysisRepository(
             }
         }
     }
+
+    /** Removes every local row and photo file (account switch isolation). */
+    suspend fun clearAllLocal() = mutex.withLock {
+        withContext(Dispatchers.IO + NonCancellable) {
+            dao.deleteAll()
+            photos.listFiles()?.forEach { file ->
+                if (file.isFile) file.delete()
+            }
+        }
+    }
+
+    suspend fun hasLocalRows(): Boolean = dao.count() > 0
 }
+
+/**
+ * Decides whether local data must be wiped on authentication.
+ *
+ * Room rows carry no owner column, so rows of a previous account must never
+ * be shown to (or synced as) a different account. Same-account re-login keeps
+ * everything (offline-first preserved); logout alone never wipes.
+ */
+internal fun shouldWipeForAccountSwitch(
+    storedUserId: String?,
+    newUserId: String,
+    hasLocalRows: Boolean,
+): Boolean = hasLocalRows && (storedUserId == null || storedUserId != newUserId)

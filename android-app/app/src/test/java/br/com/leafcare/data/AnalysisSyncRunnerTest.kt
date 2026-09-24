@@ -68,6 +68,13 @@ internal class FakeAnalysisDao(initial: List<AnalysisEntity> = emptyList()) : An
         update(id) { it.copy(syncStatus = SyncState.PENDING_DELETE, deletedAt = deletedAt) }
     }
 
+    override suspend fun count(): Int = rows.size
+
+    override suspend fun deleteAll() {
+        rows.clear()
+        changes.value++
+    }
+
     override suspend fun getPendingPhotoDownloads(): List<AnalysisEntity> =
         rows.values.filter {
             it.photoSyncStatus == PhotoSyncState.REMOTE_ONLY && it.deletedAt == null

@@ -3,7 +3,6 @@
 
     <!-- History Screen -->
     <string name="history_title">LEAFCARE</string>
-    <string name="history_greeting">Olá, Produtor</string>
     <string name="history_subtitle">Suas análises recentes</string>
     <string name="search_hint">Pesquisar análise</string>
     <string name="filter_button_desc">Filtrar análises</string>

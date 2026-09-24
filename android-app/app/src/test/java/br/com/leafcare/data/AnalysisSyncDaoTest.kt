@@ -147,7 +147,7 @@ class AnalysisSyncDaoTest {
         }
     }
 
-    @Test fun migration1To2PreservesExistingAnalyses() = runBlocking {
+    @Test fun migrationChainPreservesExistingAnalyses() = runBlocking {
         val file = dbFile("sync-migrate")
 
         // Existing v1 database with one analysis, created by Room itself.
@@ -173,8 +173,7 @@ class AnalysisSyncDaoTest {
         }
     }
 
-    @Test fun remoteOnlyStateSurvivesReopen() = runBlocking {
-        val file = dbFile("sync-restart-photo")
+    @Test fun remoteOnlyStateSurvivesReopen() = runBlocking {        val file = dbFile("sync-restart-photo")
         Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
             .allowMainThreadQueries()
             .build()
@@ -199,6 +198,24 @@ class AnalysisSyncDaoTest {
             assertEquals(PhotoSyncState.REMOTE_ONLY, row?.photoSyncStatus)
         } finally {
             reopened.close()
+        }
+    }
+
+    @Test fun deleteAllRemovesEveryRow() = runBlocking {
+        val file = dbFile("sync-delete-all")
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
+            .allowMainThreadQueries()
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .build()
+        try {
+            db.analysisDao().insert(entity())
+            db.analysisDao().insert(entity().copy(id = "a-2", photoName = "a-2.img"))
+            assertEquals(2, db.analysisDao().count())
+            db.analysisDao().deleteAll()
+            assertEquals(0, db.analysisDao().count())
+            assertNull(db.analysisDao().get("a-1"))
+        } finally {
+            db.close()
         }
     }
 

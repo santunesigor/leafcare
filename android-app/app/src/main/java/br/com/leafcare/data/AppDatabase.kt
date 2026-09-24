@@ -73,6 +73,12 @@ interface AnalysisDao {
     // Tombstones never download; missing states stay retryable downstream.
     @Query("SELECT * FROM analyses WHERE photoSyncStatus = 'REMOTE_ONLY' AND deletedAt IS NULL")
     suspend fun getPendingPhotoDownloads(): List<AnalysisEntity>
+
+    @Query("SELECT COUNT(*) FROM analyses")
+    suspend fun count(): Int
+
+    @Query("DELETE FROM analyses")
+    suspend fun deleteAll()
 }
 
 /** v1 -> v2: sync columns. Existing rows default to pending upload. */

@@ -49,7 +49,8 @@ class SyncAnalysesWorker(
 
     override suspend fun doWork(): Result {
         val app = applicationContext as LeafCareApplication
-        val userId = app.supabaseClientHolder.auth.currentUserOrNull()?.id
+        val auth = app.supabaseClientHolder.auth
+        val userId = auth.currentUserOrNull()?.id
         val dao = app.database.analysisDao()
         val client = app.supabaseClientHolder.client
         val api = PostgrestAnalysisSyncApi(
@@ -74,11 +75,14 @@ class SyncAnalysesWorker(
             is SyncRunResult.SkippedNoAuth -> return Result.success()
             is SyncRunResult.Completed -> push.failures
         }
+        // Account switch or logout mid-pass: abort instead of restoring or
+        // downloading as the wrong user (or logged out).
+        if (auth.currentUserOrNull()?.id != userId) return Result.success()
         // Same pass, same retry policy: push first, then restore remote rows
-        // into Room (no photo download in this unit).
+        // into Room, then cache their photos.
         val restoreFailures =
             (runner.restoreOnce(userId) as? SyncRunResult.Completed)?.failures ?: 0
-        // Then cache photos for REMOTE_ONLY rows (download unit).
+        if (auth.currentUserOrNull()?.id != userId) return Result.success()
         val downloadFailures =
             (runner.downloadOnce(userId) as? SyncRunResult.Completed)?.failures ?: 0
         val failures = pushFailures + restoreFailures + downloadFailures

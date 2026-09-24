@@ -6,6 +6,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import br.com.leafcare.LeafCareApplication
+import io.github.jan.supabase.gotrue.user.UserSession
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -127,11 +128,7 @@ class AuthViewModel(
                 clearForms()
                 _navigation.send(destination)
             }
-            if (result.isSuccess) {
-                // Fresh login: pull remote history (cold starts already schedule
-                // via Application.onCreate). Safe cast keeps JVM tests green.
-                (getApplication<Application>() as? LeafCareApplication)?.scheduleSync()
-            }
+            onAuthenticated(result)
         }
     }
 
@@ -148,10 +145,21 @@ class AuthViewModel(
                 clearForms()
                 _navigation.send(destination)
             }
-            if (result.isSuccess) {
-                (getApplication<Application>() as? LeafCareApplication)?.scheduleSync()
-            }
+            onAuthenticated(result)
         }
+    }
+
+    /**
+     * Post-login hook: isolate local data to this account (wipe on account
+     * switch, keep on same-account re-login) and trigger a sync pass.
+     * Cold starts schedule via Application.onCreate. Safe cast keeps JVM
+     * tests (plain Application stub) green.
+     */
+    private suspend fun onAuthenticated(result: Result<*>) {
+        if (!result.isSuccess) return
+        val app = getApplication<Application>() as? LeafCareApplication ?: return
+        (result.getOrNull() as? UserSession)?.user?.id?.let { app.ensureAccountIsolation(it) }
+        app.scheduleSync()
     }
 
     /** Sign out action */
@@ -199,8 +207,8 @@ class AuthViewModel(
             if (result.isSuccess) {
                 clearForms()
                 _navigation.send(AuthNavigationEvent.NavigateToApp)
-                (getApplication<Application>() as? LeafCareApplication)?.scheduleSync()
             }
+            onAuthenticated(result)
         }
     }
 
