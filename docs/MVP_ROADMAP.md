@@ -215,7 +215,7 @@ Escopo:
 - [x] impedir duplicações;
 - [x] sincronizar exclusões;
 - [x] tratar erros de rede;
-- [ ] testar modo offline → online.
+- [x] testar modo offline → online.
 
 Estados sugeridos:
 
@@ -241,11 +241,10 @@ análise sincroniza automaticamente
 nenhuma duplicação
 ```
 
-**Status**: Fundação implementada (não validada contra o backend real ainda). Room v2 com
-`syncStatus`/`deletedAt` e migration explícita 1→2; fila WorkManager (só com rede,
-backoff exponencial, sobrevive a reinício); upsert idempotente no UUID local;
-exclusões por tombstone; 11 testes de sync. Pendente: teste real offline → online,
-fotos (Fase 5) e multi-device (Fase 6).
+**Status**: Fundação implementada e validada manualmente no aparelho: análise criada
+offline permanece no Room; ao voltar a internet o WorkManager sincroniza; o registro
+aparece em `public.analyses`; fluxo offline → online funciona. Fotos na Fase 5,
+multi-device na Fase 6.
 
 ---
 
@@ -255,13 +254,13 @@ Objetivo: salvar as fotos remotamente sem prejudicar o uso offline.
 
 Escopo:
 
-- [ ] criar upload para Storage privado;
-- [ ] usar caminho por usuário/análise;
-- [ ] retry automático;
-- [ ] registrar `photo_path`;
-- [ ] tratar upload incompleto;
-- [ ] manter cópia local;
-- [ ] proteger acesso com policies.
+- [x] criar upload para Storage privado;
+- [x] usar caminho por usuário/análise;
+- [x] retry automático;
+- [x] registrar `photo_path`;
+- [x] tratar upload incompleto;
+- [x] manter cópia local;
+- [x] proteger acesso com policies.
 
 Estrutura preferida:
 
@@ -282,6 +281,12 @@ bucket é privado
 +
 usuário só acessa suas fotos
 ```
+
+**Status**: Implementado (aguardando teste físico): upload idempotente para
+`analysis-photos/{user_id}/{analysis_id}.jpg` com `upsert=true`, `photo_path`
+associado após confirmação, `photoSyncStatus` separado com migration 2→3,
+delete remoto da foto no fluxo do tombstone (404 = concluído), 12 testes de
+fotos. Sem download (Fase 6), sem URLs assinadas no banco.
 
 ---
 
