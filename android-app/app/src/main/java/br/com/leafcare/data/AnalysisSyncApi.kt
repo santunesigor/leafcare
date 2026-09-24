@@ -2,6 +2,7 @@ package br.com.leafcare.data
 
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.storage.BucketApi
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -30,6 +31,10 @@ internal fun AnalysisEntity.toRemoteJson(userId: String, appVersion: String): Js
         put("photo_path", photoName)
     }
 
+/** Remote object path for an analysis photo. No new UUIDs: same analysis id. */
+internal fun remotePhotoPath(userId: String, analysisId: String): String =
+    "$userId/$analysisId.jpg"
+
 /** Narrow seam over the remote calls the sync engine needs (testable without network). */
 internal interface AnalysisSyncApi {
     /** Idempotent insert-or-update keyed by the analysis UUID. */
@@ -37,10 +42,22 @@ internal interface AnalysisSyncApi {
 
     /** Tombstone a remote row; no photo upload in this phase. */
     suspend fun markRemoteDeleted(id: String, deletedAtIso: String)
+
+    /** Idempotent photo upload to the deterministic remote path. */
+    suspend fun uploadPhoto(path: String, bytes: ByteArray)
+
+    /** Associates the uploaded photo path on the remote row. Only the path. */
+    suspend fun updatePhotoPath(id: String, photoPath: String)
+
+    /** Removes remote photo objects. Missing objects are the caller's check. */
+    suspend fun deleteRemotePhotos(paths: List<String>)
 }
 
 /** Production [AnalysisSyncApi] on the authenticated supabase-kt 2.1.0 client. */
-internal class PostgrestAnalysisSyncApi(postgrest: Postgrest) : AnalysisSyncApi {
+internal class PostgrestAnalysisSyncApi(
+    postgrest: Postgrest,
+    private val bucket: BucketApi,
+) : AnalysisSyncApi {
 
     private val table = postgrest["analyses"]
 
@@ -56,5 +73,23 @@ internal class PostgrestAnalysisSyncApi(postgrest: Postgrest) : AnalysisSyncApi 
                 eq("id", id)
             }
         }
+    }
+
+    override suspend fun uploadPhoto(path: String, bytes: ByteArray) {
+        bucket.upload(path, bytes, upsert = true)
+    }
+
+    override suspend fun updatePhotoPath(id: String, photoPath: String) {
+        table.update({
+            set("photo_path", photoPath)
+        }) {
+            filter {
+                eq("id", id)
+            }
+        }
+    }
+
+    override suspend fun deleteRemotePhotos(paths: List<String>) {
+        bucket.delete(paths)
     }
 }

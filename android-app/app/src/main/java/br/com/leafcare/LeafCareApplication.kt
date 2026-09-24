@@ -8,13 +8,14 @@ import br.com.leafcare.data.AnalysisRepository
 import br.com.leafcare.data.AppDatabase
 import br.com.leafcare.data.DiseaseCatalog
 import br.com.leafcare.data.MIGRATION_1_2
+import br.com.leafcare.data.MIGRATION_2_3
 import br.com.leafcare.data.requestAnalysisSync
 import br.com.leafcare.ml.LeafClassifier
 
 class LeafCareApplication : Application(), Configuration.Provider {
     val database by lazy {
         Room.databaseBuilder(this, AppDatabase::class.java, "leafcare.db")
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
     }
     val catalog by lazy { DiseaseCatalog(this) }

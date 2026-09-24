@@ -86,6 +86,7 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:supabase-kt:2.1.0")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.1.0")
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.1.0")
+    implementation("io.github.jan-tennert.supabase:storage-kt:2.1.0")
 
     // WorkManager for offline-first sync queue (Phase 4)
     implementation("androidx.work:work-runtime-ktx:2.9.0")

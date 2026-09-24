@@ -13,11 +13,15 @@ import br.com.leafcare.BuildConfig
 import br.com.leafcare.LeafCareApplication
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.storage.storage
 import java.io.File
 import java.util.concurrent.TimeUnit
 
 private const val SYNC_WORK_NAME = "sync-analyses"
 private const val MAX_ATTEMPTS = 5
+
+/** Private bucket holding analysis photos at `{user_id}/{analysis_id}.jpg`. */
+internal const val PHOTOS_BUCKET = "analysis-photos"
 
 /** Schedules a sync pass: runs only with network, with exponential backoff. */
 fun requestAnalysisSync(context: Context) {
@@ -47,7 +51,11 @@ class SyncAnalysesWorker(
         val app = applicationContext as LeafCareApplication
         val userId = app.supabaseClientHolder.auth.currentUserOrNull()?.id
         val dao = app.database.analysisDao()
-        val api = PostgrestAnalysisSyncApi(app.supabaseClientHolder.client.postgrest)
+        val client = app.supabaseClientHolder.client
+        val api = PostgrestAnalysisSyncApi(
+            postgrest = client.postgrest,
+            bucket = client.storage[PHOTOS_BUCKET]
+        )
         val photosDir = File(applicationContext.filesDir, "photos")
         val runner = AnalysisSyncRunner(
             dao = dao,
@@ -56,6 +64,10 @@ class SyncAnalysesWorker(
             photoDeleter = { name ->
                 require(File(name).name == name)
                 File(photosDir, name).delete()
+            },
+            photoFile = { name ->
+                require(File(name).name == name)
+                File(photosDir, name)
             }
         )
         return when (val outcome = runner.syncOnce(userId)) {

@@ -48,6 +48,36 @@ internal abstract class LegacyAppDatabase : RoomDatabase() {
     abstract fun analysisDao(): LegacyAnalysisDao
 }
 
+/** v2 shape (pre-photo-sync columns), managed by Room. */
+@Entity(tableName = "analyses")
+internal data class LegacyV2AnalysisEntity(
+    @PrimaryKey val id: String,
+    val photoName: String,
+    val createdAt: Long,
+    val classId: String,
+    val displayName: String,
+    val scientificName: String,
+    val confidence: Float,
+    val top3Json: String,
+    val inconclusive: Boolean,
+    val threshold: Float,
+    val inferenceMs: Double,
+    val modelSha256: String,
+    val syncStatus: SyncState = SyncState.SYNCED,
+    val deletedAt: Long? = null,
+)
+
+@Dao
+internal interface LegacyV2AnalysisDao {
+    @Insert
+    suspend fun insert(analysis: LegacyV2AnalysisEntity)
+}
+
+@Database(entities = [LegacyV2AnalysisEntity::class], version = 2, exportSchema = false)
+internal abstract class LegacyV2AppDatabase : RoomDatabase() {
+    abstract fun analysisDao(): LegacyV2AnalysisDao
+}
+
 /**
  * Room persistence tests (Robolectric): pending rows survive an app restart,
  * and the explicit v1 -> v2 migration preserves existing analyses with a
@@ -129,7 +159,7 @@ class AnalysisSyncDaoTest {
 
         val migrated = Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
             .allowMainThreadQueries()
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
         try {
             val row = migrated.analysisDao().get("a-1")
@@ -138,6 +168,49 @@ class AnalysisSyncDaoTest {
             assertEquals("Olho-de-rã", row?.displayName)
             assertEquals(SyncState.PENDING_UPLOAD, row?.syncStatus)
             assertNull(row?.deletedAt)
+        } finally {
+            migrated.close()
+        }
+    }
+
+    @Test fun migration2To3PreservesExistingAnalyses() = runBlocking {
+        val file = dbFile("sync-migrate-photo")
+
+        Room.databaseBuilder(context, LegacyV2AppDatabase::class.java, file.absolutePath)
+            .allowMainThreadQueries()
+            .build()
+            .also {
+                it.analysisDao().insert(
+                    LegacyV2AnalysisEntity(
+                        id = "a-1",
+                        photoName = "a-1.img",
+                        createdAt = 1_728_000_000_000,
+                        classId = "frog_eye",
+                        displayName = "Olho-de-rã",
+                        scientificName = "Cercospora nicotianae",
+                        confidence = 0.82f,
+                        top3Json = """[{"class_id":"frog_eye","confidence":0.82}]""",
+                        inconclusive = false,
+                        threshold = 0.7f,
+                        inferenceMs = 30.0,
+                        modelSha256 = "abc123",
+                        syncStatus = SyncState.SYNCED,
+                        deletedAt = null
+                    )
+                )
+            }
+            .close()
+
+        val migrated = Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
+            .allowMainThreadQueries()
+            .addMigrations(MIGRATION_2_3)
+            .build()
+        try {
+            val row = migrated.analysisDao().get("a-1")
+            assertNotNull(row)
+            assertEquals("frog_eye", row?.classId)
+            assertEquals(SyncState.SYNCED, row?.syncStatus)
+            assertEquals(PhotoSyncState.PENDING_UPLOAD, row?.photoSyncStatus)
         } finally {
             migrated.close()
         }

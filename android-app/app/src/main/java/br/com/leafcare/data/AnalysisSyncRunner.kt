@@ -2,6 +2,7 @@ package br.com.leafcare.data
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.datetime.Instant
+import java.io.File
 
 /** Outcome of one sync pass. Never throws for backend failures. */
 internal sealed interface SyncRunResult {
@@ -16,7 +17,10 @@ internal sealed interface SyncRunResult {
  * Offline-first sync engine: Room -> Supabase.
  *
  * - Uploads pending rows with idempotent upsert on the local UUID.
- * - Deletes tombstoned rows remotely, then removes them (and the photo) locally.
+ * - Uploads photos only for remotely confirmed analyses, then associates
+ *   the remote path on the row. Same deterministic path on every retry.
+ * - Deletes tombstoned rows remotely (photo first), then removes them
+ *   (and the photo) locally.
  * - A failed delete keeps its tombstone and retries through the delete path,
  *   so a deleted analysis can never be resurrected by a later upsert.
  * - Network/auth failures never touch local data beyond the ERROR state.
@@ -26,6 +30,7 @@ internal class AnalysisSyncRunner(
     private val api: AnalysisSyncApi,
     private val appVersion: String,
     private val photoDeleter: (photoName: String) -> Unit = {},
+    private val photoFile: (photoName: String) -> File = { throw IllegalStateException("no photo storage") },
 ) {
     suspend fun syncOnce(userId: String?): SyncRunResult {
         if (userId == null) return SyncRunResult.SkippedNoAuth
@@ -44,8 +49,33 @@ internal class AnalysisSyncRunner(
             }
         }
 
+        dao.getPendingPhotoUploads().forEach { entity ->
+            try {
+                val path = remotePhotoPath(userId, entity.id)
+                api.uploadPhoto(path, photoFile(entity.photoName).readBytes())
+                api.updatePhotoPath(entity.id, path)
+                dao.markPhotoSynced(entity.id)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Missing local file included: retryable, never a crash.
+                dao.markPhotoError(entity.id)
+                failures++
+            }
+        }
+
         dao.getPendingDeletes().forEach { entity ->
             try {
+                if (entity.photoSyncStatus == PhotoSyncState.SYNCED) {
+                    try {
+                        api.deleteRemotePhotos(listOf(remotePhotoPath(userId, entity.id)))
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // Already gone remotely: treated as completed, not fatal.
+                        if (!isRemoteNotFound(e)) throw e
+                    }
+                }
                 val deletedAt = entity.deletedAt ?: System.currentTimeMillis()
                 api.markRemoteDeleted(entity.id, Instant.fromEpochMilliseconds(deletedAt).toString())
                 dao.delete(entity.id)
@@ -59,5 +89,12 @@ internal class AnalysisSyncRunner(
         }
 
         return SyncRunResult.Completed(failures)
+    }
+
+    private fun isRemoteNotFound(e: Exception): Boolean {
+        val raw = e.message.orEmpty().lowercase()
+        return raw.contains("not found") ||
+            raw.contains("does not exist") ||
+            raw.contains("404")
     }
 }

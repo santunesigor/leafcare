@@ -25,3 +25,22 @@ class SyncStateConverter {
     @TypeConverter
     fun toState(name: String): SyncState = SyncState.valueOf(name)
 }
+
+/**
+ * Photo upload state, tracked separately from the analysis row state so an
+ * analysis is never marked fully SYNCED before its photo is uploaded.
+ * Survives app restarts via the Room column.
+ */
+enum class PhotoSyncState {
+    PENDING_UPLOAD,
+    SYNCED,
+    ERROR
+}
+
+class PhotoSyncStateConverter {
+    @TypeConverter
+    fun fromState(state: PhotoSyncState): String = state.name
+
+    @TypeConverter
+    fun toState(name: String): PhotoSyncState = PhotoSyncState.valueOf(name)
+}
