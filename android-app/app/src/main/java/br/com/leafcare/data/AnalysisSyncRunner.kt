@@ -141,6 +141,56 @@ internal class AnalysisSyncRunner(
         return SyncRunResult.Completed(0)
     }
 
+    /**
+     * Downloads photos for REMOTE_ONLY rows into the private local photo
+     * storage, using the same files the UI already reads (`{id}.img`).
+     *
+     * - Existing valid local file: cache satisfied, no download.
+     * - Writes go through a temp file + rename, so a failed download never
+     *   leaves a partial file as a valid photo.
+     * - Failures keep REMOTE_ONLY (retryable); the analysis row is untouched.
+     * - Remote path is always derived from the session user id, never read
+     *   from stored data, so another user's path can't be fetched.
+     */
+    suspend fun downloadOnce(userId: String?): SyncRunResult {
+        if (userId == null) return SyncRunResult.SkippedNoAuth
+
+        var failures = 0
+
+        dao.getPendingPhotoDownloads().forEach { entity ->
+            try {
+                val target = photoFile(entity.photoName)
+                if (target.isFile && target.length() > 0) {
+                    dao.markPhotoSynced(entity.id)
+                } else {
+                    if (target.isFile) target.delete()
+                    val bytes = api.downloadPhoto(remotePhotoPath(userId, entity.id))
+                    require(bytes.isNotEmpty()) { "empty photo payload" }
+                    writeAtomically(target, bytes)
+                    dao.markPhotoSynced(entity.id)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failures++
+            }
+        }
+
+        return SyncRunResult.Completed(failures)
+    }
+
+    private fun writeAtomically(target: File, bytes: ByteArray) {
+        target.parentFile?.mkdirs()
+        val tmp = File(target.parent, "${target.name}.tmp")
+        try {
+            tmp.writeBytes(bytes)
+            require(tmp.renameTo(target)) { "photo rename failed" }
+        } catch (e: Exception) {
+            tmp.delete()
+            throw e
+        }
+    }
+
     private fun isRemoteNotFound(e: Exception): Boolean {
         val raw = e.message.orEmpty().lowercase()
         return raw.contains("not found") ||

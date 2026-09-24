@@ -78,7 +78,10 @@ class SyncAnalysesWorker(
         // into Room (no photo download in this unit).
         val restoreFailures =
             (runner.restoreOnce(userId) as? SyncRunResult.Completed)?.failures ?: 0
-        val failures = pushFailures + restoreFailures
+        // Then cache photos for REMOTE_ONLY rows (download unit).
+        val downloadFailures =
+            (runner.downloadOnce(userId) as? SyncRunResult.Completed)?.failures ?: 0
+        val failures = pushFailures + restoreFailures + downloadFailures
         return if (failures == 0 || runAttemptCount >= MAX_ATTEMPTS) {
             Result.success()
         } else {

@@ -68,6 +68,11 @@ internal class FakeAnalysisDao(initial: List<AnalysisEntity> = emptyList()) : An
         update(id) { it.copy(syncStatus = SyncState.PENDING_DELETE, deletedAt = deletedAt) }
     }
 
+    override suspend fun getPendingPhotoDownloads(): List<AnalysisEntity> =
+        rows.values.filter {
+            it.photoSyncStatus == PhotoSyncState.REMOTE_ONLY && it.deletedAt == null
+        }
+
     override suspend fun getPendingPhotoUploads(): List<AnalysisEntity> =
         rows.values.filter {
             (it.photoSyncStatus == PhotoSyncState.PENDING_UPLOAD || it.photoSyncStatus == PhotoSyncState.ERROR) &&
@@ -100,6 +105,7 @@ internal class FakeAnalysisSyncApi(
     var photoDeleteNotFound: Boolean = false,
     var failFetch: Boolean = false,
     var fetchRows: List<JsonObject> = emptyList(),
+    var failDownload: Boolean = false,
 ) : AnalysisSyncApi {
 
     val remote = mutableMapOf<String, JsonObject>()
@@ -110,6 +116,8 @@ internal class FakeAnalysisSyncApi(
     val photoPathUpdates = mutableListOf<Pair<String, String>>()
     val photoDeleteCalls = mutableListOf<String>()
     var fetchCalls = 0
+    val downloadCalls = mutableListOf<String>()
+    val remoteObjects = mutableMapOf<String, ByteArray>()
 
     override suspend fun upsertAnalysis(row: JsonObject) {
         if (failUpsert) throw IOException("offline")
@@ -145,6 +153,12 @@ internal class FakeAnalysisSyncApi(
         fetchCalls++
         if (failFetch) throw IOException("offline")
         return fetchRows
+    }
+
+    override suspend fun downloadPhoto(path: String): ByteArray {
+        downloadCalls += path
+        if (failDownload) throw IOException("offline")
+        return remoteObjects[path] ?: throw IOException("404 object not found")
     }
 }
 
@@ -560,5 +574,134 @@ class AnalysisSyncRunnerTest {
 
         assertEquals(SyncRunResult.Completed(0), result)
         assertNotNull(dao.get("r-1"))
+    }
+
+    private fun remoteOnlyEntity(id: String = "r-1") = entity(
+        id = id,
+        syncStatus = SyncState.SYNCED,
+        photoSyncStatus = PhotoSyncState.REMOTE_ONLY
+    )
+
+    @Test fun remoteOnlyDownloadsPhotoToLocalCache() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(remoteOnlyEntity()))
+        val api = FakeAnalysisSyncApi()
+        api.remoteObjects["user-1/r-1.jpg"] = "remote-bytes".toByteArray()
+
+        val result = runner(dao, api).downloadOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertEquals(listOf("user-1/r-1.jpg"), api.downloadCalls)
+        val cached = File(photosDir, "r-1.img")
+        assertTrue(cached.exists())
+        assertArrayEquals("remote-bytes".toByteArray(), cached.readBytes())
+        assertEquals(PhotoSyncState.SYNCED, dao.get("r-1")?.photoSyncStatus)
+        assertEquals(SyncState.SYNCED, dao.get("r-1")?.syncStatus)
+    }
+
+    @Test fun existingValidLocalFileSkipsDownload() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(remoteOnlyEntity()))
+        val api = FakeAnalysisSyncApi()
+        localPhoto("r-1.img")
+
+        val result = runner(dao, api).downloadOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertTrue(api.downloadCalls.isEmpty())
+        assertEquals(PhotoSyncState.SYNCED, dao.get("r-1")?.photoSyncStatus)
+    }
+
+    @Test fun repeatedRestoreDoesNotDuplicateFiles() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(remoteOnlyEntity()))
+        val api = FakeAnalysisSyncApi()
+        api.remoteObjects["user-1/r-1.jpg"] = "remote-bytes".toByteArray()
+        val download = runner(dao, api)
+
+        download.downloadOnce("user-1")
+        val second = download.downloadOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), second)
+        assertEquals(listOf("user-1/r-1.jpg"), api.downloadCalls)
+    }
+
+    @Test fun downloadFailureKeepsAnalysisAndAllowsRetry() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(remoteOnlyEntity()))
+        val api = FakeAnalysisSyncApi(failDownload = true)
+        val download = runner(dao, api)
+
+        assertEquals(SyncRunResult.Completed(1), download.downloadOnce("user-1"))
+        assertEquals(PhotoSyncState.REMOTE_ONLY, dao.get("r-1")?.photoSyncStatus)
+        assertNotNull(dao.get("r-1"))
+        assertFalse(File(photosDir, "r-1.img").exists())
+
+        api.failDownload = false
+        api.remoteObjects["user-1/r-1.jpg"] = "remote-bytes".toByteArray()
+        assertEquals(SyncRunResult.Completed(0), download.downloadOnce("user-1"))
+        assertEquals(PhotoSyncState.SYNCED, dao.get("r-1")?.photoSyncStatus)
+    }
+
+    @Test fun missingRemotePhotoDoesNotCrash() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(remoteOnlyEntity()))
+        val api = FakeAnalysisSyncApi()
+
+        val result = runner(dao, api).downloadOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(1), result)
+        assertEquals(PhotoSyncState.REMOTE_ONLY, dao.get("r-1")?.photoSyncStatus)
+        assertNotNull(dao.get("r-1"))
+        assertFalse(File(photosDir, "r-1.img").exists())
+    }
+
+    @Test fun tombstoneNeverTriggersDownload() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(
+            listOf(
+                entity(
+                    syncStatus = SyncState.PENDING_DELETE,
+                    deletedAt = 1_728_000_100_000,
+                    photoSyncStatus = PhotoSyncState.REMOTE_ONLY
+                )
+            )
+        )
+        val api = FakeAnalysisSyncApi()
+
+        val result = runner(dao, api).downloadOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertTrue(api.downloadCalls.isEmpty())
+    }
+
+    @Test fun downloadSkippedWithoutAuthenticatedUser() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(remoteOnlyEntity()))
+        val api = FakeAnalysisSyncApi()
+
+        val result = runner(dao, api).downloadOnce(null)
+
+        assertEquals(SyncRunResult.SkippedNoAuth, result)
+        assertTrue(api.downloadCalls.isEmpty())
+        assertEquals(PhotoSyncState.REMOTE_ONLY, dao.get("r-1")?.photoSyncStatus)
+    }
+
+    @Test fun downloadUsesSessionUserPath() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(remoteOnlyEntity()))
+        val api = FakeAnalysisSyncApi()
+        api.remoteObjects["user-9/r-1.jpg"] = "remote-bytes".toByteArray()
+
+        runner(dao, api).downloadOnce("user-9")
+
+        // Path is always derived from the session user id, never stored data.
+        assertEquals(listOf("user-9/r-1.jpg"), api.downloadCalls)
+        assertTrue(File(photosDir, "r-1.img").exists())
+    }
+
+    @Test fun zeroLengthCacheIsReplacedWithoutPartialRemnants() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(remoteOnlyEntity()))
+        val api = FakeAnalysisSyncApi()
+        api.remoteObjects["user-1/r-1.jpg"] = "remote-bytes".toByteArray()
+        File(photosDir, "r-1.img").apply { writeBytes(ByteArray(0)) }
+
+        val result = runner(dao, api).downloadOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertArrayEquals("remote-bytes".toByteArray(), File(photosDir, "r-1.img").readBytes())
+        assertFalse(File(photosDir, "r-1.img.tmp").exists())
     }
 }

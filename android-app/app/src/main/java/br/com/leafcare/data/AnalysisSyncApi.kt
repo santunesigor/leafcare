@@ -95,6 +95,9 @@ internal interface AnalysisSyncApi {
 
     /** All rows visible to the authenticated user (RLS). No photo download. */
     suspend fun fetchAnalyses(): List<JsonObject>
+
+    /** Downloads raw photo bytes from the private bucket. */
+    suspend fun downloadPhoto(path: String): ByteArray
 }
 
 /** Production [AnalysisSyncApi] on the authenticated supabase-kt 2.1.0 client. */
@@ -140,5 +143,9 @@ internal class PostgrestAnalysisSyncApi(
     override suspend fun fetchAnalyses(): List<JsonObject> {
         val data = table.select().data
         return Json.parseToJsonElement(data).jsonArray.map { it.jsonObject }
+    }
+
+    override suspend fun downloadPhoto(path: String): ByteArray {
+        return bucket.downloadAuthenticated(path)
     }
 }

@@ -173,8 +173,36 @@ class AnalysisSyncDaoTest {
         }
     }
 
-    @Test fun migration2To3PreservesExistingAnalyses() = runBlocking {
-        val file = dbFile("sync-migrate-photo")
+    @Test fun remoteOnlyStateSurvivesReopen() = runBlocking {
+        val file = dbFile("sync-restart-photo")
+        Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
+            .allowMainThreadQueries()
+            .build()
+            .also {
+                it.analysisDao().insert(
+                    entity().copy(
+                        syncStatus = SyncState.SYNCED,
+                        photoSyncStatus = PhotoSyncState.REMOTE_ONLY
+                    )
+                )
+            }
+            .close()
+
+        val reopened = Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
+            .allowMainThreadQueries()
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .build()
+        try {
+            val row = reopened.analysisDao().get("a-1")
+            assertNotNull(row)
+            assertEquals(SyncState.SYNCED, row?.syncStatus)
+            assertEquals(PhotoSyncState.REMOTE_ONLY, row?.photoSyncStatus)
+        } finally {
+            reopened.close()
+        }
+    }
+
+    @Test fun migration2To3PreservesExistingAnalyses() = runBlocking {        val file = dbFile("sync-migrate-photo")
 
         Room.databaseBuilder(context, LegacyV2AppDatabase::class.java, file.absolutePath)
             .allowMainThreadQueries()

@@ -68,6 +68,11 @@ interface AnalysisDao {
 
     @Query("UPDATE analyses SET photoSyncStatus = 'ERROR' WHERE id = :id")
     suspend fun markPhotoError(id: String)
+
+    // Photo download queue: remote-only rows whose analysis is visible.
+    // Tombstones never download; missing states stay retryable downstream.
+    @Query("SELECT * FROM analyses WHERE photoSyncStatus = 'REMOTE_ONLY' AND deletedAt IS NULL")
+    suspend fun getPendingPhotoDownloads(): List<AnalysisEntity>
 }
 
 /** v1 -> v2: sync columns. Existing rows default to pending upload. */
