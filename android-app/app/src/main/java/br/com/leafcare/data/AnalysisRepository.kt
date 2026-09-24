@@ -72,8 +72,11 @@ class AnalysisRepository(
     suspend fun delete(id: String) = mutex.withLock {
         withContext(Dispatchers.IO + NonCancellable) {
             val row = dao.get(id) ?: return@withContext
-            dao.delete(id)
-            photo(row.photoName).delete()
+            // Tombstone: hidden from UI immediately, remote deletion synced later.
+            // The photo is removed only after the remote tombstone is confirmed.
+            if (row.deletedAt == null) {
+                dao.markDeleted(id, System.currentTimeMillis())
+            }
         }
     }
 }

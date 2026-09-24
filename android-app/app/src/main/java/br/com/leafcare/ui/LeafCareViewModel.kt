@@ -34,7 +34,11 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
         if (_ui.value.busy) { temporary?.delete(); return }
         _ui.value = UiState(busy = true)
         viewModelScope.launch {
-            try { navigation.send(repository.analyze(uri)) }
+            try {
+                navigation.send(repository.analyze(uri))
+                // Room first, UI immediately; sync follows in background.
+                app.scheduleSync()
+            }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) { this@LeafCareViewModel.error(error.message ?: "Não foi possível analisar a imagem.") }
             finally { temporary?.delete(); _ui.update { it.copy(busy = false) } }
@@ -43,7 +47,11 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
 
     fun delete(id: String, onDeleted: () -> Unit) {
         viewModelScope.launch {
-            try { repository.delete(id); onDeleted() }
+            try {
+                repository.delete(id)
+                app.scheduleSync()
+                onDeleted()
+            }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) { this@LeafCareViewModel.error(error.message ?: "Falha ao excluir a análise.") }
         }

@@ -81,10 +81,14 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert-api:1.4.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Supabase dependencies for Auth (Phase 3)
+    // Supabase dependencies for Auth (Phase 3) and sync (Phase 4)
     // Using supabase-kt 2.1.0 with gotrue-kt (compatible with Kotlin 2.0.21)
     implementation("io.github.jan-tennert.supabase:supabase-kt:2.1.0")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.1.0")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:2.1.0")
+
+    // WorkManager for offline-first sync queue (Phase 4)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
     // Ktor client engine required by supabase-kt 2.1.0 (Ktor 2.3.7).
     // Without an engine, HttpClient creation crashes the app at startup.
     implementation("io.ktor:ktor-client-okhttp:2.3.7")

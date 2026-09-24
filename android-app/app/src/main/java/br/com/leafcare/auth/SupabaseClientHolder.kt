@@ -7,6 +7,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.gotrue.Auth
+import io.github.jan.supabase.postgrest.Postgrest
 
 /**
  * Holds a single [SupabaseClient] instance for the application lifecycle.
@@ -42,6 +43,7 @@ class SupabaseClientHolder(application: Application) {
             supabaseKey = publishableKey
         ) {
             install(Auth)
+            install(Postgrest)
         }
     }
 }
