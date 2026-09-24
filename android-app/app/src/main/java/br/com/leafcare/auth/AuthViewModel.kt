@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
+import br.com.leafcare.LeafCareApplication
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -126,6 +127,11 @@ class AuthViewModel(
                 clearForms()
                 _navigation.send(destination)
             }
+            if (result.isSuccess) {
+                // Fresh login: pull remote history (cold starts already schedule
+                // via Application.onCreate). Safe cast keeps JVM tests green.
+                (getApplication<Application>() as? LeafCareApplication)?.scheduleSync()
+            }
         }
     }
 
@@ -141,6 +147,9 @@ class AuthViewModel(
             if (destination != null) {
                 clearForms()
                 _navigation.send(destination)
+            }
+            if (result.isSuccess) {
+                (getApplication<Application>() as? LeafCareApplication)?.scheduleSync()
             }
         }
     }
@@ -190,6 +199,7 @@ class AuthViewModel(
             if (result.isSuccess) {
                 clearForms()
                 _navigation.send(AuthNavigationEvent.NavigateToApp)
+                (getApplication<Application>() as? LeafCareApplication)?.scheduleSync()
             }
         }
     }

@@ -70,14 +70,19 @@ class SyncAnalysesWorker(
                 File(photosDir, name)
             }
         )
-        return when (val outcome = runner.syncOnce(userId)) {
-            is SyncRunResult.SkippedNoAuth -> Result.success()
-            is SyncRunResult.Completed ->
-                if (outcome.failures == 0 || runAttemptCount >= MAX_ATTEMPTS) {
-                    Result.success()
-                } else {
-                    Result.retry()
-                }
+        val pushFailures = when (val push = runner.syncOnce(userId)) {
+            is SyncRunResult.SkippedNoAuth -> return Result.success()
+            is SyncRunResult.Completed -> push.failures
+        }
+        // Same pass, same retry policy: push first, then restore remote rows
+        // into Room (no photo download in this unit).
+        val restoreFailures =
+            (runner.restoreOnce(userId) as? SyncRunResult.Completed)?.failures ?: 0
+        val failures = pushFailures + restoreFailures
+        return if (failures == 0 || runAttemptCount >= MAX_ATTEMPTS) {
+            Result.success()
+        } else {
+            Result.retry()
         }
     }
 }

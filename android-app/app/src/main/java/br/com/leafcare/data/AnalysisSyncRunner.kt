@@ -2,6 +2,7 @@ package br.com.leafcare.data
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.datetime.Instant
+import kotlinx.serialization.json.JsonObject
 import java.io.File
 
 /** Outcome of one sync pass. Never throws for backend failures. */
@@ -66,7 +67,9 @@ internal class AnalysisSyncRunner(
 
         dao.getPendingDeletes().forEach { entity ->
             try {
-                if (entity.photoSyncStatus == PhotoSyncState.SYNCED) {
+                if (entity.photoSyncStatus == PhotoSyncState.SYNCED ||
+                    entity.photoSyncStatus == PhotoSyncState.REMOTE_ONLY
+                ) {
                     try {
                         api.deleteRemotePhotos(listOf(remotePhotoPath(userId, entity.id)))
                     } catch (e: CancellationException) {
@@ -89,6 +92,53 @@ internal class AnalysisSyncRunner(
         }
 
         return SyncRunResult.Completed(failures)
+    }
+
+    /**
+     * Restores remote analyses into Room (no photo download in this unit).
+     *
+     * Merge policy (simplest safe):
+     * - remote active + no local row -> insert as SYNCED / REMOTE_ONLY;
+     * - same UUID locally (pending, synced or tombstoned) -> never overwritten,
+     *   so pending uploads and offline deletions can't be lost or resurrected;
+     * - remote tombstone + no local row -> skipped, never imported as active;
+     * - remote tombstone + local SYNCED row -> local row and photo removed;
+     * - remote tombstone + local pending/tombstone -> kept as is.
+     * Malformed remote rows are skipped without failing the restore.
+     */
+    suspend fun restoreOnce(userId: String?): SyncRunResult {
+        if (userId == null) return SyncRunResult.SkippedNoAuth
+
+        val rows: List<JsonObject> = try {
+            api.fetchAnalyses()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return SyncRunResult.Completed(1)
+        }
+
+        rows.forEach { row ->
+            try {
+                val entity = row.toAnalysisEntity()
+                val local = dao.get(entity.id)
+                if (entity.deletedAt != null) {
+                    if (local != null && local.deletedAt == null &&
+                        local.syncStatus == SyncState.SYNCED
+                    ) {
+                        dao.delete(entity.id)
+                        photoDeleter(local.photoName)
+                    }
+                } else if (local == null) {
+                    dao.insert(entity)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Malformed row: skip without failing the whole restore.
+            }
+        }
+
+        return SyncRunResult.Completed(0)
     }
 
     private fun isRemoteNotFound(e: Exception): Boolean {

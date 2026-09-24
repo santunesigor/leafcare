@@ -6,7 +6,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -93,6 +98,8 @@ internal class FakeAnalysisSyncApi(
     var failUpload: Boolean = false,
     var failPhotoDelete: Boolean = false,
     var photoDeleteNotFound: Boolean = false,
+    var failFetch: Boolean = false,
+    var fetchRows: List<JsonObject> = emptyList(),
 ) : AnalysisSyncApi {
 
     val remote = mutableMapOf<String, JsonObject>()
@@ -102,6 +109,7 @@ internal class FakeAnalysisSyncApi(
     val uploadCalls = mutableListOf<String>()
     val photoPathUpdates = mutableListOf<Pair<String, String>>()
     val photoDeleteCalls = mutableListOf<String>()
+    var fetchCalls = 0
 
     override suspend fun upsertAnalysis(row: JsonObject) {
         if (failUpsert) throw IOException("offline")
@@ -132,6 +140,12 @@ internal class FakeAnalysisSyncApi(
         photoDeleteCalls += paths
         paths.forEach { remotePhotos.remove(it) }
     }
+
+    override suspend fun fetchAnalyses(): List<JsonObject> {
+        fetchCalls++
+        if (failFetch) throw IOException("offline")
+        return fetchRows
+    }
 }
 
 /**
@@ -159,12 +173,13 @@ class AnalysisSyncRunnerTest {
         syncStatus: SyncState = SyncState.PENDING_UPLOAD,
         deletedAt: Long? = null,
         photoSyncStatus: PhotoSyncState = PhotoSyncState.PENDING_UPLOAD,
+        displayName: String = "Olho-de-rã",
     ) = AnalysisEntity(
         id = id,
         photoName = "$id.img",
         createdAt = 1_728_000_000_000,
         classId = "frog_eye",
-        displayName = "Olho-de-rã",
+        displayName = displayName,
         scientificName = "Cercospora nicotianae",
         confidence = 0.82f,
         top3Json = """[{"class_id":"frog_eye","confidence":0.82}]""",
@@ -394,5 +409,156 @@ class AnalysisSyncRunnerTest {
         assertEquals(SyncState.ERROR, dao.get("a-1")?.syncStatus)
         assertEquals(1_728_000_100_000, dao.get("a-1")?.deletedAt)
         assertTrue(api.deleteCalls.isEmpty())
+    }
+
+    private fun remoteRow(
+        id: String = "r-1",
+        displayName: String = "Olho-de-rã",
+        deletedAt: String? = null,
+        photoPath: String? = "user-1/r-1.jpg",
+    ) = buildJsonObject {
+        put("id", id)
+        put("user_id", "user-1")
+        put("created_at", "2024-09-23T12:00:00Z")
+        put("class_id", "frog_eye")
+        put("display_name", displayName)
+        put("scientific_name", "Cercospora nicotianae")
+        put("confidence", 0.82)
+        put("top3", buildJsonArray {
+            addJsonObject {
+                put("class_id", "frog_eye")
+                put("confidence", 0.82)
+            }
+        })
+        put("inconclusive", false)
+        put("threshold", 0.7)
+        put("inference_ms", 30.0)
+        put("model_sha256", "abc123")
+        put("app_version", "0.3.0")
+        if (photoPath == null) put("photo_path", JsonNull) else put("photo_path", photoPath)
+        if (deletedAt == null) put("deleted_at", JsonNull) else put("deleted_at", deletedAt)
+    }
+
+    @Test fun restoreInsertsMissingRowAsSynced() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao()
+        val api = FakeAnalysisSyncApi(fetchRows = listOf(remoteRow()))
+
+        val result = runner(dao, api).restoreOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertEquals(1, api.fetchCalls)
+        val row = dao.get("r-1")
+        assertNotNull(row)
+        assertEquals(SyncState.SYNCED, row?.syncStatus)
+        assertEquals(PhotoSyncState.REMOTE_ONLY, row?.photoSyncStatus)
+        assertEquals("r-1.img", row?.photoName)
+        assertEquals("frog_eye", row?.classId)
+        assertEquals("Olho-de-rã", row?.displayName)
+        assertNull(row?.deletedAt)
+    }
+
+    @Test fun restoreTwiceDoesNotDuplicate() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao()
+        val api = FakeAnalysisSyncApi(fetchRows = listOf(remoteRow()))
+        val restore = runner(dao, api)
+
+        restore.restoreOnce("user-1")
+        val second = restore.restoreOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), second)
+        assertEquals(2, api.fetchCalls)
+        assertNotNull(dao.get("r-1"))
+    }
+
+    @Test fun remoteTombstoneIsNeverImportedAsActive() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao()
+        val api = FakeAnalysisSyncApi(
+            fetchRows = listOf(remoteRow(deletedAt = "2024-09-24T12:00:00Z"))
+        )
+
+        val result = runner(dao, api).restoreOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertNull(dao.get("r-1"))
+    }
+
+    @Test fun remoteTombstoneRemovesMatchingLocalSyncedRow() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(
+            listOf(
+                entity(
+                    id = "r-1",
+                    syncStatus = SyncState.SYNCED,
+                    photoSyncStatus = PhotoSyncState.SYNCED
+                )
+            )
+        )
+        val api = FakeAnalysisSyncApi(
+            fetchRows = listOf(remoteRow(deletedAt = "2024-09-24T12:00:00Z"))
+        )
+        val deletedPhotos = mutableListOf<String>()
+
+        val result = runner(dao, api, deletedPhotos).restoreOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertNull(dao.get("r-1"))
+        assertEquals(listOf("r-1.img"), deletedPhotos)
+    }
+
+    @Test fun localPendingUploadIsNeverOverwritten() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(entity(id = "r-1", displayName = "Local")))
+        val api = FakeAnalysisSyncApi(fetchRows = listOf(remoteRow(displayName = "Remoto")))
+        localPhoto("r-1.img")
+
+        val result = runner(dao, api).restoreOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertEquals(SyncState.PENDING_UPLOAD, dao.get("r-1")?.syncStatus)
+        assertEquals("Local", dao.get("r-1")?.displayName)
+    }
+
+    @Test fun restoreSkippedWithoutAuthenticatedUser() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao()
+        val api = FakeAnalysisSyncApi(fetchRows = listOf(remoteRow()))
+
+        val result = runner(dao, api).restoreOnce(null)
+
+        assertEquals(SyncRunResult.SkippedNoAuth, result)
+        assertEquals(0, api.fetchCalls)
+        assertNull(dao.get("r-1"))
+    }
+
+    @Test fun fetchFailureKeepsRoomIntact() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(entity()))
+        val api = FakeAnalysisSyncApi(failFetch = true)
+
+        val result = runner(dao, api).restoreOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(1), result)
+        assertEquals(SyncState.PENDING_UPLOAD, dao.get("a-1")?.syncStatus)
+    }
+
+    @Test fun emptyRoomIsRebuiltFromRemote() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao()
+        val api = FakeAnalysisSyncApi(
+            fetchRows = listOf(remoteRow(id = "r-1"), remoteRow(id = "r-2"))
+        )
+
+        runner(dao, api).restoreOnce("user-1")
+
+        assertNotNull(dao.get("r-1"))
+        assertNotNull(dao.get("r-2"))
+        assertEquals(SyncState.SYNCED, dao.get("r-2")?.syncStatus)
+    }
+
+    @Test fun malformedRemoteRowIsSkipped() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao()
+        val api = FakeAnalysisSyncApi(
+            fetchRows = listOf(buildJsonObject { put("oops", true) }, remoteRow())
+        )
+
+        val result = runner(dao, api).restoreOnce("user-1")
+
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertNotNull(dao.get("r-1"))
     }
 }
