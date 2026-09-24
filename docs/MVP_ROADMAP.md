@@ -145,14 +145,14 @@ Objetivo: tornar conta obrigatória para uso do aplicativo.
 
 Escopo:
 
-- [ ] cadastro;
-- [ ] login;
-- [ ] logout;
-- [ ] recuperação de senha;
-- [ ] sessão persistida;
-- [ ] perfil básico;
-- [ ] tela de autenticação;
-- [ ] direcionamento correto ao iniciar o app.
+- [x] cadastro;
+- [x] login;
+- [x] logout;
+- [x] recuperação de senha;
+- [x] sessão persistida;
+- [x] perfil básico;
+- [x] tela de autenticação;
+- [x] direcionamento correto ao iniciar o app.
 
 Fluxo esperado:
 
@@ -181,6 +181,10 @@ app abre offline após login anterior
 logout funciona
 ```
 
+**Status**: Concluído e validado manualmente no aparelho. Cadastro sem confirmação web
+(sessão direta), login, logout, recuperação OTP in-app, sessão persistida, perfil
+básico com acesso na home, launcher e UI alinhados ao V3.
+
 ---
 
 # Fase 4 — Sincronização de análises
@@ -201,16 +205,16 @@ Supabase
 
 Escopo:
 
-- [ ] adicionar estado de sincronização;
-- [ ] manter Room como fonte local;
-- [ ] salvar análise local imediatamente;
-- [ ] criar fila de sincronização;
-- [ ] usar WorkManager ou mecanismo adequado;
-- [ ] implementar retry;
-- [ ] implementar upsert idempotente;
-- [ ] impedir duplicações;
-- [ ] sincronizar exclusões;
-- [ ] tratar erros de rede;
+- [x] adicionar estado de sincronização;
+- [x] manter Room como fonte local;
+- [x] salvar análise local imediatamente;
+- [x] criar fila de sincronização;
+- [x] usar WorkManager ou mecanismo adequado;
+- [x] implementar retry;
+- [x] implementar upsert idempotente;
+- [x] impedir duplicações;
+- [x] sincronizar exclusões;
+- [x] tratar erros de rede;
 - [ ] testar modo offline → online.
 
 Estados sugeridos:
@@ -236,6 +240,12 @@ análise sincroniza automaticamente
 +
 nenhuma duplicação
 ```
+
+**Status**: Fundação implementada (não validada contra o backend real ainda). Room v2 com
+`syncStatus`/`deletedAt` e migration explícita 1→2; fila WorkManager (só com rede,
+backoff exponencial, sobrevive a reinício); upsert idempotente no UUID local;
+exclusões por tombstone; 11 testes de sync. Pendente: teste real offline → online,
+fotos (Fase 5) e multi-device (Fase 6).
 
 ---
 
