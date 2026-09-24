@@ -415,10 +415,139 @@ Este documento registra as principais decisões de arquitetura, ML e engenharia,
 **Motivo:**
 - Honestidade acadêmica e técnica.
 - Evita overclaiming; reviewers/audience sabem exatamente o que foi validado.
-- Base para roadmap realista (fases 3-6).
+- Base para roadmap realista (fases 3–6).
 
 **Onde aparece no código:**
 - `README.md` seção Known limitations
 - `docs/DATASET.md` seção Limitações
 - `docs/VALIDATION.md` notas finais
 - `docs/RELATORIO_COMPARATIVO_MODELOS_LEAFCARE.md` seções 12, 14
+
+---
+
+## Erratas (código atual vs. texto antigo acima)
+
+- **#4 (ausência de backend): SUPERSEDE — o MVP atual tem Supabase** (Auth, Postgres, Storage) com offline-first; ver decisões 21–30.
+- **#10/#16 (threshold via SharedPreferences): SUPERSEDE — resíduo removido na Fase 1**; threshold vem sempre de `classifier.defaultThreshold` (`model_metadata.json`).
+
+---
+
+## 21. Supabase como backend (Auth + Postgres + Storage)
+
+**Decisão:** supabase-kt 2.1.0 (gotrue, postgrest, storage) + Ktor OkHttp 2.3.7; sem Firebase, sem backend próprio, sem Realtime no MVP.
+
+**Motivo:** Postgres + Auth + Storage privado + RLS em um serviço gerenciado; SDK Kotlin multiplataforma; realtime desnecessário (sync sob demanda basta).
+
+**Trade-off:** Dependência de provedor externo; publishable key embutida no APK (aceitável: RLS protege tudo; service_role nunca no app).
+
+**Onde aparece no código:** `SupabaseClientHolder.kt` (instala Auth/Postgrest/Storage), `app/build.gradle.kts`, `local.properties` → `BuildConfig` (nunca commitado; build falha com placeholder).
+
+---
+
+## 22. Offline-first com Room como fonte da UI
+
+**Decisão:** Room continua fonte única da interface; Supabase nunca é observado diretamente. Análise nasce local (`PENDING_UPLOAD`), aparece na hora, sincroniza depois.
+
+**Motivo:** Campo sem internet não pode travar; UI idêntica online/offline; falha de rede nunca perde dado local.
+
+**Trade-off:** Estados de sync e lógica de merge moram no app.
+
+**Onde aparece no código:** `AnalysisDao.observeAll()`, `LeafCareViewModel.analyses`, `AnalysisSyncRunner.kt`.
+
+---
+
+## 23. WorkManager para a fila de sync
+
+**Decisão:** `SyncAnalysesWorker` único (`sync-analyses`, `APPEND`): só com `CONNECTED`, backoff exponencial 30s, teto de 5 tentativas, sobrevive a restart; sem auth = nada executa; aborta a passada se a sessão mudar.
+
+**Motivo:** Constraints, persistência e retry prontos; sem pipeline paralela.
+
+**Trade-off:** Sem tempo real; sync acontece sob demanda/boot.
+
+**Onde aparece no código:** `SyncAnalysesWorker.kt`, `LeafCareApplication.scheduleSync()` (+ flush no `onCreate`, `Configuration.Provider` com initializer padrão removido).
+
+---
+
+## 24. UUID compartilhado local/remoto + upsert idempotente
+
+**Decisão:** Mesmo UUID gerado no `analyze()` como PK local e remota; `upsert(..., onConflict = "id")`; retry nunca duplica.
+
+**Motivo:** Idempotência sem servidor de reconciliação; mesma conta em dois aparelhos converge naturalmente.
+
+**Trade-off:** UUIDs precisam ser únicos (v4; colisão impraticável).
+
+**Onde aparece no código:** `AnalysisRepository.analyze()`, `toRemoteJson()`, `PostgrestAnalysisSyncApi.upsertAnalysis()`.
+
+---
+
+## 25. Tombstones em vez de hard delete distribuído
+
+**Decisão:** Exclusão local marca `PENDING_DELETE` + `deletedAt` (some da UI); worker remove foto remota (404 = ok), grava `deleted_at` remoto e só então apaga local + foto. Restore nunca importa tombstone nem o aplica sobre pendente local.
+
+**Motivo:** Exclusão offline precisa sobreviver e propagar sem ressuscitar dados.
+
+**Trade-off:** Linha "morta" ocupa espaço até confirmar; delete físico remoto da linha não é exigido (soft delete é o estado coerente).
+
+**Onde aparece no código:** `AnalysisRepository.delete()`, `AnalysisSyncRunner` (push + restore), testes de tombstone.
+
+---
+
+## 26. Estado de foto separado (`photoSyncStatus` / `REMOTE_ONLY`)
+
+**Decisão:** `PENDING_UPLOAD`/`SYNCED`/`ERROR`/`REMOTE_ONLY` em coluna própria; análise nunca é marcada completa pela foto e vice-versa; importados entram `SYNCED`/`REMOTE_ONLY`; download escreve via tmp + rename.
+
+**Motivo:** Upload e download têm ciclos de vida independentes; `REMOTE_ONLY` diz "existe no servidor, sem cache" sem confundir com pendência de envio.
+
+**Trade-off:** Mais um estado para explicar; download de linha `ERROR` de envio não é tentado (correto: nada remoto para baixar).
+
+**Onde aparece no código:** `SyncState.kt`, migration `MIGRATION_2_3`, `downloadOnce()`.
+
+---
+
+## 27. Restore por merge simples e seguro
+
+**Decisão:** Ausente → insere; mesmo UUID local (pendente/synced/tombstone) → nunca sobrescreve; tombstone remoto → nunca importado, aplicado só sobre linha `SYNCED`; linhas malformadas puladas; sem resolução avançada de conflitos.
+
+**Motivo:** Previsibilidade total; nenhum caminho perde dado local nem ressuscita exclusão.
+
+**Trade-off:** `photo_path` divergente entre aparelhos não é reconciliado nesta unidade (download deriva o path deterministicamente).
+
+**Onde aparece no código:** `AnalysisSyncRunner.restoreOnce()`, `JsonObject.toAnalysisEntity()`.
+
+---
+
+## 28. Wipe controlado na troca de conta (isolamento)
+
+**Decisão:** Room sem coluna de dono: `ensureAccountIsolation()` apaga linhas + fotos só na troca de conta (ou órfãos sem proveniência no primeiro login pós-upgrade); mesmo login e logout preservam tudo.
+
+**Motivo:** Sem isso, worker subiria dados de A como B e o histórico de A ficaria visível para B (bug crítico de privacidade achado na Fase 7).
+
+**Alternativas:** Coluna `user_id` + queries filtradas (200+ linhas, churn em DAO/VM/UI; singleton de repositório complica troca de usuário).
+
+**Trade-off:** Pendentes nunca sincronizados de A se perdem na troca (documentado; remoto restaura o resto).
+
+**Onde aparece no código:** `LeafCareApplication.ensureAccountIsolation()`, `shouldWipeForAccountSwitch()`, `AuthViewModel.onAuthenticated()`, recheck no worker.
+
+---
+
+## 29. Bucket privado + RLS (sem afrouxar)
+
+**Decisão:** `analysis-photos` privado com policies por pasta `{user_id}/`; tabelas com `TO authenticated` + `(select auth.uid())`; triggers `SECURITY DEFINER` com revokes; paths sempre derivados da sessão; sem signed URL no banco; sem `service_role` no app.
+
+**Motivo:** Segurança por padrão em todas as camadas; convenção de path elimina classe inteira de bugs de acesso.
+
+**Trade-off:** Nenhum acesso anônimo/legado possível; debug exige usuário real.
+
+**Onde aparece no código:** `supabase/migrations/*storage*`, `*security_hardening*`, `remotePhotoPath()`, `PostgrestAnalysisSyncApi`.
+
+---
+
+## 30. Sem Realtime e sem ensemble no MVP
+
+**Decisão:** Sem `realtime-kt`; sem ensemble no app (segue MobileNetV3Small único).
+
+**Motivo:** Sync sob demanda cobre o MVP; realtime adiciona conexão permanente/bateria por ganho nulo. Ensemble: +15 MB e latência sem medição em device.
+
+**Trade-off:** Atraso de sincronização até o próximo gatilho; teto de acurácia do baseline.
+
+**Onde aparece no código:** `app/build.gradle.kts` (dependências ausentes de propósito).

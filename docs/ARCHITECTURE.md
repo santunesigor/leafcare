@@ -2,15 +2,17 @@
 
 ## 1. Visão geral
 
-O LeafCare é um aplicativo Android nativo para **triagem visual offline** de doenças e alterações em folhas de fumo. O produtor captura ou seleciona uma foto e o modelo roda direto no celular — sem internet, sem backend, sem cadastro.
+O LeafCare é um aplicativo Android nativo para **triagem visual offline-first** de doenças e alterações em folhas de fumo, com conta, sincronização e histórico multi-device. O produtor captura ou seleciona uma foto e o modelo roda direto no celular; a nuvem (Supabase) serve para conta, backup e sincronização — **nunca para classificar**.
 
 Características principais:
 
 - **Android nativo**: Kotlin + Jetpack Compose, minSdk 26 (Android 8.0), targetSdk 35
-- **100% offline**: Manifesto sem permissão `INTERNET`; nenhum backend, Firebase, Supabase, analytics ou telemetria
+- **Conta obrigatória**: Supabase Auth (gotrue-kt 2.1.0) — cadastro, login, logout, recuperação OTP in-app, sessão persistida
+- **Offline-first**: classificação, histórico, câmera e galeria funcionam sem internet após autenticação anterior
 - **Classificação local**: TensorFlow Lite / LiteRT 1.4.0 com API `Interpreter`, float32, 2 threads
-- **Persistência local**: Room/SQLite com `Flow` reativo; fotos em armazenamento privado (`filesDir/photos/`)
-- **MVVM pragmático**: Injeção manual no `Application`; `ViewModel` expõe `StateFlow`/`Flow`; UI não acessa DAO, Room ou Classifier diretamente
+- **Persistência local**: Room/SQLite v3 com `Flow` reativo (fonte única da UI); fotos em armazenamento privado (`filesDir/photos/`)
+- **Sync em background**: WorkManager (só com rede, backoff, sobrevive a restart) — upsert idempotente, fotos privadas, tombstones, restore
+- **MVVM pragmático**: Injeção manual no `Application`; `ViewModel` expõe `StateFlow`/`Flow`; UI não acessa DAO, Room, Classifier ou Supabase diretamente
 - **Contrato de inferência idêntico Python ↔ Android**: center crop, resize bilinear half-pixel inteiro, 224×224, RGB float32 NHWC 0–255, sem normalização no app (Rescaling incorporado na MobileNetV3 via `include_preprocessing=True`)
 
 ### Diagrama geral
@@ -18,18 +20,21 @@ Características principais:
 ```
 Usuário
   ↓
-Compose UI (MainActivity, Navigation)
+Compose UI (MainActivity auth gate, Navigation: auth + history/camera/result/profile)
   ↓
-LeafCareViewModel (estado, navegação, erros)
+ViewModels (LeafCareViewModel p/ análises; AuthViewModel p/ conta)
   ↓
-AnalysisRepository (coordenação, Mutex, armazenamento)
-  ├── Room (AnalysisDao, AnalysisEntity, Flow)
+AnalysisRepository (coordenação, Mutex, armazenamento) + AuthRepository (conta)
+  ├── Room (AnalysisDao, AnalysisEntity, Flow) ← fonte da UI
   ├── Arquivos privados (filesDir/photos/)
-  └── LeafClassifier
-          ↓
-       LiteRT Interpreter (reutilizado, validado na inicialização)
-          ↓
-       leafcare.tflite (MobileNetV3Small, ~3.8 MB, float32)
+  ├── LeafClassifier
+  │         ↓
+  │      LiteRT Interpreter (reutilizado, validado na inicialização)
+  │         ↓
+  │      leafcare.tflite (MobileNetV3Small, ~3.8 MB, float32)
+  └── Sync Engine (WorkManager → Supabase: PostgREST + Storage)
+            ↓
+     Supabase (Auth, analyses com RLS, bucket privado analysis-photos)
 ```
 
 ---
@@ -46,10 +51,11 @@ Passo a passo, do toque do usuário até o resultado na tela:
 6. **LeafClassifier executa inferência** — Tensor `float32 NHWC [1,224,224,3]` faixa **0–255** (não dividir por 255); `Interpreter` reutilizado (criado uma vez na inicialização); `run()` com buffers pré-alocados
 7. **PredictionPolicy aplica política** — Softmax já vem do modelo; top-3 estável (ordem decrescente, empate = menor índice); **sem renormalização**; threshold do `model_metadata.json` (baseline 0.70); resultado inconclusivo se `max < threshold`
 8. **DiseaseCatalog adiciona informações descritivas** — `diseases.json` mapeia `classId` → nome, nome científico, descrição, sintomas, condições favoráveis, orientação, `reviewed: false`
-9. **AnalysisEntity persistida no Room** — ID, caminho relativo da foto, timestamp, classe principal, nomes, confiança, top-3 JSON, flag inconclusivo, threshold usado, tempo de inferência (ms), hash do modelo
+9. **AnalysisEntity persistida no Room** — ID (UUID compartilhado com o remoto), caminho relativo da foto, timestamp, classe principal, nomes, confiança, top-3 JSON, flag inconclusivo, threshold usado, tempo de inferência (ms), hash do modelo, `syncStatus` (nasce `PENDING_UPLOAD`)
 10. **Foto permanece em armazenamento privado** — Room guarda apenas nome relativo; arquivo físico em `filesDir/photos/`
 11. **Resultado mostrado na tela** — `ResultScreen` exibe classe principal, confiança, top-3, descrição, aviso de triagem, tempo
-12. **Histórico observa dados via Flow** — `AnalysisDao.observeAll()` emite `Flow<List<AnalysisEntity>>`; `ViewModel` expõe via `stateIn`; `HistoryScreen` recompos automaticamente
+12. **Histórico observa dados via Flow** — `AnalysisDao.observeAll()` (tombstones filtrados) emite `Flow<List<AnalysisEntity>>`; `ViewModel` expõe via `stateIn`; `HistoryScreen` recompos automaticamente
+13. **Sync em background** — `scheduleSync()` agenda WorkManager (só com rede): upsert idempotente da análise → upload da foto → `photo_path` → tombstones → restore remoto → download de fotos `REMOTE_ONLY`. Falha de rede nunca afeta o fluxo local
 
 ### Diagrama do fluxo
 
@@ -93,13 +99,16 @@ Flow emite lista atualizada → HistoryScreen
 
 ## 3. Camada de apresentação
 
-- **Jetpack Compose** — UI declarativa, Material3, `Navigation Compose` para rotas (`history`, `camera`, `result/{id}`)
-- **MainActivity** — `ComponentActivity`, `enableEdgeToEdge()`, `setContent { LeafCareTheme { LeafCareApp() } }`
-- **Navigation** — `NavHost` com 3 destinos; `NavController` navega via callbacks do `ViewModel`; `popUpTo("history")` evita pilha profunda
-- **LeafCareViewModel** — `AndroidViewModel`; expõe `analyses: Flow<List<AnalysisEntity>>`, `ui: StateFlow<UiState>`, `results: Flow<String>` (navegação), `threshold: MutableStateFlow<Float>`; encapsula acesso ao `Repository` e `Catalog`
-- **StateFlow / Flow** — Estado reativo unidirecional; `UiState(busy, error)` controla diálogos globais de carregamento e erro
+- **Jetpack Compose** — UI declarativa, Material3, `Navigation Compose` para rotas (`history`, `camera`, `result/{id}`, `profile`)
+- **MainActivity** — `ComponentActivity`, `enableEdgeToEdge()`, auth gate por estado de sessão (`Loading`/`Main`/`Auth` via função pura `appGateDestination`); `MainAppNavHost` recebe o mesmo `AuthViewModel`
+- **Auth flow** — `AuthNavHost` renderiza por `uiState.currentScreen` (Login/SignUp/ForgotPassword/RecoveryCode/NewPassword/Profile); sem `NavHost` aninhado
+- **Profile** — Rota `profile` com `ProfileScreen` (nome, e-mail, sair); voltar = `popBackStack`; logout descarta o `NavHost` principal (Back nunca retorna à área autenticada)
+- **Navigation** — Transições em escala rápida centralizada (linguagem do modal de ajuda), sem crossfade genérico
+- **LeafCareViewModel** — `AndroidViewModel`; expõe `analyses: Flow<List<AnalysisEntity>>`, `ui: StateFlow<UiState>`, `results: Flow<String>` (navegação), `threshold: MutableStateFlow<Float>`; encapsula acesso ao `Repository` e `Catalog`; agenda sync após analyze/delete
+- **AuthViewModel** — Conta e sessão (`AuthRepository`); mapeamentos puros de navegação; `getAuthDisplayName()` alimenta a saudação da home
+- **StateFlow / Flow** — Estado reativo unidirecional; `UiState(busy, error)` controla diálogos globais de carregamento e erro; `error`/`infoMessage` do Auth exibem mensagens sanitizadas (nunca dumps HTTP)
 - **Eventos/navegação** — `Channel<String>` no `ViewModel` emite ID da análise concluída; `LaunchedEffect` no `LeafCareApp` navega para `result/{id}`
-- **UI não acessa diretamente detalhes internos do Repository após hardening** — `ViewModel` expõe apenas `getPhoto(name)`, `getModelError()`, `observeAnalysis(id)`, `getDiseaseInfo(classId)`; DAO, Room, Classifier, Mutex ficam privados no `Repository`
+- **UI não acessa diretamente detalhes internos do Repository após hardening** — `ViewModel` expõe apenas `getPhoto(name)`, `getModelError()`, `observeAnalysis(id)`, `getDiseaseInfo(classId)`; DAO, Room, Classifier, Mutex, Supabase ficam privados nas camadas de dados
 
 > **Terminologia**: "MVVM pragmático" ou "MVVM-style". Não é Clean Architecture (não há Use Cases, Entities de domínio puro, Data Sources abstratas, Boundaries). A injeção é manual no `Application`; o `ViewModel` conhece o `Repository` concreto.
 
@@ -113,11 +122,11 @@ Flow emite lista atualizada → HistoryScreen
 |---|---|
 | **Expor estado reativo** | `analyses` (Flow do DAO via `stateIn`), `ui` (busy/error), `results` (Channel→Flow para navegação), `threshold` (MutableStateFlow) |
 | **Intermediar UI ↔ Repository** | `analyze(uri)`, `delete(id, onDeleted)`, `getPhoto(name)`, `getModelError()`, `observeAnalysis(id)`, `getDiseaseInfo(classId)` |
-| **Análise** | Valida `busy`; define `busy=true`; lança coroutine em `viewModelScope`; chama `repository.analyze(uri)`; emite ID no `Channel`; trata exceções; `finally` limpa `busy` e arquivo temporário |
-| **Exclusão** | `repository.delete(id)` em `viewModelScope`; callback `onDeleted()` para fechar tela de resultado |
+| **Análise** | Valida `busy`; define `busy=true`; lança coroutine em `viewModelScope`; chama `repository.analyze(uri)`; emite ID no `Channel`; agenda sync (`app.scheduleSync()`); trata exceções; `finally` limpa `busy` e arquivo temporário |
+| **Exclusão** | `repository.delete(id)` (tombstone, some da UI na hora) em `viewModelScope`; agenda sync; callback `onDeleted()` para fechar tela de resultado |
 | **Consulta** | Delega ao `Repository`/`Catalog`; não expõe DAO nem Entity bruta |
 | **Navegação** | Não navega diretamente; emite no `Channel`; `LeafCareApp` escuta e navega |
-| **Erros** | `error(message)` / `clearError()` atualizam `UiState`; `MainActivity` renderiza `AlertDialog` global |
+| **Erros** | `error(message)` / `clearError()` atualizam `UiState`; `MainActivity` renderiza `AlertDialog` global (erros locais; erros de rede nunca chegam aqui) |
 
 **Por que a UI não deve manipular DAO/Room/Classifier diretamente:**
 
@@ -137,10 +146,11 @@ Flow emite lista atualizada → HistoryScreen
 - **Armazenamento da foto** — Copia stream da `Uri` (file ou content) para `filesDir/photos/{id}.img`; valida 30 MB durante cópia; `committed` flag garante limpeza se falhar antes do insert
 - **Chamada ao classifier** — `ImageDecoder.decode(file)` → `PixelPreprocessor.toRgb()` → `classifier.classify(bitmap)` → `bitmap.recycle()` em `finally`
 - **Persistência** — Monta `AnalysisEntity` com top-3 JSON, threshold, inferenceMs, modelHash; `dao.insert(entity)` em `withContext(NonCancellable)` para não perder gravação se usuário sair da tela
-- **Exclusão** — `suspend fun delete(id)` apaga linha no Room **e** arquivo de foto atomicamente (mesmo Mutex)
-- **NonCancellable onde aplicável** — Insert e delete usam `withContext(NonCancellable)` para garantir conclusão mesmo se coroutine pai for cancelada
-- **Mutex** — `private val mutex = Mutex()`; `analyze()` e `delete()` executam `mutex.withLock { ... }`; serializa inferências (evita `Interpreter.run()` concorrente na mesma instância) e exclusões
-- **Threshold** — Lê de `SharedPreferences` com fallback para `classifier.defaultThreshold` (vem do `model_metadata.json`); `setThreshold(value)` valida 0.5–0.95
+- **Exclusão** — `suspend fun delete(id)` marca tombstone (`PENDING_DELETE` + `deletedAt`); some da UI imediatamente; foto local só é removida após confirmação remota (mesmo Mutex)
+- **Isolamento entre contas** — `clearAllLocal()` apaga linhas + fotos (wipe só na troca de conta, via `ensureAccountIsolation`); logout sozinho preserva offline
+- **NonCancellable onde aplicável** — Insert e operações críticas usam `withContext(NonCancellable)` para garantir conclusão mesmo se coroutine pai for cancelada
+- **Mutex** — `private val mutex = Mutex()`; `analyze()`, `delete()` e `clearAllLocal()` executam `mutex.withLock { ... }`; serializa inferências (evita `Interpreter.run()` concorrente na mesma instância) e mutações
+- **Threshold** — Sempre `classifier.defaultThreshold` (vem do `model_metadata.json`, 0.70 baseline); resíduo de SharedPreferences removido na Fase 1
 
 > **Nota sobre thread-safety**: O Repository serializa as operações de análise com `Mutex`, evitando inferências concorrentes sobre a mesma instância reutilizada do `Interpreter`. A API `Interpreter` do LiteRT não garante segurança para `run()` concorrente; o Mutex é a estratégia adotada (alternativa: pool de interpreters, descartada por complexidade vs uso esporádico).
 
@@ -148,17 +158,42 @@ Flow emite lista atualizada → HistoryScreen
 
 ## 6. Persistência
 
-- **Room** — `AppDatabase` versão **1**, `exportSchema = true` (schemas em `android-app/app/schemas/`)
-- **AnalysisEntity** — Tabela `analyses`; PK `id` (UUID string); colunas: `photoName`, `createdAt`, `classId`, `displayName`, `scientificName`, `confidence`, `top3Json`, `inconclusive`, `threshold`, `inferenceMs`, `modelSha256`
-- **AnalysisDao** — `observeAll(): Flow<List<AnalysisEntity>>` (ordenado por `createdAt DESC`); `observe(id)`; `get(id)` suspenso; `insert` (ABORT); `delete(id)`
+- **Room** — `AppDatabase` versão **3**, `exportSchema = true` (schemas em `android-app/app/schemas/`)
+- **AnalysisEntity** — Tabela `analyses`; PK `id` (UUID string compartilhado com o remoto); colunas: `photoName`, `createdAt`, `classId`, `displayName`, `scientificName`, `confidence`, `top3Json`, `inconclusive`, `threshold`, `inferenceMs`, `modelSha256`, `syncStatus`, `deletedAt`, `photoSyncStatus`
+- **Migrations explícitas, sem destructive** — `MIGRATION_1_2` (sync) e `MIGRATION_2_3` (foto), testadas com dados reais
+- **AnalysisDao** — `observeAll()` filtra tombstones (`deletedAt IS NULL`, `createdAt DESC`); `observe(id)`; `get(id)`; `insert` (ABORT); filas `getPendingUploads`/`getPendingDeletes`/`getPendingPhotoUploads`/`getPendingPhotoDownloads`; marcações `markSynced/markError/markDeleted/markPhotoSynced/markPhotoError`; `count`/`deleteAll` (isolamento)
 - **Flow reativo** — `dao.observeAll()` emite lista completa a cada mudança; `ViewModel` usa `stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())`
 - **Arquivo da foto separado do banco** — Room guarda **apenas nome relativo** (`photoName`); arquivo físico em `filesDir/photos/{photoName}`; `Repository.photo(name)` valida `File(name).name == name` (evita path traversal)
-- **Banco atualmente version = 1** — **Não há migrations implementadas**; `exportSchema = true` gera JSON para referência futura
-- **Futuras alterações de schema exigirão migrations explícitas** — Room não usa `fallbackToDestructiveMigration`; qualquer mudança (nova coluna, índice, tabela) requer `Migration` declarada no builder
 
 ---
 
-## 7. Machine Learning no Android
+## 7. Autenticação (Supabase Auth)
+
+- **Conta obrigatória** — `AuthRepository` + `AuthViewModel`; `MainActivity` é o auth gate (`session != null → app`)
+- **Supabase 2.1.0** (`supabase-kt`/`gotrue-kt`, Ktor OkHttp); `SupabaseClientHolder` instala `Auth` (+`Postgrest`, `Storage`); config via `local.properties` → `BuildConfig` (`SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`, nunca commitada; build falha com placeholder)
+- **Cadastro sem confirmação web** — sessão direta; `display_name` vai em user metadata (trigger cria `profiles`); ramo defensivo sem sessão nunca usa browser
+- **Recuperação OTP in-app** — e-mail com código → `verifyEmailOtp(RECOVERY)` → nova senha via `modifyUser`; sem deep link, WebView ou localhost
+- **Sessão persistida** — restore no boot; offline após login anterior; logout limpa e descarta o `NavHost` (Back nunca volta)
+- **Erros sanitizados** — `sanitizeError()` converte dumps HTTP em mensagens fixas; nunca expõe URL, headers, tokens ou chaves na UI ou em logs
+
+## 8. Sincronização offline-first (Supabase)
+
+```
+UI → ViewModel → Repository → Room (fonte da UI) → Sync Engine / WorkManager → Supabase
+```
+
+- **WorkManager** (`sync-analyses`, único, `APPEND`): só com `CONNECTED`, backoff exponencial, teto de 5 tentativas, sobrevive a restart; sem auth = nada executa; aborta a passada se a sessão mudar (logout/troca)
+- **Disparos** — após analyze/delete, no `onCreate` (flush pós-restart) e após login/cadastro
+- **Análises** — upsert idempotente `onConflict=id` no UUID local; `PENDING_UPLOAD` → `SYNCED` → `ERROR` (retry); falha de rede nunca perde dado local
+- **Fotos** — `photoSyncStatus` separado (`PENDING_UPLOAD`/`SYNCED`/`ERROR`/`REMOTE_ONLY`); upload `upsert=true` para `analysis-photos/{user_id}/{analysis_id}.jpg`; `photo_path` associado após confirmação; arquivo local preservado
+- **Exclusões** — tombstone local (`PENDING_DELETE` + `deletedAt`, some da UI) → remove foto remota (404 = ok) → `deleted_at` remoto → limpa local + foto; nunca ressuscita
+- **Restore** — `fetch` via RLS + merge por UUID na mesma passada: ausente → insere `SYNCED`/`REMOTE_ONLY`; mesmo UUID nunca sobrescrito (pendentes e tombstones intactos); tombstone remoto nunca importado e aplicado sobre linha `SYNCED`; download de fotos `REMOTE_ONLY` para `filesDir/photos/{id}.img` (tmp + rename, sem parcial válida)
+- **Segurança** — RLS `TO authenticated` + `(select auth.uid())`; bucket privado por pasta de usuário; paths sempre derivados da sessão; sem `service_role`; sem signed URL no banco
+- **Isolamento entre contas** — Room sem coluna de dono: `ensureAccountIsolation` faz wipe local só na troca de conta (mesmo login e logout preservam); worker resolve o usuário por fase
+
+---
+
+## 9. Machine Learning no Android
 
 `LeafClassifier` (`android-app/app/src/main/java/br/com/leafcare/ml/LeafClassifier.kt`) — encapsula carregamento, validação e inferência:
 
@@ -184,7 +219,7 @@ Flow emite lista atualizada → HistoryScreen
 
 ---
 
-## 8. Contrato de pré-processamento
+## 10. Contrato de pré-processamento
 
 Fonte principal: `docs/INFERENCE_CONTRACT.md` (versão 1). O contrato **deve ser idêntico** entre Python (`leafcare/preprocessing.py`) e Kotlin (`ml/PixelPreprocessor.kt`).
 
@@ -207,7 +242,7 @@ Qualquer divergência entre treino e app **pode mudar a previsão**. O modelo ap
 
 ---
 
-## 9. Política de resultado
+## 11. Política de resultado
 
 `PredictionPolicy` (`android-app/app/src/main/java/br/com/leafcare/ml/Prediction.kt`):
 
@@ -226,7 +261,7 @@ Qualquer divergência entre treino e app **pode mudar a previsão**. O modelo ap
 
 ---
 
-## 10. Pipeline de Machine Learning
+## 12. Pipeline de Machine Learning
 
 ### Diagrama ASCII
 
@@ -279,7 +314,7 @@ Android assets  (prontos para build)
 
 ---
 
-## 11. Baseline vs ensemble
+## 13. Baseline vs ensemble
 
 ### Arquiteturalmente
 
@@ -307,60 +342,62 @@ Android assets  (prontos para build)
 
 ---
 
-## 12. Offline e privacidade
+## 14. Offline e privacidade
 
 Fatos verificados no código:
 
-- **Manifest sem `INTERNET`** — `AndroidManifest.xml` não declara a permissão; `usesCleartextTraffic="false"`
+- **Permissão `INTERNET` declarada** — necessária para conta e sincronização; classificação continua 100% local
+- **`usesCleartextTraffic="false"`** — só HTTPS
 - **Câmera** — Permissão `CAMERA` apenas; `android.hardware.camera.any required="false"`
-- **Galeria** — Seletor de documentos do sistema (`ACTION_OPEN_DOCUMENT` / `ActivityResultContracts.OpenDocument`); sem acesso amplo a armazenamento (`READ_EXTERNAL_STORAGE` não declarada)
-- **Room local** — Banco SQLite em `databases/leafcare.db`; sem sincronização
-- **Fotos privadas** — `filesDir/photos/` (acesso só pelo app; `allowBackup="false"` exclui do backup do Google)
+- **Galeria** — Seletor de documentos do sistema; sem acesso amplo a armazenamento
+- **Room local** — Banco SQLite em `databases/leafcare.db` (v3); fonte da UI mesmo com rede
+- **Fotos privadas** — `filesDir/photos/` (só o app; `allowBackup="false"` exclui do backup do Google)
 - **Backup automático desativado** — `android:allowBackup="false"` no `<application>`
-- **Sem login, analytics, telemetria, Firebase, Supabase** — Nenhuma dependência de rede no `build.gradle.kts`; `LeafCareApplication` não inicializa clientes HTTP
+- **Conta/sync via Supabase** — publishable key em `BuildConfig` (de `local.properties`, nunca commitada); `service_role`, senhas e JWT secret nunca entram no app
+- **RLS por usuário** — `TO authenticated` + `(select auth.uid())`; bucket privado por pasta; isolamento entre contas no aparelho (wipe na troca)
 - **Desinstalar/limpar dados remove todo o histórico** — Comportamento padrão do Android para armazenamento privado
 
-> **Não diga que algo foi testado fisicamente se não foi**. Validação manual de câmera/galeria/persistência em dispositivo físico **pendente** (ver `docs/MANUAL_TESTS.md`).
+> **Não diga que algo foi testado fisicamente se não foi**. Bateria final em `docs/FINAL_QA_CHECKLIST.md`.
 
 ---
 
-## 13. Validações arquiteturais
+## 15. Validações arquiteturais
 
 Somente validações **realmente executadas/documentadas**:
 
 | Validação | Comando | Status |
 |---|---|---|
-| Testes Python (28) | `python -m pytest -q` | **PASS** (14.07 s) |
+| Testes Python (28) | `python -m pytest -q` | **PASS** |
 | Validação bundle ML | `python validate_bundle.py --require-model` | **PASS** (`model_bundle_valid`, 16 classes, hashes e ordem consistentes) |
-| Android unit tests | `./gradlew testDebugUnitTest` | **PASS** (8 testes: 4 política/pré-processamento + 4 interface Robolectric) |
+| Android unit tests | `./gradlew testDebugUnitTest` | **PASS** (115 testes: auth, sync, UI, ML) |
 | Verificação assets ML | `./gradlew verifyModelAssets` | **PASS** |
+| Lint | `./gradlew lintDebug` | **PASS** (1 erro pré-existente corrigido via `values-v27`; warnings só de versões pinadas) |
 | Build debug | `./gradlew assembleDebug` | **PASS** (APK gerado) |
 
-**Total**: 36 testes aprovados (28 Python + 8 Android unit).
+**Total**: 143 testes aprovados (28 Python + 115 Android unit).
 
 ### Explícito: NÃO executados
 
 - `connectedDebugAndroidTest` — Testes instrumentados em emulador/dispositivo
-- Teste em dispositivo físico ou emulador Android
-- Câmera real, permissões runtime, galeria do sistema, persistência entre processos, desempenho no celular
+- Bateria física final (`docs/FINAL_QA_CHECKLIST.md`), reinstalação, dois aparelhos, conexão instável
 - Validação agronômica de campo (Sul do Brasil)
 
-> Robolectric **não substitui** testes instrumentados. O APK de testes instrumentados desta versão não foi executado.
+> Robolectric **não substitui** testes instrumentados nem teste físico.
 
 ---
 
-## 14. Decisões e trade-offs
+## 16. Decisões e trade-offs
 
 Resumo arquitetural. Detalhes completos (20 decisões com justificativa, alternativas, trade-offs, localização no código) em:
 
 📖 **[docs/TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md)**
 
-Principais decisões registradas lá:
+Principais decisões registradas lá (1–20 originais + 21+ da fase cloud):
 
 1. Kotlin nativo + Jetpack Compose
 2. CameraX para captura
 3. Room + SQLite + Flow
-4. Ausência de backend / `INTERNET`
+4. ~~Ausência de backend~~ → **substituída**: Supabase offline-first (decisões 21+)
 5. MobileNetV3Small + Transfer Learning (duas etapas)
 6. Two-stage training: freeze → fine-tune
 7. Class weights (razão ≥ 1.5)
@@ -380,20 +417,20 @@ Principais decisões registradas lá:
 
 ---
 
-## 15. Limitações arquiteturais atuais
+## 17. Limitações arquiteturais atuais
 
 - **Classificador closed-set** — 16 classes fixas; não detecta "não é folha de fumo" nem doenças fora do conjunto
 - **Sem OOD robusto** — Imagens fora de domínio (solo, céu, outras culturas, fotos borradas) podem receber confiança alta
 - **Sem quality gate** — Não há detecção de blur, baixa luz, folha distante, fora de enquadramento, múltiplas folhas
-- **Sem backend/sync** — Histórico só no dispositivo; desinstalação apaga tudo; exportação manual futura (fase 5 roadmap)
 - **Sem propriedade/talhão/planta/sessão** — Agrupamento por dHash/nome é proxy frágil; split group-aware não garante independência de campo
 - **Ensemble pendente** — Não validado em Android real; latência, RAM, APK size, bateria, aquecimento desconhecidos
 - **Sem device profiling** — Latência, memória, CPU, GPU/NPU não medidos em entry-level/mid-range
 - **Conteúdo agronômico ainda sem revisão completa** — `diseases.json` tem `reviewed: false` em todas as 16 classes; nomes, descrições, sintomas, orientações precisam de validação por especialista
 - **Dataset pequeno** — 696 imagens; classes raras (anthracnose, TSWV, black_shank, genetic_abnormality) com 1–2 amostras no teste
 - **Threshold baseline não calibrado** — 0.70 é valor inicial; ensemble usa 0.74 calibrado apenas em validação (não em campo)
-- **Validação física pendente** — Câmera real, galeria, persistência entre reinicializações, desempenho térmico não executados
+- **Validação física pendente** — Bateria final em `docs/FINAL_QA_CHECKLIST.md` não executada
+- **Sem Realtime** — Sync por WorkManager sob demanda; sem escuta contínua, sem multi-device em tempo real
 
 ---
 
-*Documento gerado a partir do código real (branch `docs/overhaul`, commit `1eb9139`). Não contém componentes inventados, métricas não validadas ou afirmações de "produção pronta" sem evidência.*
+*Documento gerado a partir do código real (branch `feature/mvp-cloud`). Não contém componentes inventados, métricas não validadas ou afirmações de "produção pronta" sem evidência.*

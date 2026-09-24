@@ -24,10 +24,13 @@ The Android app will need these **public** values (safe to include in build conf
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `SUPABASE_URL` | Project REST API URL | `https://nhkqfanjfcivcbndivav.supabase.co` |
-| `SUPABASE_ANON_KEY` | Anonymous public key (JWT) | `eyJhbGciOiJIUzI1NiIs...` |
+| `SUPABASE_PUBLISHABLE_KEY` | Publishable key (JWT, ex-anon) | `eyJhbGciOiJIUzI1NiIs...` |
 
 **Where to find them:**
-- Dashboard → Settings → API → Project URL / anon public key
+- Dashboard → Settings → API → Project URL / publishable key
+
+> Nota: o app atual usa `SUPABASE_PUBLISHABLE_KEY` (alias legado
+> `SUPABASE_ANON_KEY` mantido no `BuildConfig` apontando para a mesma chave).
 
 **NEVER put these in the repo:**
 - `service_role` key (bypasses RLS)
@@ -166,7 +169,7 @@ The Android app reads Supabase configuration from `local.properties` → `BuildC
 
 ```properties
 # local.properties (create from local.properties.example)
-SUPABASE_ANON_KEY=your_actual_anon_key_here
+SUPABASE_PUBLISHABLE_KEY=your_actual_publishable_key_here
 ```
 
 `SUPABASE_URL` is hardcoded in BuildConfig as `https://nhkqfanjfcivcbndivav.supabase.co` since it's fixed for this project.
@@ -176,7 +179,7 @@ SUPABASE_ANON_KEY=your_actual_anon_key_here
 ```kotlin
 // In Kotlin code
 val url = BuildConfig.SUPABASE_URL
-val anonKey = BuildConfig.SUPABASE_ANON_KEY
+val publishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
 ```
 
 ### local.properties.example
@@ -194,7 +197,7 @@ See `android-app/local.properties.example` for the template.
 | JWT secret | Supabase internal | ✅ |
 | Dashboard access tokens | Personal/CI only | ✅ |
 
-Only `SUPABASE_URL` and `SUPABASE_ANON_KEY` go into the Android app (via `local.properties` → `BuildConfig`, not hardcoded).
+Only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` go into the Android app (via `local.properties` → `BuildConfig`, not hardcoded).
 
 ---
 
