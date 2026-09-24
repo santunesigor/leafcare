@@ -60,6 +60,12 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
     private val ioScope = CoroutineScope(Dispatchers.IO + Job())
     private val mainScope = CoroutineScope(Dispatchers.Main + Job())
 
+    // Explicit bootstrap state: false until the first storage-restore attempt
+    // finishes. The UI gate shows only Loading before this resolves, so the
+    // Login screen never flashes when a persisted session exists.
+    private val _sessionChecked = MutableStateFlow(false)
+    val sessionChecked: StateFlow<Boolean> = _sessionChecked.asStateFlow()
+
     // Flag to track if initial session restoration has been attempted
     private var _initialSessionRestored = false
 
@@ -78,13 +84,17 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
 
         // Load session from storage (does not require network)
         ioScope.launch {
-            val hasSession = backend.loadFromStorage()
-            if (hasSession) {
-                val session = backend.loadSession()
-                if (session != null) {
-                    _session.value = session
-                    _user.value = session.user
+            try {
+                val hasSession = backend.loadFromStorage()
+                if (hasSession) {
+                    val session = backend.loadSession()
+                    if (session != null) {
+                        _session.value = session
+                        _user.value = session.user
+                    }
                 }
+            } finally {
+                _sessionChecked.value = true
             }
         }
 
@@ -114,11 +124,10 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
      * The display name is sent as user metadata ("display_name") and used by the
      * database trigger to create the profile.
      *
-     * Two outcomes are supported:
-     * - Supabase returns a session: user is authenticated.
-     * - Account created but email confirmation required: no session exists.
-     *   Returns [EmailConfirmationRequiredException] failure and sets [infoMessage];
-     *   the user is NOT marked as authenticated.
+     * With email confirmation enabled on the hosted project, a successful
+     * sign-up returns no session: the account awaits the in-app OTP code.
+     * Returns [SignupWithoutSessionException] failure and sets [infoMessage];
+     * the user is NOT marked as authenticated. No browser involved.
      */
     suspend fun signUp(
         email: String,
@@ -144,10 +153,9 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 _user.value = session.user
                 Result.success(session)
             } else {
-                // Defensive path only: with email confirmation disabled on the
-                // hosted project, sign-up returns a session. Never build
-                // web/browser UX around this branch.
-                _infoMessage.value = "Cadastro concluído. Entre com seu e-mail e senha."
+                // Email confirmation is enabled: the account waits for the
+                // in-app OTP code verified by verifySignupCode().
+                _infoMessage.value = "Enviamos um código de confirmação para seu e-mail."
                 Result.failure(SignupWithoutSessionException())
             }
         } catch (e: Exception) {
@@ -260,6 +268,74 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
     /** Clears the current informational message */
     fun clearInfo() {
         _infoMessage.value = null
+    }
+
+    /**
+     * Verifies the signup confirmation code sent to the user's email.
+     * On success a session exists and is reflected locally; the user is
+     * authenticated. Fully in-app (OTP, no browser).
+     */
+    suspend fun verifySignupCode(email: String, code: String): Result<UserSession> {
+        _isLoading.value = true
+        _error.value = null
+        _infoMessage.value = null
+
+        return try {
+            if (email.isBlank()) {
+                _error.value = "E-mail inválido"
+                return Result.failure(IllegalArgumentException("E-mail inválido"))
+            }
+            if (code.isBlank()) {
+                _error.value = "Informe o código enviado ao seu e-mail."
+                return Result.failure(IllegalArgumentException("Código inválido"))
+            }
+
+            backend.verifySignupCode(email.trim(), code.trim())
+
+            val session = backend.loadSession()
+            if (session != null) {
+                _session.value = session
+                _user.value = session.user
+                Result.success(session)
+            } else {
+                val message = "Não foi possível concluir o cadastro. Tente novamente."
+                _error.value = message
+                Result.failure(AuthException(message))
+            }
+        } catch (e: Exception) {
+            val message = sanitizeError(AuthOperation.SIGNUP_VERIFY, e)
+            _error.value = message
+            Result.failure(AuthException(message, e))
+        } finally {
+            _isLoading.value = false
+        }
+    }
+
+    /**
+     * Resends the signup confirmation code. Fully in-app.
+     */
+    suspend fun resendSignupCode(email: String): Result<Unit> {
+        _isLoading.value = true
+        _error.value = null
+        _infoMessage.value = null
+
+        return try {
+            if (email.isBlank()) {
+                _error.value = "E-mail inválido"
+                return Result.failure(IllegalArgumentException("E-mail inválido"))
+            }
+
+            backend.resendSignupCode(email.trim())
+
+            _infoMessage.value = "Enviamos um novo código para seu e-mail."
+            Result.success(Unit)
+        } catch (e: Exception) {
+            val message = sanitizeError(AuthOperation.SIGNUP_RESEND, e)
+            _error.value = message
+            Result.failure(AuthException(message, e))
+        } finally {
+            _isLoading.value = false
+        }
     }
 
     /**
@@ -396,6 +472,8 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 AuthOperation.PASSWORD_RESET -> "Não foi possível enviar a recuperação. Tente novamente."
                 AuthOperation.RECOVERY_VERIFY -> "Não foi possível confirmar o código. Tente novamente."
                 AuthOperation.UPDATE_PASSWORD -> "Não foi possível definir a nova senha. Tente novamente."
+                AuthOperation.SIGNUP_VERIFY -> "Não foi possível confirmar o código. Tente novamente."
+                AuthOperation.SIGNUP_RESEND -> "Não foi possível reenviar o código. Tente novamente."
             }
         }
 
@@ -417,19 +495,20 @@ internal enum class AuthOperation {
     SIGN_OUT,
     PASSWORD_RESET,
     RECOVERY_VERIFY,
-    UPDATE_PASSWORD
+    UPDATE_PASSWORD,
+    SIGNUP_VERIFY,
+    SIGNUP_RESEND
 }
 
 /** Custom exception for auth errors */
 class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * Returned (not thrown) by [AuthRepository.signUp] when no session exists
- * after sign-up. Defensive only: email confirmation is disabled on the
- * hosted project, so this branch is not part of the normal flow.
+ * Returned (not thrown) by [AuthRepository.signUp] when the account was created
+ * but email confirmation is still pending (no session yet).
  */
 class SignupWithoutSessionException(
-    message: String = "Cadastro concluído. Entre com seu e-mail e senha."
+    message: String = "Enviamos um código de confirmação para seu e-mail."
 ) : Exception(message)
 
 /**
@@ -448,6 +527,8 @@ internal interface AuthBackend {
     suspend fun resetPasswordForEmail(email: String)
     suspend fun verifyRecoveryCode(email: String, code: String)
     suspend fun updatePassword(newPassword: String)
+    suspend fun verifySignupCode(email: String, code: String)
+    suspend fun resendSignupCode(email: String)
 }
 
 /** Production [AuthBackend] backed by the supabase-kt 2.1.0 public API. */
@@ -492,5 +573,13 @@ internal class SupabaseAuthBackend(private val auth: Auth) : AuthBackend {
         auth.modifyUser {
             password = newPassword
         }
+    }
+
+    override suspend fun verifySignupCode(email: String, code: String) {
+        auth.verifyEmailOtp(OtpType.Email.SIGNUP, email, code)
+    }
+
+    override suspend fun resendSignupCode(email: String) {
+        auth.resendEmail(OtpType.Email.SIGNUP, email)
     }
 }

@@ -28,25 +28,27 @@ class AppGateTest {
         expiresAt = Clock.System.now()
     )
 
-    @Test fun restoringWithoutSession_showsLoading() {
-        assertEquals(AppGate.Loading, appGateDestination(null, true))
+    @Test fun uncheckedSession_showsLoadingNeverAuth() {
+        // Bootstrap unresolved: only Loading, even with no session yet.
+        assertEquals(AppGate.Loading, appGateDestination(null, false))
     }
 
-    @Test fun noSessionWithoutLoading_showsAuth() {
-        assertEquals(AppGate.Auth, appGateDestination(null, false))
+    @Test fun uncheckedSession_neverShowsMainEither() {
+        // A session object must not leak to Main before restore resolves.
+        assertEquals(AppGate.Loading, appGateDestination(testSession(), false))
     }
 
-    @Test fun sessionShowsMain_evenWhileLoading() {
+    @Test fun checkedWithoutSession_showsAuth() {
+        assertEquals(AppGate.Auth, appGateDestination(null, true))
+    }
+
+    @Test fun checkedSession_showsMain() {
         assertEquals(AppGate.Main, appGateDestination(testSession(), true))
-    }
-
-    @Test fun sessionShowsMain() {
-        assertEquals(AppGate.Main, appGateDestination(testSession(), false))
     }
 
     @Test fun logoutClearedSession_showsAuth() {
         // After signOut the repository exposes null session/user (see
         // AuthRepositoryTest.signOut_clearsSession); the gate must show Auth.
-        assertEquals(AppGate.Auth, appGateDestination(null, false))
+        assertEquals(AppGate.Auth, appGateDestination(null, true))
     }
 }

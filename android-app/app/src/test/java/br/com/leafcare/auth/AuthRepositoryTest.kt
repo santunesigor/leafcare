@@ -32,6 +32,9 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     var lastVerify: Pair<String, String>? = null
     var updatePasswordCalls = 0
     var lastNewPassword: String? = null
+    var verifySignupCalls = 0
+    var lastSignupVerify: Pair<String, String>? = null
+    val resendSignupEmails = mutableListOf<String>()
 
     override suspend fun loadFromStorage(): Boolean = session != null
 
@@ -63,6 +66,15 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     override suspend fun updatePassword(newPassword: String) {
         updatePasswordCalls++
         lastNewPassword = newPassword
+    }
+
+    override suspend fun verifySignupCode(email: String, code: String) {
+        verifySignupCalls++
+        lastSignupVerify = email to code
+    }
+
+    override suspend fun resendSignupCode(email: String) {
+        resendSignupEmails += email
     }
 }
 
@@ -130,7 +142,7 @@ class AuthRepositoryTest {
         assertEquals(1, backend.signUpCalls)
     }
 
-    @Test fun signUp_withoutSessionIsDefensiveWithoutCrash() = runTest(testDispatcher) {
+    @Test fun signUp_withoutSessionGoesToConfirmationWithoutCrash() = runTest(testDispatcher) {
         val repository = repositoryWithSession(null)
 
         // Must not throw (previous code crashed on `session!!` here).
@@ -140,7 +152,57 @@ class AuthRepositoryTest {
         assertTrue(result.exceptionOrNull() is SignupWithoutSessionException)
         assertNull(repository.session.value)
         assertFalse(repository.hasPersistedSession())
-        assertEquals("Cadastro concluído. Entre com seu e-mail e senha.", repository.infoMessage.value)
+        assertEquals("Enviamos um código de confirmação para seu e-mail.", repository.infoMessage.value)
+    }
+
+    @Test fun verifySignupCode_blankCodeFailsWithoutBackendCall() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(null)
+
+        val result = repository.verifySignupCode("a@b.com", "  ")
+
+        assertTrue(result.isFailure)
+        assertEquals(0, backend.verifySignupCalls)
+    }
+
+    @Test fun verifySignupCode_successAuthenticates() = runTest(testDispatcher) {
+        val session = testSession()
+        val repository = repositoryWithSession(session)
+
+        val result = repository.verifySignupCode("a@b.com", "123456")
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, backend.verifySignupCalls)
+        assertEquals("a@b.com" to "123456", backend.lastSignupVerify)
+        assertEquals(session, repository.session.value)
+        assertTrue(repository.hasPersistedSession())
+    }
+
+    @Test fun resendSignupCode_recordsEmailAndInforms() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(null)
+
+        val result = repository.resendSignupCode("a@b.com")
+
+        assertTrue(result.isSuccess)
+        assertEquals(listOf("a@b.com"), backend.resendSignupEmails)
+        assertNotNull(repository.infoMessage.value)
+    }
+
+    @Test fun resendSignupCode_blankEmailFails() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(null)
+
+        val result = repository.resendSignupCode("  ")
+
+        assertTrue(result.isFailure)
+        assertTrue(backend.resendSignupEmails.isEmpty())
+    }
+
+    @Test fun restoreMarksSessionChecked() = runTest(testDispatcher) {
+        val repository = AuthRepository(backend)
+
+        // The bootstrap flag flips once the storage attempt finishes; the
+        // gate shows only Loading before that (see AppGateTest).
+        testScheduler.advanceUntilIdle()
+        assertTrue(repository.sessionChecked.value)
     }
 
     @Test fun signUp_forwardsDisplayName() = runTest(testDispatcher) {

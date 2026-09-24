@@ -95,4 +95,27 @@ class AuthErrorSanitizerTest {
             AuthRepository.sanitizeError(AuthOperation.UPDATE_PASSWORD, Exception("boom"))
         )
     }
+
+    @Test fun signupVerifyFallback_isFixedMessage() {
+        assertEquals(
+            "Não foi possível confirmar o código. Tente novamente.",
+            AuthRepository.sanitizeError(AuthOperation.SIGNUP_VERIFY, Exception("boom"))
+        )
+    }
+
+    @Test fun signupResendFallback_isFixedMessage() {
+        assertEquals(
+            "Não foi possível reenviar o código. Tente novamente.",
+            AuthRepository.sanitizeError(AuthOperation.SIGNUP_RESEND, Exception("boom"))
+        )
+    }
+
+    @Test fun expiredSignupCode_mapsToCodeMessage() {
+        val raw = Exception("Status 400 body={\"error\":\"Token has expired or is invalid\"}")
+
+        assertEquals(
+            "Código inválido ou expirado.",
+            AuthRepository.sanitizeError(AuthOperation.SIGNUP_VERIFY, raw)
+        )
+    }
 }

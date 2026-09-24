@@ -43,15 +43,16 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
     val session by authViewModel.session.collectAsStateWithLifecycle()
-    val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
+    val sessionChecked by authViewModel.sessionChecked.collectAsStateWithLifecycle()
 
     // On first launch, trigger session restoration
     androidx.compose.runtime.LaunchedEffect(Unit) {
         authViewModel.onSessionRestored()
     }
 
-    // Auth gate: a single auth state decides which flow is visible.
-    when (appGateDestination(session, isLoading)) {
+    // Auth gate: Loading until the restore attempt resolves, so the Login
+    // screen never flashes when a persisted session exists.
+    when (appGateDestination(session, sessionChecked)) {
         AppGate.Loading -> LoadingScreen()
         AppGate.Main -> MainAppNavHost(authViewModel)
         AppGate.Auth -> AuthNavHost(authViewModel)
@@ -141,11 +142,12 @@ internal enum class AppGate {
     Main,
     Auth
 }/**
- * Pure auth-gate decision (unit-testable): restoring without a session shows
- * loading, a session shows the app, otherwise the auth flow.
+ * Pure auth-gate decision (unit-testable): Loading until the restore attempt
+ * resolves, then Main with a session, Auth otherwise. Auth is never shown
+ * before the real state is known.
  */
-internal fun appGateDestination(session: UserSession?, isLoading: Boolean): AppGate =
-    if (isLoading && session == null) {
+internal fun appGateDestination(session: UserSession?, sessionChecked: Boolean): AppGate =
+    if (!sessionChecked) {
         AppGate.Loading
     } else if (session != null) {
         AppGate.Main

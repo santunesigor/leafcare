@@ -64,6 +64,7 @@ fun AuthNavHost(viewModel: AuthViewModel) {
     when (uiState.currentScreen) {
         AuthScreen.Login -> LoginScreen(viewModel)
         AuthScreen.SignUp -> SignUpScreen(viewModel)
+        AuthScreen.ConfirmEmail -> ConfirmEmailScreen(viewModel)
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
         AuthScreen.RecoveryCode -> RecoveryCodeScreen(viewModel)
         AuthScreen.NewPassword -> NewPasswordScreen(viewModel)
@@ -323,6 +324,40 @@ fun SignUpScreen(viewModel: AuthViewModel) {
         Spacer(Modifier.height(12.dp))
 
         AuthLinkedRow("Já tem uma conta?", "Entrar") { viewModel.setScreen(AuthScreen.Login) }
+    }
+}
+
+@Composable
+fun ConfirmEmailScreen(viewModel: AuthViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+
+    AuthScaffold {
+        AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
+        AuthHeader(
+            logoSize = 56,
+            title = "Confirmar e-mail",
+            subtitle = "Enviamos um código de confirmação para ${uiState.email}."
+        )
+
+        AuthField(
+            value = uiState.signupCode,
+            onValueChange = { viewModel.setSignupCode(it) },
+            label = "Código",
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done,
+            onImeDone = { viewModel.verifySignupCode() }
+        )
+
+        AuthMessages(error, infoMessage)
+        Spacer(Modifier.height(24.dp))
+
+        AuthButton(label = "Confirmar", loading = isLoading, onClick = { viewModel.verifySignupCode() })
+        Spacer(Modifier.height(12.dp))
+
+        AuthLinkButton("Reenviar código") { viewModel.resendSignupCode() }
     }
 }
 

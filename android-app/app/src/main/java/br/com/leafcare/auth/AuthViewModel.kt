@@ -33,6 +33,7 @@ class AuthViewModel(
     val isLoading = authRepository.isLoading
     val error = authRepository.error
     val infoMessage = authRepository.infoMessage
+    val sessionChecked = authRepository.sessionChecked
 
     /**
      * Authenticated user's display name from user metadata, or null when
@@ -50,8 +51,16 @@ class AuthViewModel(
 
     // --- Actions ---
 
-    /** Updates the current screen */
-    fun setScreen(screen: AuthScreen) {
+    /**
+     * Updates the current screen. By default clears the previous screen's
+     * messages so errors never leak into the next screen; success flows that
+     * navigate right after setting a message pass `clearMessages = false`.
+     */
+    fun setScreen(screen: AuthScreen, clearMessages: Boolean = true) {
+        if (clearMessages) {
+            authRepository.clearError()
+            authRepository.clearInfo()
+        }
         _uiState.value = _uiState.value.copy(currentScreen = screen)
     }
 
@@ -80,6 +89,11 @@ class AuthViewModel(
         _uiState.value = _uiState.value.copy(recoveryCode = recoveryCode)
     }
 
+    /** Updates signup confirmation code field */
+    fun setSignupCode(signupCode: String) {
+        _uiState.value = _uiState.value.copy(signupCode = signupCode)
+    }
+
     /** Updates new password field */
     fun setNewPassword(newPassword: String) {
         _uiState.value = _uiState.value.copy(newPassword = newPassword)
@@ -97,6 +111,7 @@ class AuthViewModel(
             password = "",
             confirmPassword = "",
             displayName = "",
+            signupCode = "",
             recoveryCode = "",
             newPassword = "",
             confirmNewPassword = ""
@@ -116,11 +131,11 @@ class AuthViewModel(
                 password = state.password,
                 displayName = state.displayName.trim()
             )
-            // Signup without session is defensive-only (email confirmation is
-            // disabled on the hosted project): stay in Auth on the Login
-            // screen so the user can sign in. No web/browser involved.
+            // Signup without session means email confirmation is pending:
+            // stay in Auth on the ConfirmEmail screen (message preserved).
+            // No web/browser involved.
             if (result.exceptionOrNull() is SignupWithoutSessionException) {
-                setScreen(AuthScreen.Login)
+                setScreen(AuthScreen.ConfirmEmail, clearMessages = false)
                 return@launch
             }
             val destination = navigationForAuthResult(result.isSuccess)
@@ -162,10 +177,12 @@ class AuthViewModel(
         app.scheduleSync()
     }
 
-    /** Sign out action */
+    /** Sign out action: always back to the initial Auth screen. */
     fun signOut() {
         viewModelScope.launch {
             authRepository.signOut()
+            clearForms()
+            setScreen(AuthScreen.Login)
             _navigation.send(navigationAfterSignOut())
         }
     }
@@ -176,7 +193,7 @@ class AuthViewModel(
         viewModelScope.launch {
             val result = authRepository.requestPasswordReset(email = state.email.trim())
             if (result.isSuccess) {
-                setScreen(AuthScreen.RecoveryCode)
+                setScreen(AuthScreen.RecoveryCode, clearMessages = false)
             }
         }
     }
@@ -190,8 +207,32 @@ class AuthViewModel(
                 code = state.recoveryCode.trim()
             )
             if (result.isSuccess) {
-                setScreen(AuthScreen.NewPassword)
+                setScreen(AuthScreen.NewPassword, clearMessages = false)
             }
+        }
+    }
+
+    /** Verify the signup confirmation code (in-app OTP, no browser) */
+    fun verifySignupCode() {
+        val state = _uiState.value
+        viewModelScope.launch {
+            val result = authRepository.verifySignupCode(
+                email = state.email.trim(),
+                code = state.signupCode.trim()
+            )
+            if (result.isSuccess) {
+                clearForms()
+                _navigation.send(AuthNavigationEvent.NavigateToApp)
+            }
+            onAuthenticated(result)
+        }
+    }
+
+    /** Resend the signup confirmation code (in-app, no browser) */
+    fun resendSignupCode() {
+        val state = _uiState.value
+        viewModelScope.launch {
+            authRepository.resendSignupCode(email = state.email.trim())
         }
     }
 
@@ -252,6 +293,7 @@ data class AuthUiState(
     val password: String = "",
     val confirmPassword: String = "",
     val displayName: String = "",
+    val signupCode: String = "",
     val recoveryCode: String = "",
     val newPassword: String = "",
     val confirmNewPassword: String = ""
@@ -261,6 +303,7 @@ data class AuthUiState(
 enum class AuthScreen {
     Login,
     SignUp,
+    ConfirmEmail,
     ForgotPassword,
     RecoveryCode,
     NewPassword,
