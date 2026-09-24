@@ -7,9 +7,9 @@ import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -31,6 +31,12 @@ class AuthViewModel(
     val isLoading = authRepository.isLoading
     val error = authRepository.error
     val infoMessage = authRepository.infoMessage
+
+    /**
+     * Authenticated user's display name from user metadata, or null when
+     * unavailable. Home greeting falls back to a plain greeting in that case.
+     */
+    fun getAuthDisplayName(): String? = displayNameOf(user.value)
 
     // UI state for different screens
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -244,8 +250,7 @@ enum class AuthScreen {
 }
 
 /** Navigation events for auth flow */
-sealed interface AuthNavigationEvent {
-    data class NavigateToAuth(val initialScreen: AuthScreen = AuthScreen.Login) : AuthNavigationEvent
+sealed interface AuthNavigationEvent {    data class NavigateToAuth(val initialScreen: AuthScreen = AuthScreen.Login) : AuthNavigationEvent
     object NavigateToApp : AuthNavigationEvent
 }
 
@@ -266,3 +271,7 @@ internal fun navigationForSessionRestore(hasSession: Boolean): AuthNavigationEve
 /** After sign-out: always back to Auth. */
 internal fun navigationAfterSignOut(): AuthNavigationEvent =
     AuthNavigationEvent.NavigateToAuth()
+
+/** Extracts the producer display name from a GoTrue user, or null when absent. */
+internal fun displayNameOf(user: io.github.jan.supabase.gotrue.user.UserInfo?): String? =
+    user?.userMetadata?.get("display_name")?.jsonPrimitive?.content

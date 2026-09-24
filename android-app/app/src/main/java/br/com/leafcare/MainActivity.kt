@@ -5,6 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import br.com.leafcare.auth.AuthViewModel
+import br.com.leafcare.auth.displayNameOf
 import br.com.leafcare.ui.auth.AuthNavHost
 import br.com.leafcare.ui.auth.ProfileScreen
 import br.com.leafcare.ui.*
@@ -72,13 +80,22 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
     val nav = rememberNavController()
     val vm: LeafCareViewModel = viewModel()
     val state by vm.ui.collectAsStateWithLifecycle()
+    // Drives recomposition when the user changes; the name is read fresh below.
+    val user by authViewModel.user.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.results.collect { id ->
         nav.navigate("result/$id") { popUpTo("history"); launchSingleTop = true } } }
     Surface(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-            NavHost(nav, startDestination = "history") {
+            NavHost(
+                nav,
+                startDestination = "history",
+                enterTransition = { leafEnterTransition },
+                exitTransition = { leafExitTransition },
+                popEnterTransition = { leafEnterTransition },
+                popExitTransition = { leafExitTransition }
+            ) {
                 composable("history") {
-                    HistoryScreen(vm, { nav.navigate("camera") }, { nav.navigate("result/$it") }, { nav.navigate("profile") })
+                    HistoryScreen(vm, { nav.navigate("camera") }, { nav.navigate("result/$it") }, { nav.navigate("profile") }, displayNameOf(user))
                 }
                 composable("profile") {
                     // Same AuthViewModel instance: logout clears the session and the
@@ -109,14 +126,21 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
     }
 }
 
+/**
+ * Navigation motion in the HelpSheet dialog language: a quick centered scale,
+ * like a dialog opening/closing. No generic crossfade, no lateral slide.
+ */
+private val leafEnterTransition: EnterTransition =
+    scaleIn(initialScale = 0.94f, animationSpec = tween(220, easing = FastOutSlowInEasing))
+private val leafExitTransition: ExitTransition =
+    scaleOut(targetScale = 0.96f, animationSpec = tween(180, easing = LinearOutSlowInEasing))
+
 /** Visible root decided by the single auth state. */
 internal enum class AppGate {
     Loading,
     Main,
     Auth
-}
-
-/**
+}/**
  * Pure auth-gate decision (unit-testable): restoring without a session shows
  * loading, a session shows the app, otherwise the auth flow.
  */

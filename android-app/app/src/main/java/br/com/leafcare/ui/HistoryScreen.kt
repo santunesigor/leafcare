@@ -20,6 +20,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.Popup
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
@@ -33,16 +35,23 @@ import java.util.Locale
 fun percent(value: Float) = String.format(Locale.forLanguageTag("pt-BR"), "%.0f%%", value * 100)
 
 @Composable
-fun HistoryScreen(vm: LeafCareViewModel, onCamera: () -> Unit, onResult: (String) -> Unit, onProfile: () -> Unit = {}) {
+fun HistoryScreen(vm: LeafCareViewModel, onCamera: () -> Unit, onResult: (String) -> Unit, onProfile: () -> Unit = {}, displayName: String? = null) {
     val rows by vm.analyses.collectAsStateWithLifecycle()
     val threshold by vm.threshold.collectAsStateWithLifecycle()
     val modelError = vm.getModelError()
-    HistoryContent(rows, threshold, onCamera, onResult, { vm.getPhoto(it) }, modelError, onProfile)
+    HistoryContent(rows, threshold, onCamera, onResult, { vm.getPhoto(it) }, modelError, onProfile, displayName)
 }
+
+/**
+ * Home greeting from the authenticated user's display name.
+ * Falls back to a plain greeting when the name is unavailable.
+ */
+internal fun homeGreeting(displayName: String?): String =
+    if (displayName.isNullOrBlank()) "Olá" else "Olá, $displayName"
 
 @Composable
 fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: Float, onCamera: () -> Unit, onResult: (String) -> Unit,
-    photo: (String) -> Any, modelError: String?, onProfile: () -> Unit = {}) {
+    photo: (String) -> Any, modelError: String?, onProfile: () -> Unit = {}, displayName: String? = null) {
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("Todas") }
     var showFilter by remember { mutableStateOf(false) }
@@ -68,7 +77,7 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                             Text(stringResource(R.string.history_title), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.04.sp, color = LeafColors.Green)
                         }
                         Spacer(Modifier.height(4.dp))
-                        Text(stringResource(R.string.history_greeting), fontSize = 27.sp, letterSpacing = (-0.945).sp)
+                        Text(homeGreeting(displayName), fontSize = 27.sp, letterSpacing = (-0.945).sp)
                         Spacer(Modifier.height(4.dp))
                         Text(stringResource(R.string.history_subtitle), fontSize = 14.sp, color = LeafColors.Muted)
                     }
@@ -96,10 +105,42 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                     Spacer(Modifier.width(10.dp))
                     Box {
                         IconButton(onClick = { showFilter = true }, modifier = Modifier.size(46.dp).border(1.dp, LeafColors.Border, RoundedCornerShape(14.dp))) { FigmaIcon(R.drawable.v3_filter, stringResource(R.string.filter_button_desc), 20) }
-                        DropdownMenu(expanded = showFilter, onDismissRequest = { showFilter = false }) {
-                            DropdownMenuItem(text = { Text(stringResource(R.string.confidence_threshold_label, percent(threshold))) }, onClick = { })
-                            listOf(stringResource(R.string.filter_all), stringResource(R.string.filter_identified), stringResource(R.string.filter_inconclusive)).forEach { option ->
-                                DropdownMenuItem(text = { Text(option) }, onClick = { filter = option; showFilter = false })
+                        if (showFilter) {
+                            Popup(alignment = Alignment.TopEnd, onDismissRequest = { showFilter = false }) {
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(1.dp, LeafColors.Border),
+                                    shadowElevation = 8.dp,
+                                    modifier = Modifier.widthIn(min = 220.dp).padding(top = 4.dp)
+                                ) {
+                                    Column(Modifier.padding(8.dp)) {
+                                        Text(
+                                            stringResource(R.string.confidence_threshold_label, percent(threshold)),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = LeafColors.Muted,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                                        )
+                                        HorizontalDivider(color = LeafColors.Border, thickness = 1.dp)
+                                        listOf(stringResource(R.string.filter_all), stringResource(R.string.filter_identified), stringResource(R.string.filter_inconclusive)).forEach { option ->
+                                            val selected = filter == option
+                                            Row(
+                                                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { filter = option; showFilter = false }
+                                                    .background(if (selected) LeafColors.Pale else Color.Transparent).padding(horizontal = 12.dp, vertical = 10.dp),
+                                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                if (selected) FigmaIcon(R.drawable.v3_check, null, 16) else Spacer(Modifier.size(16.dp))
+                                                Text(
+                                                    option,
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                                                    ),
+                                                    color = LeafColors.Text
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -118,10 +159,29 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
 
             }
             if (filtered.isEmpty()) item {
-                Column(Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 40.dp, horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Icon(Icons.Default.Eco, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text(if (rows.isEmpty()) stringResource(R.string.empty_history_title) else stringResource(R.string.empty_search_title), style = MaterialTheme.typography.titleLarge)
-                    Text(if (rows.isEmpty()) stringResource(R.string.empty_history_subtitle) else stringResource(R.string.empty_search_subtitle))
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (rows.isEmpty()) stringResource(R.string.empty_history_title) else stringResource(R.string.empty_search_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = LeafColors.Text,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        if (rows.isEmpty()) stringResource(R.string.empty_history_subtitle) else stringResource(R.string.empty_search_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = LeafColors.Muted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
             grouped.forEach { (date, records) ->

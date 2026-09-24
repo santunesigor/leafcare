@@ -1,6 +1,8 @@
 package br.com.leafcare.auth
 
 import android.app.Application
+import io.github.jan.supabase.gotrue.user.UserInfo
+import io.github.jan.supabase.gotrue.user.UserSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -10,6 +12,9 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.datetime.Clock
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -158,6 +163,31 @@ class AuthViewModelTest {
         assertEquals("As senhas não coincidem", viewModel.error.value)
     }
 
+    @Test fun displayNameOf_readsMetadata() {
+        val user = UserInfo(
+            id = "user-id",
+            aud = "",
+            email = "a@b.com",
+            userMetadata = buildJsonObject {
+                put("display_name", "Maria Silva")
+            }
+        )
+
+        assertEquals("Maria Silva", displayNameOf(user))
+    }
+
+    @Test fun displayNameOf_nullWithoutUserOrMetadata() {
+        assertNull(displayNameOf(null))
+        assertNull(
+            displayNameOf(
+                UserInfo(
+                    id = "user-id",
+                    aud = "",
+                    email = "a@b.com"
+                )
+            )
+        )
+    }
     @Test fun matchingNewPasswords_updateAndNavigateToApp() = runTest(dispatcher) {
         viewModel.setNewPassword("nova-senha-123")
         viewModel.setConfirmNewPassword("nova-senha-123")

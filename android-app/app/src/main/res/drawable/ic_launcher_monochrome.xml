@@ -1,0 +1,8 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Single-layer leaves silhouette (generated from v3_logo) for themed icons. -->
+    <item
+        android:width="78dp"
+        android:height="78dp"
+        android:gravity="center"
+        android:drawable="@drawable/ic_launcher_mono" />
+</layer-list>

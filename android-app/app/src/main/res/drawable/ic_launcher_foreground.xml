@@ -1,36 +1,9 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- Two-leaf LeafCare mark in white. Artwork stays inside the 66dp safe
-         circle so circular, square and rounded-square masks never clip it. -->
-    <group
-        android:translateX="-7"
-        android:rotation="-18"
-        android:pivotX="54"
-        android:pivotY="70">
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M54,84 C44,70 44,50 54,32 C64,50 64,70 54,84 Z" />
-        <path
-            android:strokeColor="#2E7D32"
-            android:strokeWidth="2.5"
-            android:strokeLineCap="round"
-            android:pathData="M54,78 L54,40" />
-    </group>
-    <group
-        android:translateX="7"
-        android:rotation="18"
-        android:pivotX="54"
-        android:pivotY="70">
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M54,84 C44,70 44,50 54,32 C64,50 64,70 54,84 Z" />
-        <path
-            android:strokeColor="#2E7D32"
-            android:strokeWidth="2.5"
-            android:strokeLineCap="round"
-            android:pathData="M54,78 L54,40" />
-    </group>
-</vector>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Real V3 two-leaf asset, uniformly scaled to 78dp and centered so the
+         artwork stays inside the 66dp safe circle of every launcher mask. -->
+    <item
+        android:width="78dp"
+        android:height="78dp"
+        android:gravity="center"
+        android:drawable="@drawable/v3_logo" />
+</layer-list>

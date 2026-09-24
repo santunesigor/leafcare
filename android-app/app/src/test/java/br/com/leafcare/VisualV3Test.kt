@@ -33,7 +33,7 @@ class VisualV3Test {
         compose.activity.imageLoader.memoryCache?.clear()
         val row = AnalysisEntity("fixture", "fixture.jpg", 1788134400000, "frog_eye", "Olho-de-rã", "Cercospora nicotianae", .82f, "[]", false, .7f, 30.0, "fixture")
         compose.setContent { LeafCareTheme { HistoryContent(listOf(row), .7f, { opened = true }, { selected = true }, { R.drawable.v3_example_correct }, null) } }
-        compose.onNodeWithText("Olá, Produtor").assertExists()
+        compose.onNodeWithText("Olá").assertExists()
         awaitPhoto()
         capture("historico-v3")
         compose.onNodeWithText("Olho-de-rã").performClick()
