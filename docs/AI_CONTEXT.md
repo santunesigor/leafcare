@@ -196,13 +196,12 @@ Recursos mínimos:
 - recuperação de senha;
 - perfil básico.
 
-> **Política temporária do MVP:** cadastro por e-mail + senha **sem**
-> confirmação de e-mail; recuperação por link seguro com retorno ao app
-> (`leafcare://auth/reset-password` na allowlist) e troca de senha no Perfil
-> autenticado. Motivo: o domínio corporativo para SMTP transacional ainda
-> não foi fornecido (sem SMTP customizado, sem templates customizados).
-> Quando houver domínio/SMTP, reativar confirmação por OTP in-app.
-> Não é limitação do Android.
+> **Política do MVP:** cadastro por e-mail + senha **com confirmação por
+> link** (Supabase confirma, deep link `leafcare://auth/confirm-email` abre
+> o app direto, sem OTP, sem browser in-app); recuperação por link seguro
+> com retorno ao app (`leafcare://auth/reset-password`) e troca de senha no
+> Perfil autenticado. Sem SMTP customizado, sem templates customizados,
+> sem localhost, sem domínio próprio.
 
 Não adicionar login social sem solicitação explícita.
 

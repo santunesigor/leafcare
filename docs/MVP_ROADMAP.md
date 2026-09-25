@@ -181,15 +181,13 @@ app abre offline após login anterior
 logout funciona
 ```
 
-**Status**: Concluído e validado manualmente no aparelho. Cadastro direto por
-e-mail + senha (sem confirmação), login, logout, sessão persistida, perfil
+**Status**: Concluído e validado manualmente no aparelho. Cadastro por e-mail
++ senha com confirmação por link, login, logout, sessão persistida, perfil
 básico com acesso na home, launcher e UI alinhados ao V3.
 
-> **Política temporária do MVP:** sem confirmação de e-mail e sem recovery
-> por OTP (requer SMTP/domínio corporativo). Recovery funciona por link
-> seguro com deep link de retorno; troca de senha disponível no Perfil
-> autenticado. Reativar OTP in-app quando houver domínio/SMTP. Não é
-> limitação do Android.
+> **Política do MVP:** confirmação de e-mail ATIVA via link padrão do
+> Supabase (sem OTP, sem SMTP customizado); recovery por link seguro com
+> deep link de retorno; troca de senha no Perfil autenticado.
 
 ---
 

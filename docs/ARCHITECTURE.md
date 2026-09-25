@@ -7,7 +7,7 @@ O LeafCare é um aplicativo Android nativo para **triagem visual offline-first**
 Características principais:
 
 - **Android nativo**: Kotlin + Jetpack Compose, minSdk 26 (Android 8.0), targetSdk 35
-- **Conta obrigatória**: Supabase Auth (gotrue-kt 2.1.0) — cadastro, login, logout, sessão persistida
+- **Conta obrigatória**: Supabase Auth (gotrue-kt 2.1.0) — cadastro com confirmação por link, login, logout, sessão persistida
 - **Offline-first**: classificação, histórico, câmera e galeria funcionam sem internet após autenticação anterior
 - **Classificação local**: TensorFlow Lite / LiteRT 1.4.0 com API `Interpreter`, float32, 2 threads
 - **Persistência local**: Room/SQLite v3 com `Flow` reativo (fonte única da UI); fotos em armazenamento privado (`filesDir/photos/`)
@@ -101,7 +101,7 @@ Flow emite lista atualizada → HistoryScreen
 
 - **Jetpack Compose** — UI declarativa, Material3, `Navigation Compose` para rotas (`history`, `camera`, `result/{id}`, `profile`)
 - **MainActivity** — `ComponentActivity`, `enableEdgeToEdge()`, auth gate por estado de sessão (`Loading`/`Main`/`Auth` via função pura `appGateDestination`); `MainAppNavHost` recebe o mesmo `AuthViewModel`
-- **Auth flow** — `AuthNavHost` renderiza por `uiState.currentScreen` (Login/SignUp/ForgotPassword/NewPassword/Profile); rota `change-password` no app autenticado reutiliza a tela de nova senha; mensagens isoladas por tela; gate com bootstrap explícito (sem piscar Login)
+- **Auth flow** — `AuthNavHost` renderiza por `uiState.currentScreen` (Login/SignUp/VerifyEmail/ForgotPassword/NewPassword/Profile); rota `change-password` no app autenticado reutiliza a tela de nova senha; deep links `leafcare://auth/confirm-email` e `leafcare://auth/reset-password` (parser puro distingue os fluxos); mensagens isoladas por tela; gate com bootstrap explícito (sem piscar Login)
 - **Profile** — Rota `profile` com `ProfileScreen` (nome, e-mail, sair); voltar = `popBackStack`; logout descarta o `NavHost` principal (Back nunca retorna à área autenticada)
 - **Navigation** — Transições em escala rápida centralizada (linguagem do modal de ajuda), sem crossfade genérico
 - **LeafCareViewModel** — `AndroidViewModel`; expõe `analyses: Flow<List<AnalysisEntity>>`, `ui: StateFlow<UiState>`, `results: Flow<String>` (navegação), `threshold: MutableStateFlow<Float>`; encapsula acesso ao `Repository` e `Catalog`; agenda sync após analyze/delete

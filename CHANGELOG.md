@@ -3,11 +3,11 @@
 Formato por fase do `docs/MVP_ROADMAP.md`. Sem versão/tag final ainda
 (atual: `versionCode 2`, `versionName 0.3.0`).
 
-## MVP atual — política de Auth temporária
+## MVP atual — política de Auth
 
-- Cadastro direto por e-mail + senha, sem confirmação (sem SMTP corporativo)
+- Cadastro por e-mail + senha COM confirmação por link (deep link Android)
 - Recovery por link seguro com deep link de retorno + troca de senha autenticada no Perfil
-- Telas OTP de confirmação fora do fluxo (reativar com domínio/SMTP)
+- Signup redirect `leafcare://auth/confirm-email`; sem OTP, sem localhost
 
 ## Fase 7 — QA e segurança (técnico)
 

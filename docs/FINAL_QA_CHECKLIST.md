@@ -22,8 +22,8 @@ Para cada item: `[ ] passo` → **Resultado esperado** → *Evidência/observaç
 
 ## C. Cadastro
 
-- [VISUAL] Nome + e-mail novo + senha ≥ 6 + confirmação igual → Criar conta.
-- **Resultado esperado:** entra direto no app (sem confirmação web).
+- [ ] Nome + e-mail novo + senha ≥ 6 + confirmação igual → Criar conta → tela "Verifique seu e-mail".
+- **Resultado esperado:** não entra direto; abrir o link do e-mail abre o LeafCare e entra no app.
 - *Evidência/observação:* Quando eu tento entrar com um email que nao esta cadastrado e clico em criar conta logo após, ele continua com o aviso de que o email ou a senha estãoincorretos, deveria limpar
 
 ## D. Perfil/nome

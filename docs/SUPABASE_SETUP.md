@@ -211,25 +211,27 @@ Only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` go into the Android app (via 
 
 ---
 
-## 10. Email Auth Policy (MVP temporário)
+## 10. Email Auth Policy (MVP)
 
-> **MVP atual: cadastro por e-mail e senha SEM confirmação de e-mail.**
-> A recuperação de senha usa o link seguro padrão do Supabase com retorno
-> ao app (sem SMTP customizado, sem templates customizados, sem domínio
-> próprio). Motivo: o domínio corporativo para SMTP transacional ainda não
-> foi fornecido. Não é limitação do Android.
+> **MVP atual: cadastro por e-mail e senha COM confirmação por link.**
+> A recuperação de senha usa link seguro com retorno ao app. Sem OTP,
+> sem SMTP customizado, sem templates customizados, sem localhost, sem
+> domínio próprio.
 
 Dashboard → **Authentication → Providers → Email**:
-**Confirm email = OFF** para novos cadastros entrarem direto.
+**Confirm email = ON** para novos cadastros exigirem confirmação.
 
-### Redirect allowlist (obrigatório para o recovery)
+### Redirect allowlist (obrigatório)
 
-O e-mail de recuperação redireciona para o app. Registrar exatamente:
+Os e-mails de confirmação e recuperação redirecionam para o app
+(o clique passa brevemente pelo endpoint HTTPS do Supabase; não é
+App Link/Universal Link). Registrar exatamente:
 
 Dashboard → **Authentication → URL Configuration → Redirect URLs**,
 adicionar:
 
 ```text
+leafcare://auth/confirm-email
 leafcare://auth/reset-password
 ```
 
