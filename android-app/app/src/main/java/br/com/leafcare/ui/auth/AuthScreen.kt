@@ -64,6 +64,7 @@ fun AuthNavHost(viewModel: AuthViewModel) {
     when (uiState.currentScreen) {
         AuthScreen.Login -> LoginScreen(viewModel)
         AuthScreen.SignUp -> SignUpScreen(viewModel)
+        AuthScreen.VerifyEmail -> VerifyEmailScreen(viewModel)
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
         AuthScreen.NewPassword -> NewPasswordScreen(
             viewModel = viewModel,
@@ -325,6 +326,30 @@ fun SignUpScreen(viewModel: AuthViewModel) {
         Spacer(Modifier.height(12.dp))
 
         AuthLinkedRow("Já tem uma conta?", "Entrar") { viewModel.setScreen(AuthScreen.Login) }
+    }
+}
+
+@Composable
+fun VerifyEmailScreen(viewModel: AuthViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+
+    AuthScaffold {
+        AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
+        AuthHeader(
+            logoSize = 56,
+            title = "Verifique seu e-mail",
+            subtitle = "Enviamos um link de confirmação para ${uiState.email}."
+        )
+
+        AuthMessages(error, infoMessage)
+        Spacer(Modifier.height(24.dp))
+
+        AuthLinkButton("Reenviar e-mail") { viewModel.resendSignupEmail() }
+        Spacer(Modifier.height(12.dp))
+
+        AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }
     }
 }
 

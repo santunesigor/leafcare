@@ -107,7 +107,7 @@ class AuthViewModelTest {
         assertEquals(0, backend.signUpCalls)
     }
 
-    @Test fun signupWithoutSession_goesToLoginWithoutAppNavigation() = runTest(dispatcher) {
+    @Test fun signupWithoutSession_goesToVerifyEmailWithoutAppNavigation() = runTest(dispatcher) {
         backend.session = null
         viewModel.setDisplayName("Nome Teste")
         viewModel.setEmail("a@b.com")
@@ -124,10 +124,10 @@ class AuthViewModelTest {
 
         assertTrue(events.none { it is AuthNavigationEvent.NavigateToApp })
         assertEquals(
-            "Cadastro concluído. Entre com seu e-mail e senha.",
+            "Enviamos um link de confirmação para seu e-mail.",
             viewModel.infoMessage.value
         )
-        assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
+        assertEquals(AuthScreen.VerifyEmail, viewModel.uiState.value.currentScreen)
         job.cancel()
     }
 
@@ -151,11 +151,11 @@ class AuthViewModelTest {
         job.cancel()
     }
 
-    @Test fun authScreensContainNoSignupOtpScreens() {
+    @Test fun authScreensContainExpectedSet() {
         // Regression guard: signup confirmation OTP stays out (no corporate
-        // SMTP domain). NewPassword exists for link recovery + auth change.
+        // SMTP domain). VerifyEmail is the link-confirmation screen (no code).
         assertEquals(
-            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.ForgotPassword, AuthScreen.NewPassword, AuthScreen.Profile),
+            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.VerifyEmail, AuthScreen.ForgotPassword, AuthScreen.NewPassword, AuthScreen.Profile),
             AuthScreen.values().toSet()
         )
     }
@@ -247,7 +247,7 @@ class AuthViewModelTest {
         // No repo session yet; the fake backend yields one after the exchange.
         backend.session = testSession()
 
-        viewModel.handleRecoveryDeeplink("leafcare://auth/reset-password?code=pkce-code")
+        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=pkce-code")
         advanceUntilIdle()
 
         assertEquals(listOf("pkce-code"), backend.exchangeCodeCalls)
@@ -258,7 +258,7 @@ class AuthViewModelTest {
     @Test fun recoveryDeeplinkTokens_opensNewPassword() = runTest(dispatcher) {
         backend.session = testSession()
 
-        viewModel.handleRecoveryDeeplink(
+        viewModel.handleAuthDeeplink(
             "leafcare://auth/reset-password#access_token=at&refresh_token=rt&type=recovery"
         )
         advanceUntilIdle()
@@ -272,8 +272,8 @@ class AuthViewModelTest {
         backend.session = null
         viewModel.setScreen(AuthScreen.Login)
 
-        viewModel.handleRecoveryDeeplink("leafcare://auth/reset-password?code=%20")
-        viewModel.handleRecoveryDeeplink("https://evil.example/x")
+        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=%20")
+        viewModel.handleAuthDeeplink("https://evil.example/x")
         advanceUntilIdle()
 
         assertTrue(backend.exchangeCodeCalls.isEmpty())
@@ -290,12 +290,68 @@ class AuthViewModelTest {
         advanceUntilIdle()
         viewModel.setScreen(AuthScreen.Login)
 
-        viewModel.handleRecoveryDeeplink("leafcare://auth/reset-password?code=pkce-code")
+        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=pkce-code")
         advanceUntilIdle()
 
         // A logged-in session is never replaced by a link tap.
         assertTrue(backend.exchangeCodeCalls.isEmpty())
         assertFalse(viewModel.recoveryMode.value)
+    }
+
+    @Test fun confirmDeeplinkCode_authenticatesWithoutNewPassword() = runTest(dispatcher) {
+        backend.session = testSession()
+
+        val events = mutableListOf<AuthNavigationEvent>()
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.navigation.collect { events.add(it) }
+        }
+
+        viewModel.handleAuthDeeplink("leafcare://auth/confirm-email?code=pkce-code")
+        advanceUntilIdle()
+
+        assertEquals(listOf("pkce-code"), backend.exchangeCodeCalls)
+        // Confirm opens the app directly: no recovery mode, no NewPassword.
+        assertFalse(viewModel.recoveryMode.value)
+        assertTrue(events.none { it is AuthNavigationEvent.NavigateToApp })
+        job.cancel()
+    }
+
+    @Test fun confirmDeeplinkTokens_authenticatesWithoutNewPassword() = runTest(dispatcher) {
+        backend.session = testSession()
+
+        viewModel.handleAuthDeeplink(
+            "leafcare://auth/confirm-email#access_token=at&refresh_token=rt&type=signup"
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("at" to "rt"), backend.importedTokens)
+        assertFalse(viewModel.recoveryMode.value)
+    }
+
+    @Test fun confirmDeeplinkInvalid_doesNotAuthenticate() = runTest(dispatcher) {
+        backend.session = null
+        viewModel.setScreen(AuthScreen.Login)
+
+        viewModel.handleAuthDeeplink("leafcare://auth/confirm-email?code=%20")
+        viewModel.handleAuthDeeplink("leafcare://auth/unknown?code=abc")
+        advanceUntilIdle()
+
+        assertTrue(backend.exchangeCodeCalls.isEmpty())
+        assertTrue(backend.importedTokens.isEmpty())
+        assertFalse(viewModel.recoveryMode.value)
+        assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
+        assertNull(viewModel.session.value)
+    }
+
+    @Test fun resendSignupEmail_recordsEmailAndInforms() = runTest(dispatcher) {
+        viewModel.setScreen(AuthScreen.VerifyEmail)
+        viewModel.setEmail("a@b.com")
+
+        viewModel.resendSignupEmail()
+        advanceUntilIdle()
+
+        assertEquals(listOf("a@b.com"), backend.resendSignupEmails)
+        assertNotNull(viewModel.infoMessage.value)
     }
 
     @Test fun mismatchedNewPasswords_blockUpdateWithVisibleError() = runTest(dispatcher) {

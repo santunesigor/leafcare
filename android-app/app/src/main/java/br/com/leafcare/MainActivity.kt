@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
     private fun handleRecoveryIntent(intent: Intent?) {
         val url = intent?.data?.toString() ?: return
         if (url.startsWith("leafcare://")) {
-            authViewModel.handleRecoveryDeeplink(url)
+            authViewModel.handleAuthDeeplink(url)
         }
     }
 }

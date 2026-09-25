@@ -5,6 +5,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
 import br.com.leafcare.LeafCareApplication
 import io.github.jan.supabase.gotrue.Auth
+import io.github.jan.supabase.gotrue.OtpType
 import io.github.jan.supabase.gotrue.SignOutScope
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 import io.github.jan.supabase.gotrue.SessionStatus
@@ -123,9 +124,10 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
      * The display name is sent as user metadata ("display_name") and used by the
      * database trigger to create the profile.
      *
-     * MVP policy: email confirmation is OFF (no corporate SMTP domain yet),
-     * so a successful sign-up returns a session and the user is authenticated
-     * directly. The null-session branch below is defensive only.
+     * Email confirmation is ON: a successful sign-up returns no session yet.
+     * The confirmation email links back to [SIGNUP_REDIRECT_URL]; completing
+     * it (see [completeEmailLink]) authenticates the user. No browser in-app,
+     * no OTP, no localhost.
      */
     suspend fun signUp(
         email: String,
@@ -143,7 +145,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 return Result.failure(IllegalArgumentException(validationError))
             }
 
-            backend.signUpWithEmail(email, password, displayName)
+            backend.signUpWithEmail(email, password, displayName, SIGNUP_REDIRECT_URL)
 
             val session = backend.loadSession()
             if (session != null) {
@@ -151,9 +153,9 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 _user.value = session.user
                 Result.success(session)
             } else {
-                // Defensive only: confirmation is OFF, so sign-up returns a
-                // session. If it ever doesn't, stay unauthenticated.
-                _infoMessage.value = "Cadastro concluído. Entre com seu e-mail e senha."
+                // Confirmation pending: the user taps the email link, which
+                // returns through the deep link handled by completeEmailLink().
+                _infoMessage.value = "Enviamos um link de confirmação para seu e-mail."
                 Result.failure(SignupWithoutSessionException())
             }
         } catch (e: Exception) {
@@ -263,20 +265,30 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
     }
 
     /**
-     * Completes password recovery from a deep link (PKCE code or session
-     * tokens). On success a recovery session exists and is reflected
-     * locally; the UI proceeds to new-password entry.
+     * Completes an email deep link (signup confirmation or password
+     * recovery): PKCE code or session tokens. On success a session exists
+     * and is reflected locally. The caller decides the next screen.
      */
-    internal suspend fun completePasswordRecovery(link: RecoveryDeeplink): Result<Unit> {
+    internal suspend fun completeEmailLink(link: AuthDeeplink): Result<Unit> {
         _isLoading.value = true
         _error.value = null
         _infoMessage.value = null
 
+        val operation = when (link) {
+            is AuthDeeplink.ConfirmEmailCode,
+            is AuthDeeplink.ConfirmEmailTokens -> AuthOperation.SIGNUP_CONFIRM
+            is AuthDeeplink.RecoveryCode,
+            is AuthDeeplink.RecoveryTokens -> AuthOperation.RECOVERY_VERIFY
+        }
+
         return try {
             when (link) {
-                is RecoveryDeeplink.Code -> backend.exchangeRecoveryCode(link.code)
-                is RecoveryDeeplink.Tokens ->
-                    backend.importRecoveryTokens(link.accessToken, link.refreshToken)
+                is AuthDeeplink.ConfirmEmailCode -> backend.exchangeLinkCode(link.code)
+                is AuthDeeplink.ConfirmEmailTokens ->
+                    backend.importLinkTokens(link.accessToken, link.refreshToken)
+                is AuthDeeplink.RecoveryCode -> backend.exchangeLinkCode(link.code)
+                is AuthDeeplink.RecoveryTokens ->
+                    backend.importLinkTokens(link.accessToken, link.refreshToken)
             }
 
             val session = backend.loadSession()
@@ -285,12 +297,39 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 _user.value = session.user
                 Result.success(Unit)
             } else {
-                val message = "Não foi possível concluir a recuperação. Tente novamente."
+                val message = sanitizeError(operation, IllegalStateException("no session"))
                 _error.value = message
                 Result.failure(AuthException(message))
             }
         } catch (e: Exception) {
-            val message = sanitizeError(AuthOperation.RECOVERY_VERIFY, e)
+            val message = sanitizeError(operation, e)
+            _error.value = message
+            Result.failure(AuthException(message, e))
+        } finally {
+            _isLoading.value = false
+        }
+    }
+
+    /**
+     * Resends the signup confirmation email. Fully in-app (no browser).
+     */
+    suspend fun resendSignupEmail(email: String): Result<Unit> {
+        _isLoading.value = true
+        _error.value = null
+        _infoMessage.value = null
+
+        return try {
+            if (email.isBlank()) {
+                _error.value = "E-mail inválido"
+                return Result.failure(IllegalArgumentException("E-mail inválido"))
+            }
+
+            backend.resendSignupEmail(email.trim())
+
+            _infoMessage.value = "Enviamos um novo e-mail de confirmação."
+            Result.success(Unit)
+        } catch (e: Exception) {
+            val message = sanitizeError(AuthOperation.SIGNUP_RESEND, e)
             _error.value = message
             Result.failure(AuthException(message, e))
         } finally {
@@ -399,6 +438,8 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 AuthOperation.PASSWORD_RESET -> "Não foi possível enviar a recuperação. Tente novamente."
                 AuthOperation.RECOVERY_VERIFY -> "Não foi possível concluir a recuperação. Tente novamente."
                 AuthOperation.UPDATE_PASSWORD -> "Não foi possível definir a nova senha. Tente novamente."
+                AuthOperation.SIGNUP_CONFIRM -> "Não foi possível concluir o cadastro. Tente novamente."
+                AuthOperation.SIGNUP_RESEND -> "Não foi possível reenviar o e-mail. Tente novamente."
             }
         }
 
@@ -420,11 +461,16 @@ internal enum class AuthOperation {
     SIGN_OUT,
     PASSWORD_RESET,
     RECOVERY_VERIFY,
-    UPDATE_PASSWORD
+    UPDATE_PASSWORD,
+    SIGNUP_CONFIRM,
+    SIGNUP_RESEND
 }
 
 /** Deep-link target for the Supabase password-recovery email. */
 internal const val PASSWORD_RECOVERY_REDIRECT = "leafcare://auth/reset-password"
+
+/** Deep-link target for the Supabase signup-confirmation email. */
+internal const val SIGNUP_REDIRECT_URL = "leafcare://auth/confirm-email"
 
 /** Custom exception for auth errors */
 class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -434,7 +480,7 @@ class AuthException(message: String, cause: Throwable? = null) : Exception(messa
  * after sign-up. Defensive only (confirmation is OFF in this MVP).
  */
 class SignupWithoutSessionException(
-    message: String = "Cadastro concluído. Entre com seu e-mail e senha."
+    message: String = "Enviamos um link de confirmação para seu e-mail."
 ) : Exception(message)
 
 /**
@@ -447,13 +493,14 @@ internal interface AuthBackend {
     val sessionStatus: StateFlow<SessionStatus>
     suspend fun loadFromStorage(): Boolean
     suspend fun loadSession(): UserSession?
-    suspend fun signUpWithEmail(email: String, password: String, displayName: String)
+    suspend fun signUpWithEmail(email: String, password: String, displayName: String, redirectUrl: String?)
     suspend fun signInWithEmail(email: String, password: String)
     suspend fun signOut()
     suspend fun requestPasswordRecovery(email: String, redirectUrl: String)
-    suspend fun exchangeRecoveryCode(code: String)
-    suspend fun importRecoveryTokens(accessToken: String, refreshToken: String)
+    suspend fun exchangeLinkCode(code: String)
+    suspend fun importLinkTokens(accessToken: String, refreshToken: String)
     suspend fun updatePassword(newPassword: String)
+    suspend fun resendSignupEmail(email: String)
 }
 
 /** Production [AuthBackend] backed by the supabase-kt 2.1.0 public API. */
@@ -465,8 +512,13 @@ internal class SupabaseAuthBackend(private val auth: Auth) : AuthBackend {
 
     override suspend fun loadSession(): UserSession? = auth.sessionManager.loadSession()
 
-    override suspend fun signUpWithEmail(email: String, password: String, displayName: String) {
-        auth.signUpWith(Email) {
+    override suspend fun signUpWithEmail(
+        email: String,
+        password: String,
+        displayName: String,
+        redirectUrl: String?
+    ) {
+        auth.signUpWith(Email, redirectUrl) {
             this.email = email
             this.password = password
             data = buildJsonObject {
@@ -490,11 +542,11 @@ internal class SupabaseAuthBackend(private val auth: Auth) : AuthBackend {
         auth.resetPasswordForEmail(email, redirectUrl)
     }
 
-    override suspend fun exchangeRecoveryCode(code: String) {
+    override suspend fun exchangeLinkCode(code: String) {
         auth.exchangeCodeForSession(code)
     }
 
-    override suspend fun importRecoveryTokens(accessToken: String, refreshToken: String) {
+    override suspend fun importLinkTokens(accessToken: String, refreshToken: String) {
         auth.importAuthToken(accessToken, refreshToken, retrieveUser = true)
     }
 
@@ -502,5 +554,9 @@ internal class SupabaseAuthBackend(private val auth: Auth) : AuthBackend {
         auth.modifyUser {
             password = newPassword
         }
+    }
+
+    override suspend fun resendSignupEmail(email: String) {
+        auth.resendEmail(OtpType.Email.SIGNUP, email)
     }
 }

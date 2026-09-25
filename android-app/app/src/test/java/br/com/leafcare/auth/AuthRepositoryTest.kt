@@ -25,11 +25,13 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
 
     var signUpCalls = 0
     var lastSignUp: Triple<String, String, String>? = null
+    var lastSignUpRedirect: String? = null
     var signInCalls = 0
     var signOutCalls = 0
     val resetRequests = mutableListOf<Pair<String, String>>()
     val exchangeCodeCalls = mutableListOf<String>()
     val importedTokens = mutableListOf<Pair<String, String>>()
+    val resendSignupEmails = mutableListOf<String>()
     var updatePasswordCalls = 0
     var lastNewPassword: String? = null
 
@@ -37,9 +39,15 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
 
     override suspend fun loadSession(): UserSession? = session
 
-    override suspend fun signUpWithEmail(email: String, password: String, displayName: String) {
+    override suspend fun signUpWithEmail(
+        email: String,
+        password: String,
+        displayName: String,
+        redirectUrl: String?
+    ) {
         signUpCalls++
         lastSignUp = Triple(email, password, displayName)
+        lastSignUpRedirect = redirectUrl
     }
 
     override suspend fun signInWithEmail(email: String, password: String) {
@@ -55,12 +63,16 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
         resetRequests += email to redirectUrl
     }
 
-    override suspend fun exchangeRecoveryCode(code: String) {
+    override suspend fun exchangeLinkCode(code: String) {
         exchangeCodeCalls += code
     }
 
-    override suspend fun importRecoveryTokens(accessToken: String, refreshToken: String) {
+    override suspend fun importLinkTokens(accessToken: String, refreshToken: String) {
         importedTokens += accessToken to refreshToken
+    }
+
+    override suspend fun resendSignupEmail(email: String) {
+        resendSignupEmails += email
     }
 
     override suspend fun updatePassword(newPassword: String) {
@@ -143,7 +155,7 @@ class AuthRepositoryTest {
         assertTrue(result.exceptionOrNull() is SignupWithoutSessionException)
         assertNull(repository.session.value)
         assertFalse(repository.hasPersistedSession())
-        assertEquals("Cadastro concluído. Entre com seu e-mail e senha.", repository.infoMessage.value)
+        assertEquals("Enviamos um link de confirmação para seu e-mail.", repository.infoMessage.value)
     }
 
     @Test fun restoreMarksSessionChecked() = runTest(testDispatcher) {
@@ -221,7 +233,7 @@ class AuthRepositoryTest {
         val session = testSession()
         val repository = repositoryWithSession(session)
 
-        val result = repository.completePasswordRecovery(RecoveryDeeplink.Code("pkce-code"))
+        val result = repository.completeEmailLink(AuthDeeplink.RecoveryCode("pkce-code"))
 
         assertTrue(result.isSuccess)
         assertEquals(listOf("pkce-code"), backend.exchangeCodeCalls)
@@ -233,13 +245,55 @@ class AuthRepositoryTest {
         val session = testSession()
         val repository = repositoryWithSession(session)
 
-        val result = repository.completePasswordRecovery(
-            RecoveryDeeplink.Tokens("access-123", "refresh-123")
+        val result = repository.completeEmailLink(
+            AuthDeeplink.RecoveryTokens("access-123", "refresh-123")
         )
 
         assertTrue(result.isSuccess)
         assertEquals(listOf("access-123" to "refresh-123"), backend.importedTokens)
         assertEquals(session, repository.session.value)
+    }
+
+    @Test fun completeConfirmEmailWithCode_authenticates() = runTest(testDispatcher) {
+        val session = testSession()
+        val repository = repositoryWithSession(session)
+
+        val result = repository.completeEmailLink(AuthDeeplink.ConfirmEmailCode("pkce-code"))
+
+        assertTrue(result.isSuccess)
+        assertEquals(listOf("pkce-code"), backend.exchangeCodeCalls)
+        assertEquals(session, repository.session.value)
+    }
+
+    @Test fun completeConfirmEmailWithTokens_authenticates() = runTest(testDispatcher) {
+        val session = testSession()
+        val repository = repositoryWithSession(session)
+
+        val result = repository.completeEmailLink(
+            AuthDeeplink.ConfirmEmailTokens("access-123", "refresh-123")
+        )
+
+        assertTrue(result.isSuccess)
+        assertEquals(listOf("access-123" to "refresh-123"), backend.importedTokens)
+        assertEquals(session, repository.session.value)
+    }
+
+    @Test fun signUp_usesConfirmEmailRedirect() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(null)
+
+        repository.signUp("a@b.com", "123456", "Nome Teste")
+
+        assertEquals("leafcare://auth/confirm-email", backend.lastSignUpRedirect)
+    }
+
+    @Test fun resendSignupEmail_recordsEmailAndInforms() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(null)
+
+        val result = repository.resendSignupEmail("a@b.com")
+
+        assertTrue(result.isSuccess)
+        assertEquals(listOf("a@b.com"), backend.resendSignupEmails)
+        assertNotNull(repository.infoMessage.value)
     }
 
     @Test fun updatePassword_shortPasswordFailsWithoutBackendCall() = runTest(testDispatcher) {

@@ -125,11 +125,11 @@ class AuthViewModel(
                 password = state.password,
                 displayName = state.displayName.trim()
             )
-            // Signup without session is defensive-only (confirmation is OFF
-            // in this MVP): stay in Auth on the Login screen so the user
-            // can sign in. The message is preserved for this screen.
+            // Signup without session means email confirmation is pending:
+            // show the VerifyEmail screen (message preserved). The user taps
+            // the email link, which returns through the deep link.
             if (result.exceptionOrNull() is SignupWithoutSessionException) {
-                setScreen(AuthScreen.Login, clearMessages = false)
+                setScreen(AuthScreen.VerifyEmail, clearMessages = false)
                 return@launch
             }
             val destination = navigationForAuthResult(result.isSuccess)
@@ -191,20 +191,36 @@ class AuthViewModel(
     }
 
     /**
-     * Handles a password-recovery deep-link return (`leafcare://...`).
-     * Ignored when already authenticated or when the link is not a recovery
-     * return. No browser or WebView involved.
+     * Handles an auth deep-link return (`leafcare://auth/...`): signup
+     * confirmation opens the app directly; password recovery opens the
+     * new-password screen. Ignored when already authenticated or when the
+     * link is unknown. No browser or WebView involved.
      */
-    fun handleRecoveryDeeplink(url: String) {
+    fun handleAuthDeeplink(url: String) {
         if (authRepository.hasPersistedSession()) return
-        val link = parseRecoveryDeeplink(url) ?: return
+        val link = parseAuthDeeplink(url) ?: return
         viewModelScope.launch {
-            val result = authRepository.completePasswordRecovery(link)
-            if (result.isSuccess) {
-                isolateCurrentUser()
-                _recoveryMode.value = true
-                setScreen(AuthScreen.NewPassword, clearMessages = false)
+            val result = authRepository.completeEmailLink(link)
+            if (!result.isSuccess) return@launch
+            isolateCurrentUser()
+            clearForms()
+            when (link) {
+                is AuthDeeplink.ConfirmEmailCode,
+                is AuthDeeplink.ConfirmEmailTokens -> Unit
+                is AuthDeeplink.RecoveryCode,
+                is AuthDeeplink.RecoveryTokens -> {
+                    _recoveryMode.value = true
+                    setScreen(AuthScreen.NewPassword, clearMessages = false)
+                }
             }
+        }
+    }
+
+    /** Resend the signup confirmation email (in-app, no browser). */
+    fun resendSignupEmail() {
+        val state = _uiState.value
+        viewModelScope.launch {
+            authRepository.resendSignupEmail(email = state.email.trim())
         }
     }
 
@@ -281,26 +297,30 @@ data class AuthUiState(
 enum class AuthScreen {
     Login,
     SignUp,
+    VerifyEmail,
     ForgotPassword,
     NewPassword,
     Profile
 }
 
 /**
- * A password-recovery return from the Supabase email link, either PKCE
- * (`?code=`) or session tokens (`#access_token=&refresh_token=`).
- * Only recovery links are accepted; anything else is ignored.
+ * An auth return from a Supabase email link, either PKCE (`?code=`) or
+ * session tokens (`#access_token=&refresh_token=`), for signup confirmation
+ * (`/confirm-email`) or password recovery (`/reset-password`).
+ * Anything else is ignored. The two flows are never confused.
  */
-internal sealed interface RecoveryDeeplink {
-    data class Code(val code: String) : RecoveryDeeplink
-    data class Tokens(val accessToken: String, val refreshToken: String) : RecoveryDeeplink
+internal sealed interface AuthDeeplink {
+    data class ConfirmEmailCode(val code: String) : AuthDeeplink
+    data class ConfirmEmailTokens(val accessToken: String, val refreshToken: String) : AuthDeeplink
+    data class RecoveryCode(val code: String) : AuthDeeplink
+    data class RecoveryTokens(val accessToken: String, val refreshToken: String) : AuthDeeplink
 }
 
 /**
- * Pure parser for the recovery deep link (JVM-testable, no Android types).
- * Returns null for anything that is not a LeafCare recovery return.
+ * Pure parser for LeafCare auth deep links (JVM-testable, no Android types).
+ * Returns null for unknown links; those never authenticate and never crash.
  */
-internal fun parseRecoveryDeeplink(url: String): RecoveryDeeplink? {
+internal fun parseAuthDeeplink(url: String): AuthDeeplink? {
     return try {
         val uri = java.net.URI(url)
         if (uri.scheme != "leafcare") return null
@@ -314,19 +334,27 @@ internal fun parseRecoveryDeeplink(url: String): RecoveryDeeplink? {
                 key to value
             }.toMap()
         }
-        params(uri.rawQuery)["code"]?.takeIf { it.isNotBlank() }?.let {
-            return RecoveryDeeplink.Code(it)
-        }
+        val code = params(uri.rawQuery)["code"]?.takeIf { it.isNotBlank() }
         val fragment = params(uri.rawFragment)
         val accessToken = fragment["access_token"]
         val refreshToken = fragment["refresh_token"]
         val type = fragment["type"]
-        if (!accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank() &&
-            (type == null || type == "recovery")
-        ) {
-            RecoveryDeeplink.Tokens(accessToken, refreshToken)
-        } else {
-            null
+        return when (uri.path) {
+            "/confirm-email" -> when {
+                code != null -> AuthDeeplink.ConfirmEmailCode(code)
+                !accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank() &&
+                    (type == null || type == "signup") ->
+                    AuthDeeplink.ConfirmEmailTokens(accessToken, refreshToken)
+                else -> null
+            }
+            "/reset-password" -> when {
+                code != null -> AuthDeeplink.RecoveryCode(code)
+                !accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank() &&
+                    (type == null || type == "recovery") ->
+                    AuthDeeplink.RecoveryTokens(accessToken, refreshToken)
+                else -> null
+            }
+            else -> null
         }
     } catch (e: Exception) {
         null
