@@ -34,6 +34,8 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     val resendSignupEmails = mutableListOf<String>()
     var updatePasswordCalls = 0
     var lastNewPassword: String? = null
+    var failExchange: Boolean = false
+    var failImport: Boolean = false
 
     override suspend fun loadFromStorage(): Boolean = session != null
 
@@ -64,10 +66,12 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     }
 
     override suspend fun exchangeLinkCode(code: String) {
+        if (failExchange) throw IllegalStateException("Email link is invalid or has expired")
         exchangeCodeCalls += code
     }
 
     override suspend fun importLinkTokens(accessToken: String, refreshToken: String) {
+        if (failImport) throw IllegalStateException("Email link is invalid or has expired")
         importedTokens += accessToken to refreshToken
     }
 
@@ -294,6 +298,18 @@ class AuthRepositoryTest {
         assertTrue(result.isSuccess)
         assertEquals(listOf("a@b.com"), backend.resendSignupEmails)
         assertNotNull(repository.infoMessage.value)
+    }
+
+    @Test fun completeExpiredLink_failsWithoutSession() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(null)
+        backend.failExchange = true
+
+        val result = repository.completeEmailLink(AuthDeeplink.RecoveryCode("expired"))
+
+        assertTrue(result.isFailure)
+        assertEquals("Link inválido ou expirado.", repository.error.value)
+        assertNull(repository.session.value)
+        assertFalse(repository.hasPersistedSession())
     }
 
     @Test fun updatePassword_shortPasswordFailsWithoutBackendCall() = runTest(testDispatcher) {

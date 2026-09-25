@@ -1,6 +1,7 @@
 package br.com.leafcare.auth
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
@@ -20,13 +21,17 @@ import kotlinx.serialization.json.jsonPrimitive
  * ViewModel for authentication flow.
  * Handles UI state for login, signup, password reset, and profile screens.
  */
-class AuthViewModel(
+class AuthViewModel internal constructor(
     application: Application,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    store: RecoveryPendingStore? = null
 ) : AndroidViewModel(application) {
 
     /** Production entry point used by `by viewModels()` in MainActivity. */
     constructor(application: Application) : this(application, AuthRepository(application))
+
+    private val recoveryStore: RecoveryPendingStore =
+        store ?: PrefsRecoveryPendingStore(application)
 
     // Current authentication state
     val session = authRepository.session
@@ -36,10 +41,12 @@ class AuthViewModel(
     val infoMessage = authRepository.infoMessage
     val sessionChecked = authRepository.sessionChecked
 
-    // True while a password-recovery deep link is being completed: the gate
-    // shows the new-password screen instead of the main app.
-    private val _recoveryMode = MutableStateFlow(false)
-    val recoveryMode: StateFlow<Boolean> = _recoveryMode.asStateFlow()
+    // Explicit RECOVERY_PENDING: true while a password-recovery deep link is
+    // being completed. The gate shows the new-password screen instead of the
+    // main app, even though a (restricted) session exists. Initialized from
+    // the persisted marker so process death can never open the main app.
+    private val _recoveryPending = MutableStateFlow(recoveryStore.isPending)
+    val recoveryPending: StateFlow<Boolean> = _recoveryPending.asStateFlow()
 
     /**
      * Authenticated user's display name from user metadata, or null when
@@ -126,10 +133,10 @@ class AuthViewModel(
                 displayName = state.displayName.trim()
             )
             // Signup without session means email confirmation is pending:
-            // show the VerifyEmail screen (message preserved). The user taps
-            // the email link, which returns through the deep link.
+            // show the VerifyEmail screen (its static subtitle covers the
+            // message, so previous messages are cleared to avoid duplication).
             if (result.exceptionOrNull() is SignupWithoutSessionException) {
-                setScreen(AuthScreen.VerifyEmail, clearMessages = false)
+                setScreen(AuthScreen.VerifyEmail)
                 return@launch
             }
             val destination = navigationForAuthResult(result.isSuccess)
@@ -166,6 +173,7 @@ class AuthViewModel(
      */
     private suspend fun onAuthenticated(result: Result<*>) {
         if (!result.isSuccess) return
+        clearRecoveryPending()
         val app = getApplication<Application>() as? LeafCareApplication ?: return
         (result.getOrNull() as? UserSession)?.user?.id?.let { app.ensureAccountIsolation(it) }
         app.scheduleSync()
@@ -176,7 +184,7 @@ class AuthViewModel(
         viewModelScope.launch {
             authRepository.signOut()
             clearForms()
-            _recoveryMode.value = false
+            clearRecoveryPending()
             setScreen(AuthScreen.Login)
             _navigation.send(navigationAfterSignOut())
         }
@@ -193,13 +201,19 @@ class AuthViewModel(
     /**
      * Handles an auth deep-link return (`leafcare://auth/...`): signup
      * confirmation opens the app directly; password recovery opens the
-     * new-password screen. Ignored when already authenticated or when the
-     * link is unknown. No browser or WebView involved.
+     * new-password screen. Ignored when already authenticated (outside a
+     * pending recovery) or when the link is unknown. No browser/WebView.
      */
     fun handleAuthDeeplink(url: String) {
-        if (authRepository.hasPersistedSession()) return
         val link = parseAuthDeeplink(url) ?: return
+        if (authRepository.hasPersistedSession() && !_recoveryPending.value) return
         viewModelScope.launch {
+            if (_recoveryPending.value) {
+                // Drop any stale recovery state before attempting the new
+                // link, so an expired/reused link can never conserve it.
+                authRepository.signOut()
+                clearRecoveryPending()
+            }
             val result = authRepository.completeEmailLink(link)
             if (!result.isSuccess) return@launch
             isolateCurrentUser()
@@ -209,11 +223,38 @@ class AuthViewModel(
                 is AuthDeeplink.ConfirmEmailTokens -> Unit
                 is AuthDeeplink.RecoveryCode,
                 is AuthDeeplink.RecoveryTokens -> {
-                    _recoveryMode.value = true
+                    setRecoveryPending(true)
                     setScreen(AuthScreen.NewPassword, clearMessages = false)
                 }
             }
         }
+    }
+
+    /**
+     * Cancels an in-progress password recovery: the recovery session is
+     * signed out, the pending marker is cleared and the user returns to
+     * Login. Never lands in the authenticated app.
+     */
+    fun cancelRecovery() {
+        viewModelScope.launch {
+            authRepository.signOut()
+            clearRecoveryPending()
+            clearForms()
+            setScreen(AuthScreen.Login)
+        }
+    }
+
+    private fun setRecoveryPending(pending: Boolean) {
+        _recoveryPending.value = pending
+        if (pending) {
+            recoveryStore.isPending = true
+        } else {
+            recoveryStore.clear()
+        }
+    }
+
+    private fun clearRecoveryPending() {
+        setRecoveryPending(false)
     }
 
     /** Resend the signup confirmation email (in-app, no browser). */
@@ -235,7 +276,7 @@ class AuthViewModel(
             val result = authRepository.updatePassword(password = state.newPassword)
             if (result.isSuccess) {
                 clearForms()
-                _recoveryMode.value = false
+                clearRecoveryPending()
                 _navigation.send(AuthNavigationEvent.NavigateToApp)
             }
             onAuthenticated(result)
@@ -364,6 +405,38 @@ internal fun parseAuthDeeplink(url: String): AuthDeeplink? {
 /** Navigation events for auth flow */
 sealed interface AuthNavigationEvent {    data class NavigateToAuth(val initialScreen: AuthScreen = AuthScreen.Login) : AuthNavigationEvent
     object NavigateToApp : AuthNavigationEvent
+}
+
+/**
+ * Minimal persistent marker for an in-progress password recovery.
+ * Created only after a valid recovery callback, cleared on password change,
+ * cancel (+ sign-out) or fresh full authentication. Survives process death
+ * so a persisted recovery session can never open the main app.
+ * Holds no token, password or sensitive data: a single boolean.
+ */
+internal interface RecoveryPendingStore {
+    var isPending: Boolean
+    fun clear()
+}
+
+internal class PrefsRecoveryPendingStore(context: Context) : RecoveryPendingStore {
+    private val prefs = context.applicationContext.getSharedPreferences(
+        "leafcare_auth", Context.MODE_PRIVATE
+    )
+
+    override var isPending: Boolean
+        get() = prefs.getBoolean(KEY_RECOVERY_PENDING, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_RECOVERY_PENDING, value).apply()
+        }
+
+    override fun clear() {
+        prefs.edit().remove(KEY_RECOVERY_PENDING).apply()
+    }
+
+    companion object {
+        private const val KEY_RECOVERY_PENDING = "recovery_pending"
+    }
 }
 
 /**

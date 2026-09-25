@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
 import br.com.leafcare.LeafCareApplication
+import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.gotrue.OtpType
 import io.github.jan.supabase.gotrue.SignOutScope
@@ -326,7 +327,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
 
             backend.resendSignupEmail(email.trim())
 
-            _infoMessage.value = "Enviamos um novo e-mail de confirmação."
+            _infoMessage.value = "E-mail de confirmação reenviado."
             Result.success(Unit)
         } catch (e: Exception) {
             val message = sanitizeError(AuthOperation.SIGNUP_RESEND, e)
@@ -427,10 +428,22 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             }
             if (raw.contains("email not confirmed")) return "Confirme seu e-mail antes de entrar"
             if (raw.contains("invalid or has expired")) return "Link inválido ou expirado."
+            if (isRateLimited(e, raw)) {
+                return "Você solicitou um e-mail recentemente. Aguarde um pouco antes de tentar novamente."
+            }
+            if (isUnauthorizedAddress(raw)) {
+                return "Envio indisponível para esse endereço nesta configuração de teste."
+            }
             if (raw.contains("invalid api key")) {
                 return "Não foi possível conectar ao serviço. Verifique a configuração do aplicativo."
             }
-            if (isNetworkError(raw)) return "Sem conexão. Verifique sua internet."
+            if (isNetworkError(raw)) {
+                return if (operation == AuthOperation.PASSWORD_RESET) {
+                    "Não foi possível enviar o e-mail. Verifique sua conexão e tente novamente."
+                } else {
+                    "Sem conexão. Verifique sua internet."
+                }
+            }
             return when (operation) {
                 AuthOperation.SIGN_UP -> "Não foi possível criar sua conta. Tente novamente."
                 AuthOperation.SIGN_IN -> "Não foi possível entrar. Tente novamente."
@@ -450,6 +463,37 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 raw.contains("connection refused") ||
                 raw.contains("timeout") ||
                 raw.contains("unknownhost")
+        }
+
+        /**
+         * Rate-limit detection. supabase-kt 2.1.0 exposes no statusCode or
+         * errorCode accessor on RestException (only error/description), so
+         * the check combines those fields with the raw message. HTTP 429
+         * (or explicit rate-limit wording) maps to a friendly wait message.
+         */
+        private fun isRateLimited(e: Exception, raw: String): Boolean {
+            if (e is RestException) {
+                val fields = "${e.error} ${e.description}".lowercase()
+                if (fields.contains("429") ||
+                    fields.contains("rate limit") ||
+                    fields.contains("too many requests")
+                ) {
+                    return true
+                }
+            }
+            return raw.contains("429") ||
+                raw.contains("rate limit") ||
+                raw.contains("too many requests")
+        }
+
+        /**
+         * Best-effort mapping for addresses the default mailer refuses.
+         * Narrow on purpose: only when the message mentions mail delivery.
+         */
+        private fun isUnauthorizedAddress(raw: String): Boolean {
+            return raw.contains("not authorized") &&
+                (raw.contains("mail") || raw.contains("email") ||
+                    raw.contains("smtp") || raw.contains("send"))
         }
     }
 }

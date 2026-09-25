@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
 fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
     val session by authViewModel.session.collectAsStateWithLifecycle()
     val sessionChecked by authViewModel.sessionChecked.collectAsStateWithLifecycle()
-    val recoveryMode by authViewModel.recoveryMode.collectAsStateWithLifecycle()
+    val recoveryPending by authViewModel.recoveryPending.collectAsStateWithLifecycle()
 
     // On first launch, trigger session restoration
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -72,7 +72,7 @@ fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
     // Auth gate: Loading until the restore attempt resolves, so the Login
     // screen never flashes when a persisted session exists. A completed
     // recovery deep link takes precedence over the main app.
-    when (appGateDestination(session, sessionChecked, recoveryMode)) {
+    when (appGateDestination(session, sessionChecked, recoveryPending)) {
         AppGate.Loading -> LoadingScreen()
         AppGate.Recovery -> AuthNavHost(authViewModel)
         AppGate.Main -> MainAppNavHost(authViewModel)
@@ -193,11 +193,11 @@ internal enum class AppGate {
 internal fun appGateDestination(
     session: UserSession?,
     sessionChecked: Boolean,
-    recoveryMode: Boolean = false
+    recoveryPending: Boolean = false
 ): AppGate =
     if (!sessionChecked) {
         AppGate.Loading
-    } else if (recoveryMode) {
+    } else if (recoveryPending) {
         AppGate.Recovery
     } else if (session != null) {
         AppGate.Main
