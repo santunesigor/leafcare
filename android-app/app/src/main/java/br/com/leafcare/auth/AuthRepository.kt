@@ -234,6 +234,99 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         _error.value = message
     }
 
+    /**
+     * Sends the password-recovery email with a secure Supabase link back to
+     * the app ([PASSWORD_RECOVERY_REDIRECT]). No OTP, no browser in-app.
+     */
+    suspend fun requestPasswordReset(email: String): Result<Unit> {
+        _isLoading.value = true
+        _error.value = null
+        _infoMessage.value = null
+
+        return try {
+            if (email.isBlank()) {
+                _error.value = "E-mail inválido"
+                return Result.failure(IllegalArgumentException("E-mail inválido"))
+            }
+
+            backend.requestPasswordRecovery(email.trim(), PASSWORD_RECOVERY_REDIRECT)
+
+            _infoMessage.value = "Enviamos um e-mail de recuperação. Toque no link para continuar."
+            Result.success(Unit)
+        } catch (e: Exception) {
+            val message = sanitizeError(AuthOperation.PASSWORD_RESET, e)
+            _error.value = message
+            Result.failure(AuthException(message, e))
+        } finally {
+            _isLoading.value = false
+        }
+    }
+
+    /**
+     * Completes password recovery from a deep link (PKCE code or session
+     * tokens). On success a recovery session exists and is reflected
+     * locally; the UI proceeds to new-password entry.
+     */
+    internal suspend fun completePasswordRecovery(link: RecoveryDeeplink): Result<Unit> {
+        _isLoading.value = true
+        _error.value = null
+        _infoMessage.value = null
+
+        return try {
+            when (link) {
+                is RecoveryDeeplink.Code -> backend.exchangeRecoveryCode(link.code)
+                is RecoveryDeeplink.Tokens ->
+                    backend.importRecoveryTokens(link.accessToken, link.refreshToken)
+            }
+
+            val session = backend.loadSession()
+            if (session != null) {
+                _session.value = session
+                _user.value = session.user
+                Result.success(Unit)
+            } else {
+                val message = "Não foi possível concluir a recuperação. Tente novamente."
+                _error.value = message
+                Result.failure(AuthException(message))
+            }
+        } catch (e: Exception) {
+            val message = sanitizeError(AuthOperation.RECOVERY_VERIFY, e)
+            _error.value = message
+            Result.failure(AuthException(message, e))
+        } finally {
+            _isLoading.value = false
+        }
+    }
+
+    /**
+     * Sets a new password on the current session (recovery or authenticated
+     * password change).
+     */
+    suspend fun updatePassword(password: String): Result<Unit> {
+        _isLoading.value = true
+        _error.value = null
+        _infoMessage.value = null
+
+        return try {
+            val validationError = validatePasswordInput(password)
+            if (validationError != null) {
+                _error.value = validationError
+                return Result.failure(IllegalArgumentException(validationError))
+            }
+
+            backend.updatePassword(password)
+
+            _infoMessage.value = "Senha alterada com sucesso."
+            Result.success(Unit)
+        } catch (e: Exception) {
+            val message = sanitizeError(AuthOperation.UPDATE_PASSWORD, e)
+            _error.value = message
+            Result.failure(AuthException(message, e))
+        } finally {
+            _isLoading.value = false
+        }
+    }
+
     /** Clears the current informational message */
     fun clearInfo() {
         _infoMessage.value = null
@@ -272,6 +365,15 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         }
 
         /**
+         * Pure new-password validation. Returns the user-facing error message,
+         * or null when the input is valid.
+         */
+        internal fun validatePasswordInput(password: String): String? {
+            if (password.length < 6) return "A senha deve ter pelo menos 6 caracteres"
+            return null
+        }
+
+        /**
          * Converts backend exceptions into short user-facing messages.
          * The raw error (URL, headers, tokens, HTTP body) is NEVER included:
          * supabase-kt error messages embed the full request/response dump.
@@ -285,6 +387,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 return "E-mail ou senha incorretos"
             }
             if (raw.contains("email not confirmed")) return "Confirme seu e-mail antes de entrar"
+            if (raw.contains("invalid or has expired")) return "Link inválido ou expirado."
             if (raw.contains("invalid api key")) {
                 return "Não foi possível conectar ao serviço. Verifique a configuração do aplicativo."
             }
@@ -293,6 +396,9 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 AuthOperation.SIGN_UP -> "Não foi possível criar sua conta. Tente novamente."
                 AuthOperation.SIGN_IN -> "Não foi possível entrar. Tente novamente."
                 AuthOperation.SIGN_OUT -> "Não foi possível sair. Tente novamente."
+                AuthOperation.PASSWORD_RESET -> "Não foi possível enviar a recuperação. Tente novamente."
+                AuthOperation.RECOVERY_VERIFY -> "Não foi possível concluir a recuperação. Tente novamente."
+                AuthOperation.UPDATE_PASSWORD -> "Não foi possível definir a nova senha. Tente novamente."
             }
         }
 
@@ -311,8 +417,14 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
 internal enum class AuthOperation {
     SIGN_UP,
     SIGN_IN,
-    SIGN_OUT
+    SIGN_OUT,
+    PASSWORD_RESET,
+    RECOVERY_VERIFY,
+    UPDATE_PASSWORD
 }
+
+/** Deep-link target for the Supabase password-recovery email. */
+internal const val PASSWORD_RECOVERY_REDIRECT = "leafcare://auth/reset-password"
 
 /** Custom exception for auth errors */
 class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -338,6 +450,10 @@ internal interface AuthBackend {
     suspend fun signUpWithEmail(email: String, password: String, displayName: String)
     suspend fun signInWithEmail(email: String, password: String)
     suspend fun signOut()
+    suspend fun requestPasswordRecovery(email: String, redirectUrl: String)
+    suspend fun exchangeRecoveryCode(code: String)
+    suspend fun importRecoveryTokens(accessToken: String, refreshToken: String)
+    suspend fun updatePassword(newPassword: String)
 }
 
 /** Production [AuthBackend] backed by the supabase-kt 2.1.0 public API. */
@@ -368,5 +484,23 @@ internal class SupabaseAuthBackend(private val auth: Auth) : AuthBackend {
 
     override suspend fun signOut() {
         auth.signOut(SignOutScope.GLOBAL)
+    }
+
+    override suspend fun requestPasswordRecovery(email: String, redirectUrl: String) {
+        auth.resetPasswordForEmail(email, redirectUrl)
+    }
+
+    override suspend fun exchangeRecoveryCode(code: String) {
+        auth.exchangeCodeForSession(code)
+    }
+
+    override suspend fun importRecoveryTokens(accessToken: String, refreshToken: String) {
+        auth.importAuthToken(accessToken, refreshToken, retrieveUser = true)
+    }
+
+    override suspend fun updatePassword(newPassword: String) {
+        auth.modifyUser {
+            password = newPassword
+        }
     }
 }

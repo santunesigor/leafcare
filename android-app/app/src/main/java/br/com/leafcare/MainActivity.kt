@@ -1,5 +1,6 @@
 package br.com.leafcare
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,9 +22,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
+import br.com.leafcare.auth.AuthNavigationEvent
 import br.com.leafcare.auth.AuthViewModel
 import br.com.leafcare.auth.displayNameOf
 import br.com.leafcare.ui.auth.AuthNavHost
+import br.com.leafcare.ui.auth.NewPasswordScreen
 import br.com.leafcare.ui.auth.ProfileScreen
 import br.com.leafcare.ui.*
 import io.github.jan.supabase.gotrue.user.UserSession
@@ -34,8 +37,23 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleRecoveryIntent(intent)
         setContent {
             LeafCareTheme { LeafCareApp() }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleRecoveryIntent(intent)
+    }
+
+    /** Forwards password-recovery deep links; browser/WebView never involved. */
+    private fun handleRecoveryIntent(intent: Intent?) {
+        val url = intent?.data?.toString() ?: return
+        if (url.startsWith("leafcare://")) {
+            authViewModel.handleRecoveryDeeplink(url)
         }
     }
 }
@@ -44,6 +62,7 @@ class MainActivity : ComponentActivity() {
 fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
     val session by authViewModel.session.collectAsStateWithLifecycle()
     val sessionChecked by authViewModel.sessionChecked.collectAsStateWithLifecycle()
+    val recoveryMode by authViewModel.recoveryMode.collectAsStateWithLifecycle()
 
     // On first launch, trigger session restoration
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -51,9 +70,11 @@ fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
     }
 
     // Auth gate: Loading until the restore attempt resolves, so the Login
-    // screen never flashes when a persisted session exists.
-    when (appGateDestination(session, sessionChecked)) {
+    // screen never flashes when a persisted session exists. A completed
+    // recovery deep link takes precedence over the main app.
+    when (appGateDestination(session, sessionChecked, recoveryMode)) {
         AppGate.Loading -> LoadingScreen()
+        AppGate.Recovery -> AuthNavHost(authViewModel)
         AppGate.Main -> MainAppNavHost(authViewModel)
         AppGate.Auth -> AuthNavHost(authViewModel)
     }
@@ -85,6 +106,16 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
     val user by authViewModel.user.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.results.collect { id ->
         nav.navigate("result/$id") { popUpTo("history"); launchSingleTop = true } } }
+    // After a password change inside "change-password", go back to profile.
+    LaunchedEffect(nav, authViewModel) {
+        authViewModel.navigation.collect { event ->
+            if (event is AuthNavigationEvent.NavigateToApp &&
+                nav.currentDestination?.route == "change-password"
+            ) {
+                nav.popBackStack()
+            }
+        }
+    }
     Surface(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
             NavHost(
@@ -102,7 +133,17 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                     // Same AuthViewModel instance: logout clears the session and the
                     // auth gate above switches back to Auth, disposing this NavHost,
                     // so Back can never return to an authenticated screen.
-                    ProfileScreen(authViewModel, onBack = { nav.popBackStack() })
+                    ProfileScreen(
+                        authViewModel,
+                        onBack = { nav.popBackStack() },
+                        onChangePassword = { nav.navigate("change-password") }
+                    )
+                }
+                composable("change-password") {
+                    NewPasswordScreen(
+                        authViewModel,
+                        onBack = { nav.popBackStack() }
+                    )
                 }
                 composable("camera") {
                     CameraScreen(vm, onBack = { nav.popBackStack() })
@@ -139,16 +180,25 @@ private val leafExitTransition: ExitTransition =
 /** Visible root decided by the single auth state. */
 internal enum class AppGate {
     Loading,
+    Recovery,
     Main,
     Auth
-}/**
+}
+
+/**
  * Pure auth-gate decision (unit-testable): Loading until the restore attempt
- * resolves, then Main with a session, Auth otherwise. Auth is never shown
- * before the real state is known.
+ * resolves, then recovery mode (deep link completed), then Main with a
+ * session, Auth otherwise. Auth is never shown before the real state is known.
  */
-internal fun appGateDestination(session: UserSession?, sessionChecked: Boolean): AppGate =
+internal fun appGateDestination(
+    session: UserSession?,
+    sessionChecked: Boolean,
+    recoveryMode: Boolean = false
+): AppGate =
     if (!sessionChecked) {
         AppGate.Loading
+    } else if (recoveryMode) {
+        AppGate.Recovery
     } else if (session != null) {
         AppGate.Main
     } else {

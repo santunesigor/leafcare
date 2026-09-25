@@ -72,4 +72,34 @@ class AuthErrorSanitizerTest {
             AuthRepository.sanitizeError(AuthOperation.SIGN_OUT, Exception("boom"))
         )
     }
+
+    @Test fun passwordResetFallback_isFixedMessage() {
+        assertEquals(
+            "Não foi possível enviar a recuperação. Tente novamente.",
+            AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, Exception("boom"))
+        )
+    }
+
+    @Test fun recoveryVerifyFallback_isFixedMessage() {
+        assertEquals(
+            "Não foi possível concluir a recuperação. Tente novamente.",
+            AuthRepository.sanitizeError(AuthOperation.RECOVERY_VERIFY, Exception("boom"))
+        )
+    }
+
+    @Test fun updatePasswordFallback_isFixedMessage() {
+        assertEquals(
+            "Não foi possível definir a nova senha. Tente novamente.",
+            AuthRepository.sanitizeError(AuthOperation.UPDATE_PASSWORD, Exception("boom"))
+        )
+    }
+
+    @Test fun expiredLink_mapsToLinkMessage() {
+        val raw = Exception("Status 400 body={\"msg\":\"Email link is invalid or has expired\"}")
+
+        assertEquals(
+            "Link inválido ou expirado.",
+            AuthRepository.sanitizeError(AuthOperation.RECOVERY_VERIFY, raw)
+        )
+    }
 }

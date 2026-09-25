@@ -10,6 +10,7 @@ import io.github.jan.supabase.gotrue.user.UserSession
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
@@ -34,6 +35,11 @@ class AuthViewModel(
     val error = authRepository.error
     val infoMessage = authRepository.infoMessage
     val sessionChecked = authRepository.sessionChecked
+
+    // True while a password-recovery deep link is being completed: the gate
+    // shows the new-password screen instead of the main app.
+    private val _recoveryMode = MutableStateFlow(false)
+    val recoveryMode: StateFlow<Boolean> = _recoveryMode.asStateFlow()
 
     /**
      * Authenticated user's display name from user metadata, or null when
@@ -84,13 +90,25 @@ class AuthViewModel(
         _uiState.value = _uiState.value.copy(displayName = displayName)
     }
 
+    /** Updates new password field */
+    fun setNewPassword(newPassword: String) {
+        _uiState.value = _uiState.value.copy(newPassword = newPassword)
+    }
+
+    /** Updates new password confirmation field */
+    fun setConfirmNewPassword(confirmNewPassword: String) {
+        _uiState.value = _uiState.value.copy(confirmNewPassword = confirmNewPassword)
+    }
+
     /** Clears all form fields */
     fun clearForms() {
         _uiState.value = _uiState.value.copy(
             email = "",
             password = "",
             confirmPassword = "",
-            displayName = ""
+            displayName = "",
+            newPassword = "",
+            confirmNewPassword = ""
         )
     }
 
@@ -158,9 +176,61 @@ class AuthViewModel(
         viewModelScope.launch {
             authRepository.signOut()
             clearForms()
+            _recoveryMode.value = false
             setScreen(AuthScreen.Login)
             _navigation.send(navigationAfterSignOut())
         }
+    }
+
+    /** Request password-recovery email with the secure app link. */
+    fun requestPasswordReset() {
+        val state = _uiState.value
+        viewModelScope.launch {
+            authRepository.requestPasswordReset(email = state.email.trim())
+        }
+    }
+
+    /**
+     * Handles a password-recovery deep-link return (`leafcare://...`).
+     * Ignored when already authenticated or when the link is not a recovery
+     * return. No browser or WebView involved.
+     */
+    fun handleRecoveryDeeplink(url: String) {
+        if (authRepository.hasPersistedSession()) return
+        val link = parseRecoveryDeeplink(url) ?: return
+        viewModelScope.launch {
+            val result = authRepository.completePasswordRecovery(link)
+            if (result.isSuccess) {
+                isolateCurrentUser()
+                _recoveryMode.value = true
+                setScreen(AuthScreen.NewPassword, clearMessages = false)
+            }
+        }
+    }
+
+    /** Define a new password (recovery flow or authenticated change). */
+    fun updatePassword() {
+        val state = _uiState.value
+        if (state.newPassword != state.confirmNewPassword) {
+            authRepository.setError("As senhas não coincidem")
+            return
+        }
+        viewModelScope.launch {
+            val result = authRepository.updatePassword(password = state.newPassword)
+            if (result.isSuccess) {
+                clearForms()
+                _recoveryMode.value = false
+                _navigation.send(AuthNavigationEvent.NavigateToApp)
+            }
+            onAuthenticated(result)
+        }
+    }
+
+    /** Isolates local data to the current session user and schedules sync. */
+    private suspend fun isolateCurrentUser() {
+        val app = getApplication<Application>() as? LeafCareApplication ?: return
+        authRepository.getCurrentUserId()?.let { app.ensureAccountIsolation(it) }
+        app.scheduleSync()
     }
 
     /** Clear error */
@@ -202,7 +272,9 @@ data class AuthUiState(
     val email: String = "",
     val password: String = "",
     val confirmPassword: String = "",
-    val displayName: String = ""
+    val displayName: String = "",
+    val newPassword: String = "",
+    val confirmNewPassword: String = ""
 )
 
 /** Auth screen types */
@@ -210,7 +282,55 @@ enum class AuthScreen {
     Login,
     SignUp,
     ForgotPassword,
+    NewPassword,
     Profile
+}
+
+/**
+ * A password-recovery return from the Supabase email link, either PKCE
+ * (`?code=`) or session tokens (`#access_token=&refresh_token=`).
+ * Only recovery links are accepted; anything else is ignored.
+ */
+internal sealed interface RecoveryDeeplink {
+    data class Code(val code: String) : RecoveryDeeplink
+    data class Tokens(val accessToken: String, val refreshToken: String) : RecoveryDeeplink
+}
+
+/**
+ * Pure parser for the recovery deep link (JVM-testable, no Android types).
+ * Returns null for anything that is not a LeafCare recovery return.
+ */
+internal fun parseRecoveryDeeplink(url: String): RecoveryDeeplink? {
+    return try {
+        val uri = java.net.URI(url)
+        if (uri.scheme != "leafcare") return null
+        fun params(raw: String?): Map<String, String> {
+            if (raw.isNullOrBlank()) return emptyMap()
+            return raw.split("&").mapNotNull { part ->
+                val idx = part.indexOf("=")
+                if (idx <= 0) return@mapNotNull null
+                val key = java.net.URLDecoder.decode(part.substring(0, idx), "UTF-8")
+                val value = java.net.URLDecoder.decode(part.substring(idx + 1), "UTF-8")
+                key to value
+            }.toMap()
+        }
+        params(uri.rawQuery)["code"]?.takeIf { it.isNotBlank() }?.let {
+            return RecoveryDeeplink.Code(it)
+        }
+        val fragment = params(uri.rawFragment)
+        val accessToken = fragment["access_token"]
+        val refreshToken = fragment["refresh_token"]
+        val type = fragment["type"]
+        if (!accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank() &&
+            (type == null || type == "recovery")
+        ) {
+            RecoveryDeeplink.Tokens(accessToken, refreshToken)
+        } else {
+            null
+        }
+    } catch (e: Exception) {
+        null
+    }
 }
 
 /** Navigation events for auth flow */

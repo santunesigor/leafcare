@@ -151,11 +151,11 @@ class AuthViewModelTest {
         job.cancel()
     }
 
-    @Test fun authScreensContainNoOtpScreens() {
-        // Regression guard: signup confirmation and recovery OTP were removed
-        // from this MVP (no corporate SMTP domain yet).
+    @Test fun authScreensContainNoSignupOtpScreens() {
+        // Regression guard: signup confirmation OTP stays out (no corporate
+        // SMTP domain). NewPassword exists for link recovery + auth change.
         assertEquals(
-            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.ForgotPassword, AuthScreen.Profile),
+            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.ForgotPassword, AuthScreen.NewPassword, AuthScreen.Profile),
             AuthScreen.values().toSet()
         )
     }
@@ -225,6 +225,109 @@ class AuthViewModelTest {
         assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
         assertEquals("", viewModel.uiState.value.email)
         assertTrue(events.any { it is AuthNavigationEvent.NavigateToAuth })
+        job.cancel()
+    }
+
+    @Test fun requestPasswordReset_showsInfoAndStays() = runTest(dispatcher) {
+        viewModel.setScreen(AuthScreen.ForgotPassword)
+        viewModel.setEmail("a@b.com")
+
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("a@b.com" to "leafcare://auth/reset-password"),
+            backend.resetRequests
+        )
+        assertNotNull(viewModel.infoMessage.value)
+        assertEquals(AuthScreen.ForgotPassword, viewModel.uiState.value.currentScreen)
+    }
+
+    @Test fun recoveryDeeplinkCode_opensNewPassword() = runTest(dispatcher) {
+        // No repo session yet; the fake backend yields one after the exchange.
+        backend.session = testSession()
+
+        viewModel.handleRecoveryDeeplink("leafcare://auth/reset-password?code=pkce-code")
+        advanceUntilIdle()
+
+        assertEquals(listOf("pkce-code"), backend.exchangeCodeCalls)
+        assertTrue(viewModel.recoveryMode.value)
+        assertEquals(AuthScreen.NewPassword, viewModel.uiState.value.currentScreen)
+    }
+
+    @Test fun recoveryDeeplinkTokens_opensNewPassword() = runTest(dispatcher) {
+        backend.session = testSession()
+
+        viewModel.handleRecoveryDeeplink(
+            "leafcare://auth/reset-password#access_token=at&refresh_token=rt&type=recovery"
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("at" to "rt"), backend.importedTokens)
+        assertTrue(viewModel.recoveryMode.value)
+        assertEquals(AuthScreen.NewPassword, viewModel.uiState.value.currentScreen)
+    }
+
+    @Test fun recoveryDeeplinkInvalid_isIgnored() = runTest(dispatcher) {
+        backend.session = null
+        viewModel.setScreen(AuthScreen.Login)
+
+        viewModel.handleRecoveryDeeplink("leafcare://auth/reset-password?code=%20")
+        viewModel.handleRecoveryDeeplink("https://evil.example/x")
+        advanceUntilIdle()
+
+        assertTrue(backend.exchangeCodeCalls.isEmpty())
+        assertTrue(backend.importedTokens.isEmpty())
+        assertFalse(viewModel.recoveryMode.value)
+        assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
+    }
+
+    @Test fun recoveryDeeplinkIgnoredWhenAuthenticated() = runTest(dispatcher) {
+        backend.session = testSession()
+        viewModel.setEmail("a@b.com")
+        viewModel.setPassword("senha123")
+        viewModel.signIn()
+        advanceUntilIdle()
+        viewModel.setScreen(AuthScreen.Login)
+
+        viewModel.handleRecoveryDeeplink("leafcare://auth/reset-password?code=pkce-code")
+        advanceUntilIdle()
+
+        // A logged-in session is never replaced by a link tap.
+        assertTrue(backend.exchangeCodeCalls.isEmpty())
+        assertFalse(viewModel.recoveryMode.value)
+    }
+
+    @Test fun mismatchedNewPasswords_blockUpdateWithVisibleError() = runTest(dispatcher) {
+        viewModel.setScreen(AuthScreen.NewPassword)
+        viewModel.setNewPassword("nova-senha-123")
+        viewModel.setConfirmNewPassword("outra-senha")
+
+        viewModel.updatePassword()
+        advanceUntilIdle()
+
+        assertEquals(0, backend.updatePasswordCalls)
+        assertEquals("As senhas não coincidem", viewModel.error.value)
+        assertEquals(AuthScreen.NewPassword, viewModel.uiState.value.currentScreen)
+    }
+
+    @Test fun matchingNewPasswords_updateAndNavigateToApp() = runTest(dispatcher) {
+        backend.session = testSession()
+        viewModel.setScreen(AuthScreen.NewPassword)
+        viewModel.setNewPassword("nova-senha-123")
+        viewModel.setConfirmNewPassword("nova-senha-123")
+
+        val events = mutableListOf<AuthNavigationEvent>()
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.navigation.collect { events.add(it) }
+        }
+
+        viewModel.updatePassword()
+        advanceUntilIdle()
+
+        assertEquals(1, backend.updatePasswordCalls)
+        assertFalse(viewModel.recoveryMode.value)
+        assertTrue(events.any { it is AuthNavigationEvent.NavigateToApp })
         job.cancel()
     }
 

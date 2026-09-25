@@ -27,6 +27,11 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     var lastSignUp: Triple<String, String, String>? = null
     var signInCalls = 0
     var signOutCalls = 0
+    val resetRequests = mutableListOf<Pair<String, String>>()
+    val exchangeCodeCalls = mutableListOf<String>()
+    val importedTokens = mutableListOf<Pair<String, String>>()
+    var updatePasswordCalls = 0
+    var lastNewPassword: String? = null
 
     override suspend fun loadFromStorage(): Boolean = session != null
 
@@ -44,6 +49,23 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     override suspend fun signOut() {
         signOutCalls++
         session = null
+    }
+
+    override suspend fun requestPasswordRecovery(email: String, redirectUrl: String) {
+        resetRequests += email to redirectUrl
+    }
+
+    override suspend fun exchangeRecoveryCode(code: String) {
+        exchangeCodeCalls += code
+    }
+
+    override suspend fun importRecoveryTokens(accessToken: String, refreshToken: String) {
+        importedTokens += accessToken to refreshToken
+    }
+
+    override suspend fun updatePassword(newPassword: String) {
+        updatePasswordCalls++
+        lastNewPassword = newPassword
     }
 }
 
@@ -171,5 +193,72 @@ class AuthRepositoryTest {
         assertNull(repository.session.value)
         assertNull(repository.user.value)
         assertFalse(repository.hasPersistedSession())
+    }
+
+    @Test fun requestPasswordReset_sendsLinkRedirect() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(null)
+
+        val result = repository.requestPasswordReset("a@b.com")
+
+        assertTrue(result.isSuccess)
+        assertEquals(
+            listOf("a@b.com" to "leafcare://auth/reset-password"),
+            backend.resetRequests
+        )
+        assertNotNull(repository.infoMessage.value)
+    }
+
+    @Test fun requestPasswordReset_blankEmailFailsWithoutBackendCall() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(null)
+
+        val result = repository.requestPasswordReset("  ")
+
+        assertTrue(result.isFailure)
+        assertTrue(backend.resetRequests.isEmpty())
+    }
+
+    @Test fun completeRecoveryWithCode_authenticates() = runTest(testDispatcher) {
+        val session = testSession()
+        val repository = repositoryWithSession(session)
+
+        val result = repository.completePasswordRecovery(RecoveryDeeplink.Code("pkce-code"))
+
+        assertTrue(result.isSuccess)
+        assertEquals(listOf("pkce-code"), backend.exchangeCodeCalls)
+        assertEquals(session, repository.session.value)
+        assertTrue(repository.hasPersistedSession())
+    }
+
+    @Test fun completeRecoveryWithTokens_authenticates() = runTest(testDispatcher) {
+        val session = testSession()
+        val repository = repositoryWithSession(session)
+
+        val result = repository.completePasswordRecovery(
+            RecoveryDeeplink.Tokens("access-123", "refresh-123")
+        )
+
+        assertTrue(result.isSuccess)
+        assertEquals(listOf("access-123" to "refresh-123"), backend.importedTokens)
+        assertEquals(session, repository.session.value)
+    }
+
+    @Test fun updatePassword_shortPasswordFailsWithoutBackendCall() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(testSession())
+
+        val result = repository.updatePassword("123")
+
+        assertTrue(result.isFailure)
+        assertEquals(0, backend.updatePasswordCalls)
+    }
+
+    @Test fun updatePassword_successForwardsNewPassword() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(testSession())
+
+        val result = repository.updatePassword("nova-senha-123")
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, backend.updatePasswordCalls)
+        assertEquals("nova-senha-123", backend.lastNewPassword)
+        assertEquals("Senha alterada com sucesso.", repository.infoMessage.value)
     }
 }

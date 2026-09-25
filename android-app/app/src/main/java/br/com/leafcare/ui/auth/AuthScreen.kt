@@ -65,6 +65,10 @@ fun AuthNavHost(viewModel: AuthViewModel) {
         AuthScreen.Login -> LoginScreen(viewModel)
         AuthScreen.SignUp -> SignUpScreen(viewModel)
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
+        AuthScreen.NewPassword -> NewPasswordScreen(
+            viewModel = viewModel,
+            onBack = { viewModel.setScreen(AuthScreen.Login) }
+        )
         AuthScreen.Profile -> ProfileScreen(viewModel, onBack = { viewModel.setScreen(AuthScreen.Login) })
     }
 }
@@ -326,21 +330,89 @@ fun SignUpScreen(viewModel: AuthViewModel) {
 
 @Composable
 fun ForgotPasswordScreen(viewModel: AuthViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+
     AuthScaffold {
         AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
         AuthHeader(
             logoSize = 56,
             title = "Recuperar senha",
-            subtitle = "Recuperação de senha indisponível nesta versão."
+            subtitle = "Informe seu e-mail e enviaremos um link de recuperação."
         )
+
+        AuthField(
+            value = uiState.email,
+            onValueChange = { viewModel.setEmail(it) },
+            label = "E-mail",
+            keyboardType = KeyboardType.Email,
+            imeAction = ImeAction.Done,
+            onImeDone = { viewModel.requestPasswordReset() }
+        )
+
+        AuthMessages(error, infoMessage)
+        Spacer(Modifier.height(24.dp))
+
+        AuthButton(label = "Enviar e-mail", loading = isLoading, onClick = { viewModel.requestPasswordReset() })
         Spacer(Modifier.height(12.dp))
 
         AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }
     }
 }
 
+/**
+ * New-password form shared by the recovery deep-link flow (Auth) and the
+ * authenticated change flow (main app). Behavior comes from the ViewModel;
+ * only back navigation differs per host.
+ */
 @Composable
-fun ProfileScreen(viewModel: AuthViewModel, onBack: () -> Unit) {
+fun NewPasswordScreen(viewModel: AuthViewModel, onBack: () -> Unit) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+
+    AuthScaffold {
+        AuthBackButton(onBack)
+        AuthHeader(
+            logoSize = 56,
+            title = "Nova senha",
+            subtitle = "Defina uma nova senha para a sua conta."
+        )
+
+        AuthField(
+            value = uiState.newPassword,
+            onValueChange = { viewModel.setNewPassword(it) },
+            label = "Nova senha (mín. 6 caracteres)",
+            keyboardType = KeyboardType.Password,
+            password = true
+        )
+        Spacer(Modifier.height(16.dp))
+        AuthField(
+            value = uiState.confirmNewPassword,
+            onValueChange = { viewModel.setConfirmNewPassword(it) },
+            label = "Confirmar nova senha",
+            keyboardType = KeyboardType.Password,
+            password = true,
+            imeAction = ImeAction.Done,
+            onImeDone = { viewModel.updatePassword() }
+        )
+
+        AuthMessages(error, infoMessage)
+        Spacer(Modifier.height(24.dp))
+
+        AuthButton(label = "Salvar nova senha", loading = isLoading, onClick = { viewModel.updatePassword() })
+    }
+}
+
+@Composable
+fun ProfileScreen(
+    viewModel: AuthViewModel,
+    onBack: () -> Unit,
+    onChangePassword: () -> Unit = {}
+) {
     val displayName = viewModel.getDisplayName()
     val email = viewModel.getEmail()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
@@ -381,6 +453,22 @@ fun ProfileScreen(viewModel: AuthViewModel, onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(32.dp))
+
+        Button(
+            onClick = onChangePassword,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, LeafColors.Border),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = LeafColors.Pale,
+                contentColor = LeafColors.Text
+            )
+        ) {
+            Text("Alterar senha", fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(12.dp))
 
         Button(
             onClick = { viewModel.signOut() },
