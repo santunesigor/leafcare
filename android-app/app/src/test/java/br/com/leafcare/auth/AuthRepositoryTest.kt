@@ -36,6 +36,7 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     var lastNewPassword: String? = null
     var failExchange: Boolean = false
     var failImport: Boolean = false
+    var failReset: Exception? = null
 
     override suspend fun loadFromStorage(): Boolean = session != null
 
@@ -62,6 +63,7 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     }
 
     override suspend fun requestPasswordRecovery(email: String, redirectUrl: String) {
+        failReset?.let { throw it }
         resetRequests += email to redirectUrl
     }
 
@@ -231,6 +233,35 @@ class AuthRepositoryTest {
 
         assertTrue(result.isFailure)
         assertTrue(backend.resetRequests.isEmpty())
+    }
+
+    @Test fun requestPasswordReset_rateLimitExplainsWait() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(null)
+        backend.failReset = IllegalStateException(
+            "POST /auth/v1/recover -> 429 {\"error_code\":\"over_email_send_rate_limit\"}"
+        )
+
+        val result = repository.requestPasswordReset("a@b.com")
+
+        assertTrue(result.isFailure)
+        assertEquals(
+            "Você solicitou um e-mail recentemente. Aguarde um pouco antes de tentar novamente.",
+            repository.error.value
+        )
+        assertNull(repository.session.value)
+    }
+
+    @Test fun requestPasswordReset_networkErrorExplainsConnection() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(null)
+        backend.failReset = IllegalStateException("Unable to resolve host \"example.supabase.co\"")
+
+        val result = repository.requestPasswordReset("a@b.com")
+
+        assertTrue(result.isFailure)
+        assertEquals(
+            "Não foi possível enviar o e-mail. Verifique sua conexão e tente novamente.",
+            repository.error.value
+        )
     }
 
     @Test fun completeRecoveryWithCode_authenticates() = runTest(testDispatcher) {

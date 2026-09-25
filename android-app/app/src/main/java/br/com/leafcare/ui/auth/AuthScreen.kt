@@ -1,6 +1,7 @@
 package br.com.leafcare.ui.auth
 
 import androidx.compose.foundation.BorderStroke
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -69,7 +71,8 @@ fun AuthNavHost(viewModel: AuthViewModel) {
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
         AuthScreen.NewPassword -> NewPasswordScreen(
             viewModel = viewModel,
-            onBack = { viewModel.cancelRecovery() }
+            onBack = { viewModel.requestCancelRecovery() },
+            confirmCancelRecovery = true
         )
         AuthScreen.Profile -> ProfileScreen(viewModel, onBack = { viewModel.setScreen(AuthScreen.Login) })
     }
@@ -376,8 +379,10 @@ fun VerifyEmailScreen(viewModel: AuthViewModel) {
 fun ForgotPasswordScreen(viewModel: AuthViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val resetSending by viewModel.resetSending.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+    val sending = isLoading || resetSending
 
     AuthScaffold(onBack = { viewModel.setScreen(AuthScreen.Login) }) {
         AuthHeader(
@@ -398,7 +403,7 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
         AuthMessages(error, infoMessage)
         Spacer(Modifier.height(24.dp))
 
-        AuthButton(label = "Enviar e-mail", loading = isLoading, onClick = { viewModel.requestPasswordReset() })
+        AuthButton(label = "Enviar e-mail", loading = sending, onClick = { viewModel.requestPasswordReset() })
         Spacer(Modifier.height(12.dp))
 
         AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }
@@ -411,13 +416,24 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
  * only back navigation differs per host.
  */
 @Composable
-fun NewPasswordScreen(viewModel: AuthViewModel, onBack: () -> Unit) {
+fun NewPasswordScreen(
+    viewModel: AuthViewModel,
+    onBack: () -> Unit,
+    confirmCancelRecovery: Boolean = false
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+    val showCancelDialog by viewModel.showCancelDialog.collectAsStateWithLifecycle()
 
-    AuthScaffold(onBack = onBack) {
+    // Recovery links are single-use: system back asks first instead of
+    // abandoning the flow silently. Profile change keeps default back.
+    if (confirmCancelRecovery) {
+        BackHandler { viewModel.requestCancelRecovery() }
+    }
+
+    AuthScaffold(onBack = { if (confirmCancelRecovery) viewModel.requestCancelRecovery() else onBack() }) {
         AuthHeader(
             logoSize = 56,
             title = "Nova senha",
@@ -446,6 +462,24 @@ fun NewPasswordScreen(viewModel: AuthViewModel, onBack: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         AuthButton(label = "Salvar nova senha", loading = isLoading, onClick = { viewModel.updatePassword() })
+    }
+
+    if (confirmCancelRecovery && showCancelDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissCancelDialog() },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissCancelDialog() }) {
+                    Text("Continuar recuperação", color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelRecovery() }) {
+                    Text("Sair", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            title = { Text("Cancelar recuperação?") },
+            text = { Text("Se você sair agora, será necessário solicitar um novo link de recuperação por e-mail.") }
+        )
     }
 }
 

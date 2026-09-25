@@ -102,4 +102,31 @@ class AuthErrorSanitizerTest {
             AuthRepository.sanitizeError(AuthOperation.RECOVERY_VERIFY, raw)
         )
     }
+
+    @Test fun rateLimitErrorCode_mapsToWaitMessage() {
+        val raw = Exception("Status 429 error_code=over_email_send_rate_limit")
+
+        assertEquals(
+            "Você solicitou um e-mail recentemente. Aguarde um pouco antes de tentar novamente.",
+            AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, raw)
+        )
+    }
+
+    @Test fun rateLimitWording_mapsToWaitMessage() {
+        val raw = Exception("429 Too Many Requests: rate limit exceeded")
+
+        assertEquals(
+            "Você solicitou um e-mail recentemente. Aguarde um pouco antes de tentar novamente.",
+            AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, raw)
+        )
+    }
+
+    @Test fun unauthorizedAddress_mapsToFriendlyMessage() {
+        val raw = Exception("Email address not authorized by mail server")
+
+        assertEquals(
+            "Envio indisponível para esse endereço nesta configuração de teste.",
+            AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, raw)
+        )
+    }
 }

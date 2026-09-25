@@ -12,6 +12,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
@@ -41,12 +42,36 @@ class AuthViewModel internal constructor(
     val infoMessage = authRepository.infoMessage
     val sessionChecked = authRepository.sessionChecked
 
-    // Explicit RECOVERY_PENDING: true while a password-recovery deep link is
-    // being completed. The gate shows the new-password screen instead of the
-    // main app, even though a (restricted) session exists. Initialized from
-    // the persisted marker so process death can never open the main app.
-    private val _recoveryPending = MutableStateFlow(recoveryStore.isPending)
-    val recoveryPending: StateFlow<Boolean> = _recoveryPending.asStateFlow()
+    // Explicit auth bootstrap: the gate renders only Loading until the
+    // state is resolved, so no App frame can leak during deeplink
+    // processing. Initialized from the persisted recovery marker, so a
+    // recovery session can never open the main app after process death.
+    private val _bootstrap = MutableStateFlow(
+        if (recoveryStore.isPending) {
+            AuthBootstrapState.RECOVERY_PENDING
+        } else {
+            AuthBootstrapState.CHECKING
+        }
+    )
+    internal val bootstrap: StateFlow<AuthBootstrapState> = _bootstrap.asStateFlow()
+
+    // Password-reset submit guard: one user action = at most one POST.
+    // Synchronous check + try/finally, so double taps never duplicate jobs.
+    private val _resetSending = MutableStateFlow(false)
+    val resetSending: StateFlow<Boolean> = _resetSending.asStateFlow()
+
+    // Cancel-recovery confirmation dialog state (recovery NewPassword only).
+    private val _showCancelDialog = MutableStateFlow(false)
+    val showCancelDialog: StateFlow<Boolean> = _showCancelDialog.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            authRepository.sessionChecked.first { it }
+            if (_bootstrap.value == AuthBootstrapState.CHECKING) {
+                _bootstrap.value = AuthBootstrapState.READY
+            }
+        }
+    }
 
     /**
      * Authenticated user's display name from user metadata, or null when
@@ -192,35 +217,82 @@ class AuthViewModel internal constructor(
 
     /** Request password-recovery email with the secure app link. */
     fun requestPasswordReset() {
+        // Single-submit guard: one user action = at most one POST. Checked
+        // synchronously so double taps never start duplicate jobs; the
+        // finally block always releases, so the button works again after
+        // the response (including 429).
+        if (_resetSending.value) return
         val state = _uiState.value
+        _resetSending.value = true
         viewModelScope.launch {
-            authRepository.requestPasswordReset(email = state.email.trim())
+            try {
+                authRepository.requestPasswordReset(email = state.email.trim())
+            } finally {
+                _resetSending.value = false
+            }
         }
+    }
+
+    /** Shows the cancel-recovery confirmation (recovery NewPassword only). */
+    fun requestCancelRecovery() {
+        _showCancelDialog.value = true
+    }
+
+    /** Dismisses the cancel-recovery confirmation, staying in recovery. */
+    fun dismissCancelDialog() {
+        _showCancelDialog.value = false
+    }
+
+    /**
+     * Notes an incoming auth deep link BEFORE the gate may render the app.
+     * Must be called synchronously (Activity onCreate/onNewIntent, before
+     * first composition): a recovery/confirm return immediately forces
+     * PROCESSING_DEEPLINK (Loading), so no App frame can leak. Unknown links
+     * and taps over a normal session change nothing.
+     */
+    fun noteDeeplink(url: String) {
+        val link = parseAuthDeeplink(url) ?: return
+        if (authRepository.hasPersistedSession() &&
+            _bootstrap.value != AuthBootstrapState.RECOVERY_PENDING
+        ) {
+            return
+        }
+        if (_bootstrap.value == AuthBootstrapState.PROCESSING_DEEPLINK) return
+        val wasPending = _bootstrap.value == AuthBootstrapState.RECOVERY_PENDING
+        _bootstrap.value = AuthBootstrapState.PROCESSING_DEEPLINK
+        processDeeplink(link, wasPending)
     }
 
     /**
      * Handles an auth deep-link return (`leafcare://auth/...`): signup
      * confirmation opens the app directly; password recovery opens the
-     * new-password screen. Ignored when already authenticated (outside a
-     * pending recovery) or when the link is unknown. No browser/WebView.
+     * new-password screen. See [noteDeeplink]. No browser/WebView.
      */
     fun handleAuthDeeplink(url: String) {
-        val link = parseAuthDeeplink(url) ?: return
-        if (authRepository.hasPersistedSession() && !_recoveryPending.value) return
+        noteDeeplink(url)
+    }
+
+    private fun processDeeplink(link: AuthDeeplink, wasPending: Boolean) {
         viewModelScope.launch {
-            if (_recoveryPending.value) {
+            if (wasPending) {
                 // Drop any stale recovery state before attempting the new
                 // link, so an expired/reused link can never conserve it.
                 authRepository.signOut()
                 clearRecoveryPending()
+                _bootstrap.value = AuthBootstrapState.PROCESSING_DEEPLINK
             }
             val result = authRepository.completeEmailLink(link)
-            if (!result.isSuccess) return@launch
+            if (!result.isSuccess) {
+                _bootstrap.value = AuthBootstrapState.READY
+                return@launch
+            }
             isolateCurrentUser()
             clearForms()
             when (link) {
                 is AuthDeeplink.ConfirmEmailCode,
-                is AuthDeeplink.ConfirmEmailTokens -> Unit
+                is AuthDeeplink.ConfirmEmailTokens -> {
+                    _bootstrap.value = AuthBootstrapState.READY
+                }
                 is AuthDeeplink.RecoveryCode,
                 is AuthDeeplink.RecoveryTokens -> {
                     setRecoveryPending(true)
@@ -240,12 +312,17 @@ class AuthViewModel internal constructor(
             authRepository.signOut()
             clearRecoveryPending()
             clearForms()
+            _showCancelDialog.value = false
             setScreen(AuthScreen.Login)
         }
     }
 
     private fun setRecoveryPending(pending: Boolean) {
-        _recoveryPending.value = pending
+        _bootstrap.value = if (pending) {
+            AuthBootstrapState.RECOVERY_PENDING
+        } else {
+            AuthBootstrapState.READY
+        }
         if (pending) {
             recoveryStore.isPending = true
         } else {
@@ -333,6 +410,18 @@ data class AuthUiState(
     val newPassword: String = "",
     val confirmNewPassword: String = ""
 )
+
+/** Explicit auth bootstrap state: the gate renders only Loading until resolved. */
+internal enum class AuthBootstrapState {
+    /** Initial storage restore still running. */
+    CHECKING,
+    /** Auth deep link identified, callback being processed. */
+    PROCESSING_DEEPLINK,
+    /** Valid recovery callback completed; new password still pending. */
+    RECOVERY_PENDING,
+    /** Bootstrap resolved; gate follows the session. */
+    READY
+}
 
 /** Auth screen types */
 enum class AuthScreen {

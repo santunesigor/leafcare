@@ -6,13 +6,16 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.activity.ComponentActivity
 import androidx.test.core.app.ApplicationProvider
 import br.com.leafcare.auth.AuthRepository
+import br.com.leafcare.auth.AuthScreen
 import br.com.leafcare.auth.AuthViewModel
 import br.com.leafcare.auth.FakeBackend
 import br.com.leafcare.auth.FakeRecoveryPendingStore
 import br.com.leafcare.ui.LeafCareTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -67,12 +70,57 @@ class AuthBackButtonTest {
     }
 
     @Test fun newPassword_backIsTopStart() {
-        compose.setContent { LeafCareTheme { NewPasswordScreen(viewModel()) { } } }
+        compose.setContent { LeafCareTheme { NewPasswordScreen(viewModel(), onBack = {}) } }
         assertBackAboveContent("Nova senha")
     }
 
     @Test fun profile_backIsTopStart() {
         compose.setContent { LeafCareTheme { ProfileScreen(viewModel(), {}, {}) } }
         assertBackAboveContent("CONTA LEAFCARE")
+    }
+
+    @Test fun recoveryNewPassword_backAsksBeforeLeaving() {
+        compose.setContent {
+            LeafCareTheme { NewPasswordScreen(viewModel(), {}, confirmCancelRecovery = true) }
+        }
+        compose.onNodeWithContentDescription("Voltar").performClick()
+        compose.onNodeWithText("Cancelar recuperação?").assertExists().assertIsDisplayed()
+        compose.onNodeWithText("Continuar recuperação").assertExists()
+        compose.onNodeWithText("Sair").assertExists()
+    }
+
+    @Test fun recoveryNewPassword_continueStays() {
+        val vm = viewModel()
+        compose.setContent {
+            LeafCareTheme { NewPasswordScreen(vm, {}, confirmCancelRecovery = true) }
+        }
+        compose.onNodeWithContentDescription("Voltar").performClick()
+        compose.onNodeWithText("Continuar recuperação").performClick()
+        compose.onNodeWithText("Cancelar recuperação?").assertDoesNotExist()
+        compose.onNodeWithText("Nova senha").assertExists()
+    }
+
+    @Test fun recoveryNewPassword_quitSignsOutAndLeaves() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val backend = FakeBackend()
+        val vm = AuthViewModel(app, AuthRepository(backend), FakeRecoveryPendingStore())
+        compose.setContent {
+            LeafCareTheme { NewPasswordScreen(vm, {}, confirmCancelRecovery = true) }
+        }
+        compose.onNodeWithContentDescription("Voltar").performClick()
+        compose.onNodeWithText("Sair").performClick()
+        compose.waitForIdle()
+
+        assertEquals(1, backend.signOutCalls)
+        assertEquals(AuthScreen.Login, vm.uiState.value.currentScreen)
+        compose.onNodeWithText("Cancelar recuperação?").assertDoesNotExist()
+    }
+
+    @Test fun profileChangePassword_backHasNoDialog() {
+        compose.setContent {
+            LeafCareTheme { NewPasswordScreen(viewModel(), {}, confirmCancelRecovery = false) }
+        }
+        compose.onNodeWithContentDescription("Voltar").performClick()
+        compose.onNodeWithText("Cancelar recuperação?").assertDoesNotExist()
     }
 }

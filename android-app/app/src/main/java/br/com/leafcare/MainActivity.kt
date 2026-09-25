@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import br.com.leafcare.auth.AuthNavigationEvent
+import br.com.leafcare.auth.AuthBootstrapState
 import br.com.leafcare.auth.AuthViewModel
 import br.com.leafcare.auth.displayNameOf
 import br.com.leafcare.ui.auth.AuthNavHost
@@ -49,11 +50,11 @@ class MainActivity : ComponentActivity() {
         handleRecoveryIntent(intent)
     }
 
-    /** Forwards password-recovery deep links; browser/WebView never involved. */
+    /** Forwards auth deep links; browser/WebView never involved. */
     private fun handleRecoveryIntent(intent: Intent?) {
         val url = intent?.data?.toString() ?: return
         if (url.startsWith("leafcare://")) {
-            authViewModel.handleAuthDeeplink(url)
+            authViewModel.noteDeeplink(url)
         }
     }
 }
@@ -61,18 +62,18 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
     val session by authViewModel.session.collectAsStateWithLifecycle()
-    val sessionChecked by authViewModel.sessionChecked.collectAsStateWithLifecycle()
-    val recoveryPending by authViewModel.recoveryPending.collectAsStateWithLifecycle()
+    val bootstrap by authViewModel.bootstrap.collectAsStateWithLifecycle()
 
     // On first launch, trigger session restoration
     androidx.compose.runtime.LaunchedEffect(Unit) {
         authViewModel.onSessionRestored()
     }
 
-    // Auth gate: Loading until the restore attempt resolves, so the Login
-    // screen never flashes when a persisted session exists. A completed
-    // recovery deep link takes precedence over the main app.
-    when (appGateDestination(session, sessionChecked, recoveryPending)) {
+    // Auth gate: Loading until the bootstrap resolves (storage restore or
+    // deeplink processing), so the Login screen never flashes and no App
+    // frame leaks during auth callbacks. Recovery pending always wins over
+    // an authenticated session.
+    when (appGateDestination(session, bootstrap)) {
         AppGate.Loading -> LoadingScreen()
         AppGate.Recovery -> AuthNavHost(authViewModel)
         AppGate.Main -> MainAppNavHost(authViewModel)
@@ -192,15 +193,13 @@ internal enum class AppGate {
  */
 internal fun appGateDestination(
     session: UserSession?,
-    sessionChecked: Boolean,
-    recoveryPending: Boolean = false
+    bootstrap: AuthBootstrapState
 ): AppGate =
-    if (!sessionChecked) {
-        AppGate.Loading
-    } else if (recoveryPending) {
-        AppGate.Recovery
-    } else if (session != null) {
-        AppGate.Main
-    } else {
-        AppGate.Auth
+    when (bootstrap) {
+        AuthBootstrapState.CHECKING,
+        AuthBootstrapState.PROCESSING_DEEPLINK -> AppGate.Loading
+        AuthBootstrapState.RECOVERY_PENDING ->
+            if (session != null) AppGate.Recovery else AppGate.Auth
+        AuthBootstrapState.READY ->
+            if (session != null) AppGate.Main else AppGate.Auth
     }

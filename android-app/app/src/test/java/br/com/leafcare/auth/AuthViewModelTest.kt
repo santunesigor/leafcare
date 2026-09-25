@@ -236,6 +236,31 @@ class AuthViewModelTest {
         job.cancel()
     }
 
+    @Test fun doubleSubmit_sendsExactlyOneRequest() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+
+        // Two synchronous taps before any dispatch: still a single POST.
+        viewModel.requestPasswordReset()
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+
+        assertEquals(1, backend.resetRequests.size)
+    }
+
+    @Test fun buttonUsableAgainAfterResponse() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+        assertFalse(viewModel.resetSending.value)
+
+        // A later attempt is allowed; the server stays the authority.
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+
+        assertEquals(2, backend.resetRequests.size)
+    }
+
     @Test fun requestPasswordReset_showsInfoAndStays() = runTest(dispatcher) {
         viewModel.setScreen(AuthScreen.ForgotPassword)
         viewModel.setEmail("a@b.com")
@@ -259,7 +284,7 @@ class AuthViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("pkce-code"), backend.exchangeCodeCalls)
-        assertTrue(viewModel.recoveryPending.value)
+        assertEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertEquals(AuthScreen.NewPassword, viewModel.uiState.value.currentScreen)
     }
 
@@ -272,7 +297,7 @@ class AuthViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("at" to "rt"), backend.importedTokens)
-        assertTrue(viewModel.recoveryPending.value)
+        assertEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertEquals(AuthScreen.NewPassword, viewModel.uiState.value.currentScreen)
     }
 
@@ -286,7 +311,7 @@ class AuthViewModelTest {
 
         assertTrue(backend.exchangeCodeCalls.isEmpty())
         assertTrue(backend.importedTokens.isEmpty())
-        assertFalse(viewModel.recoveryPending.value)
+        assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
     }
 
@@ -302,14 +327,14 @@ class AuthViewModelTest {
 
         // A logged-in session is never replaced by a link tap.
         assertTrue(backend.exchangeCodeCalls.isEmpty())
-        assertFalse(viewModel.recoveryPending.value)
+        assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
     }
 
     @Test fun cancelRecovery_signsOutAndReturnsToLogin() = runTest(dispatcher) {
         backend.session = testSession()
         viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=pkce-code")
         advanceUntilIdle()
-        assertTrue(viewModel.recoveryPending.value)
+        assertEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertEquals(AuthScreen.NewPassword, viewModel.uiState.value.currentScreen)
 
         val events = mutableListOf<AuthNavigationEvent>()
@@ -322,7 +347,7 @@ class AuthViewModelTest {
 
         // Recovery session revoked, marker cleared, back at Login (never App).
         assertEquals(1, backend.signOutCalls)
-        assertFalse(viewModel.recoveryPending.value)
+        assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertFalse(recoveryStore.isPending)
         assertNull(viewModel.session.value)
         assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
@@ -334,7 +359,7 @@ class AuthViewModelTest {
         backend.session = testSession()
         viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=first-code")
         advanceUntilIdle()
-        assertTrue(viewModel.recoveryPending.value)
+        assertEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
 
         // A second, expired link drops the stale session and fails loudly.
         backend.session = null
@@ -343,10 +368,10 @@ class AuthViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, backend.signOutCalls)
-        assertFalse(viewModel.recoveryPending.value)
+        assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertFalse(recoveryStore.isPending)
         assertNull(viewModel.session.value)
-        assertNotNull(viewModel.error.value)
+        assertEquals("Link inválido ou expirado.", viewModel.error.value)
     }
 
     @Test fun recoverySuccess_persistsPendingMarker() = runTest(dispatcher) {
@@ -355,7 +380,7 @@ class AuthViewModelTest {
         viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=pkce-code")
         advanceUntilIdle()
 
-        assertTrue(viewModel.recoveryPending.value)
+        assertEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertTrue(recoveryStore.isPending)
     }
 
@@ -370,7 +395,7 @@ class AuthViewModelTest {
         viewModel.updatePassword()
         advanceUntilIdle()
 
-        assertFalse(viewModel.recoveryPending.value)
+        assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertFalse(recoveryStore.isPending)
     }
 
@@ -387,7 +412,7 @@ class AuthViewModelTest {
 
         assertEquals(listOf("pkce-code"), backend.exchangeCodeCalls)
         // Confirm opens the app directly: no recovery mode, no NewPassword.
-        assertFalse(viewModel.recoveryPending.value)
+        assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertTrue(events.none { it is AuthNavigationEvent.NavigateToApp })
         job.cancel()
     }
@@ -401,7 +426,7 @@ class AuthViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("at" to "rt"), backend.importedTokens)
-        assertFalse(viewModel.recoveryPending.value)
+        assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
     }
 
     @Test fun confirmDeeplinkInvalid_doesNotAuthenticate() = runTest(dispatcher) {
@@ -414,12 +439,43 @@ class AuthViewModelTest {
 
         assertTrue(backend.exchangeCodeCalls.isEmpty())
         assertTrue(backend.importedTokens.isEmpty())
-        assertFalse(viewModel.recoveryPending.value)
+        assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
         assertNull(viewModel.session.value)
     }
 
-    @Test fun resendSignupEmail_recordsEmailAndInforms() = runTest(dispatcher) {
+    @Test fun noteDeeplink_setsProcessingSynchronously() {
+        backend.session = null
+
+        // No coroutine dispatch needed: the gate must see PROCESSING on the
+        // very first composition after the Activity intent arrives.
+        viewModel.noteDeeplink("leafcare://auth/reset-password?code=pkce-code")
+
+        assertEquals(AuthBootstrapState.PROCESSING_DEEPLINK, viewModel.bootstrap.value)
+    }
+
+    @Test fun bootstrapRestoredFromPersistedMarker() {
+        val restarted = AuthViewModel(
+            Application(),
+            AuthRepository(FakeBackend()),
+            FakeRecoveryPendingStore(initial = true)
+        )
+
+        // Process death with a pending recovery reopens straight into it.
+        assertEquals(AuthBootstrapState.RECOVERY_PENDING, restarted.bootstrap.value)
+    }
+
+    @Test fun cancelDialog_showAndDismiss() = runTest(dispatcher) {
+        assertFalse(viewModel.showCancelDialog.value)
+
+        viewModel.requestCancelRecovery()
+        assertTrue(viewModel.showCancelDialog.value)
+
+        viewModel.dismissCancelDialog()
+        assertFalse(viewModel.showCancelDialog.value)
+    }
+
+    @Test fun resendSignupEmail_showsOwnMessage() = runTest(dispatcher) {
         viewModel.setScreen(AuthScreen.VerifyEmail)
         viewModel.setEmail("a@b.com")
 
@@ -427,7 +483,7 @@ class AuthViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("a@b.com"), backend.resendSignupEmails)
-        assertNotNull(viewModel.infoMessage.value)
+        assertEquals("E-mail de confirmação reenviado.", viewModel.infoMessage.value)
     }
 
     @Test fun mismatchedNewPasswords_blockUpdateWithVisibleError() = runTest(dispatcher) {
@@ -458,7 +514,7 @@ class AuthViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, backend.updatePasswordCalls)
-        assertFalse(viewModel.recoveryPending.value)
+        assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertTrue(events.any { it is AuthNavigationEvent.NavigateToApp })
         job.cancel()
     }
