@@ -7,7 +7,7 @@ O LeafCare é um aplicativo Android nativo para **triagem visual offline-first**
 Características principais:
 
 - **Android nativo**: Kotlin + Jetpack Compose, minSdk 26 (Android 8.0), targetSdk 35
-- **Conta obrigatória**: Supabase Auth (gotrue-kt 2.1.0) — cadastro, login, logout, recuperação OTP in-app, sessão persistida
+- **Conta obrigatória**: Supabase Auth (gotrue-kt 2.1.0) — cadastro, login, logout, sessão persistida
 - **Offline-first**: classificação, histórico, câmera e galeria funcionam sem internet após autenticação anterior
 - **Classificação local**: TensorFlow Lite / LiteRT 1.4.0 com API `Interpreter`, float32, 2 threads
 - **Persistência local**: Room/SQLite v3 com `Flow` reativo (fonte única da UI); fotos em armazenamento privado (`filesDir/photos/`)
@@ -101,7 +101,7 @@ Flow emite lista atualizada → HistoryScreen
 
 - **Jetpack Compose** — UI declarativa, Material3, `Navigation Compose` para rotas (`history`, `camera`, `result/{id}`, `profile`)
 - **MainActivity** — `ComponentActivity`, `enableEdgeToEdge()`, auth gate por estado de sessão (`Loading`/`Main`/`Auth` via função pura `appGateDestination`); `MainAppNavHost` recebe o mesmo `AuthViewModel`
-- **Auth flow** — `AuthNavHost` renderiza por `uiState.currentScreen` (Login/SignUp/ForgotPassword/RecoveryCode/NewPassword/Profile); sem `NavHost` aninhado
+- **Auth flow** — `AuthNavHost` renderiza por `uiState.currentScreen` (Login/SignUp/ForgotPassword/Profile); sem `NavHost` aninhado; mensagens isoladas por tela; gate com bootstrap explícito (sem piscar Login)
 - **Profile** — Rota `profile` com `ProfileScreen` (nome, e-mail, sair); voltar = `popBackStack`; logout descarta o `NavHost` principal (Back nunca retorna à área autenticada)
 - **Navigation** — Transições em escala rápida centralizada (linguagem do modal de ajuda), sem crossfade genérico
 - **LeafCareViewModel** — `AndroidViewModel`; expõe `analyses: Flow<List<AnalysisEntity>>`, `ui: StateFlow<UiState>`, `results: Flow<String>` (navegação), `threshold: MutableStateFlow<Float>`; encapsula acesso ao `Repository` e `Catalog`; agenda sync após analyze/delete
@@ -172,7 +172,7 @@ Flow emite lista atualizada → HistoryScreen
 - **Conta obrigatória** — `AuthRepository` + `AuthViewModel`; `MainActivity` é o auth gate (`session != null → app`)
 - **Supabase 2.1.0** (`supabase-kt`/`gotrue-kt`, Ktor OkHttp); `SupabaseClientHolder` instala `Auth` (+`Postgrest`, `Storage`); config via `local.properties` → `BuildConfig` (`SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`, nunca commitada; build falha com placeholder)
 - **Cadastro sem confirmação web** — sessão direta; `display_name` vai em user metadata (trigger cria `profiles`); ramo defensivo sem sessão nunca usa browser
-- **Recuperação OTP in-app** — e-mail com código → `verifyEmailOtp(RECOVERY)` → nova senha via `modifyUser`; sem deep link, WebView ou localhost
+- **Recuperação de senha indisponível nesta versão** — tela informa indisponibilidade (sem envio, sem browser); reativar OTP in-app com domínio/SMTP corporativo
 - **Sessão persistida** — restore no boot; offline após login anterior; logout limpa e descarta o `NavHost` (Back nunca volta)
 - **Erros sanitizados** — `sanitizeError()` converte dumps HTTP em mensagens fixas; nunca expõe URL, headers, tokens ou chaves na UI ou em logs
 

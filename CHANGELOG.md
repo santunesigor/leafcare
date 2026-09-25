@@ -3,6 +3,12 @@
 Formato por fase do `docs/MVP_ROADMAP.md`. Sem versão/tag final ainda
 (atual: `versionCode 2`, `versionName 0.3.0`).
 
+## MVP atual — política de Auth temporária
+
+- Cadastro direto por e-mail + senha, sem confirmação (sem SMTP corporativo)
+- Recovery informa indisponibilidade, sem envio e sem browser
+- Telas/OTP de confirmação e recovery removidos do fluxo (reativar com domínio/SMTP)
+
 ## Fase 7 — QA e segurança (técnico)
 
 - Isolamento de dados entre contas (wipe na troca + worker aborta em troca/logout)
@@ -13,7 +19,7 @@ Formato por fase do `docs/MVP_ROADMAP.md`. Sem versão/tag final ainda
 
 ## Fases 4–6 — Sincronização
 
-- Conta Supabase Auth (cadastro, login, logout, recovery OTP in-app, sessão persistida)
+- Conta Supabase Auth (cadastro, login, logout, sessão persistida)
 - Room v3 como fonte da UI; sync engine + WorkManager (upsert idempotente, retry, tombstones)
 - Fotos privadas (`analysis-photos/{user_id}/{analysis_id}.jpg`, `photo_path`, `REMOTE_ONLY`)
 - Restore multi-device por UUID; isolamento entre contas

@@ -196,6 +196,12 @@ Recursos mínimos:
 - recuperação de senha;
 - perfil básico.
 
+> **Política temporária do MVP:** cadastro por e-mail + senha **sem**
+> confirmação de e-mail, e tela de recuperação informando indisponibilidade
+> (sem envio, sem browser). Motivo: o domínio corporativo para SMTP
+> transacional ainda não foi fornecido. Quando houver domínio/SMTP, reativar
+> confirmação e recovery por OTP in-app. Não é limitação do Android.
+
 Não adicionar login social sem solicitação explícita.
 
 ---

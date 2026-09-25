@@ -148,7 +148,7 @@ Escopo:
 - [x] cadastro;
 - [x] login;
 - [x] logout;
-- [x] recuperação de senha;
+- [x] recuperação de senha (tela informa indisponibilidade nesta versão do MVP);
 - [x] sessão persistida;
 - [x] perfil básico;
 - [x] tela de autenticação;
@@ -181,9 +181,14 @@ app abre offline após login anterior
 logout funciona
 ```
 
-**Status**: Concluído e validado manualmente no aparelho. Cadastro sem confirmação web
-(sessão direta), login, logout, recuperação OTP in-app, sessão persistida, perfil
+**Status**: Concluído e validado manualmente no aparelho. Cadastro direto por
+e-mail + senha (sem confirmação), login, logout, sessão persistida, perfil
 básico com acesso na home, launcher e UI alinhados ao V3.
+
+> **Política temporária do MVP:** sem confirmação de e-mail e sem recovery
+> funcional (tela informa indisponibilidade, sem envio, sem browser). Motivo:
+> domínio corporativo para SMTP ainda não fornecido. Reativar OTP in-app
+> quando houver domínio/SMTP. Não é limitação do Android.
 
 ---
 

@@ -211,53 +211,18 @@ Only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` go into the Android app (via 
 
 ---
 
-## 10. OTP Email Templates (in-app codes, no web links)
+## 10. Email Auth Policy (MVP temporário)
 
-The Android app verifies email confirmation and password recovery with
-6-digit codes typed **inside the app**. The hosted email templates must
-therefore send a **code**, not a link. This is a manual dashboard step;
-no SQL or code change does it.
-
-Dashboard → **Authentication → Email Templates**:
-
-### Confirm signup
-
-- Replace the default template body (which uses `{{ .ConfirmationURL }}`)
-  with plain LeafCare text containing the code placeholder, e.g.:
-
-```text
-Bem-vindo ao LeafCare!
-
-Use o código abaixo para confirmar sua conta:
-
-{{ .Token }}
-
-Se você não criou esta conta, ignore este e-mail.
-```
-
-- The template must NOT depend on `ConfirmationURL`.
-
-### Recovery / Reset password
-
-- Replace the default template body the same way, e.g.:
-
-```text
-LeafCare — recuperação de senha
-
-Use o código abaixo para definir uma nova senha:
-
-{{ .Token }}
-
-Se você não pediu isso, ignore este e-mail.
-```
-
-- The template must NOT depend on `ConfirmationURL`.
-
-### Enable confirmation for signups
+> **MVP atual: cadastro por e-mail e senha SEM confirmação de e-mail.**
+> Motivo: o domínio corporativo necessário para SMTP transacional ainda não
+> foi fornecido. Não é limitação do Android. Quando houver domínio/SMTP,
+> reativar confirmação e recovery por OTP in-app (o app já suportou esse
+> fluxo via `verifyEmailOtp` no supabase-kt 2.1.0).
 
 Dashboard → **Authentication → Providers → Email**:
-**Confirm email must be ON** so new signups require the OTP code.
+**Confirm email = OFF** para novos cadastros entrarem direto.
 
-No secrets go into templates or docs. Only the `{{ .Token }}`
-placeholder is needed; the app calls `verifyEmailOtp` with
-`OtpType.Email.SIGNUP` / `OtpType.Email.RECOVERY` on supabase-kt 2.1.0.
+Não alterar SMTP. Não configurar domínio. Não depender de template
+customizado. Não tentar mudar configuração hospedada por SQL.
+
+No secrets go into templates or docs.
