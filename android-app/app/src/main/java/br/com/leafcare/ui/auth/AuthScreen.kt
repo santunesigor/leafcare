@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
@@ -68,27 +69,56 @@ fun AuthNavHost(viewModel: AuthViewModel) {
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
         AuthScreen.NewPassword -> NewPasswordScreen(
             viewModel = viewModel,
-            onBack = { viewModel.setScreen(AuthScreen.Login) }
+            onBack = { viewModel.cancelRecovery() }
         )
         AuthScreen.Profile -> ProfileScreen(viewModel, onBack = { viewModel.setScreen(AuthScreen.Login) })
     }
 }
 
-/** White V3 scaffold: centered when content fits, scrollable with ime padding otherwise. */
+/**
+ * White V3 scaffold: an independent top-start back area (respecting the
+ * status bar) above centered, scrollable content with ime padding.
+ * The back control never lives inside the centered content column.
+ */
 @Composable
-private fun AuthScaffold(content: @Composable ColumnScope.() -> Unit) {
+private fun AuthScaffold(
+    onBack: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .verticalScroll(rememberScrollState())
-            .imePadding()
-            .padding(horizontal = 24.dp, vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .statusBarsPadding()
     ) {
-        Spacer(Modifier.weight(1f))
-        content()
-        Spacer(Modifier.weight(1f))
+        if (onBack != null) {
+            AuthTopBar(onBack)
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.weight(1f))
+            content()
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+/** Shared top-start back control: 48dp touch target, V3 styling. */
+@Composable
+private fun AuthTopBar(onBack: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = LeafColors.Text)
+        }
     }
 }
 
@@ -223,15 +253,6 @@ private fun AuthLinkedRow(prefix: String, link: String, onClick: () -> Unit) {
 }
 
 @Composable
-internal fun AuthBackButton(onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-        IconButton(onClick = onClick) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = LeafColors.Text)
-        }
-    }
-}
-
-@Composable
 fun LoginScreen(viewModel: AuthViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
@@ -280,8 +301,7 @@ fun SignUpScreen(viewModel: AuthViewModel) {
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
-    AuthScaffold {
-        AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
+    AuthScaffold(onBack = { viewModel.setScreen(AuthScreen.Login) }) {
         AuthHeader(
             logoSize = 48,
             title = "Crie sua conta",
@@ -335,8 +355,7 @@ fun VerifyEmailScreen(viewModel: AuthViewModel) {
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
-    AuthScaffold {
-        AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
+    AuthScaffold(onBack = { viewModel.setScreen(AuthScreen.Login) }) {
         AuthHeader(
             logoSize = 56,
             title = "Verifique seu e-mail",
@@ -360,8 +379,7 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
-    AuthScaffold {
-        AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
+    AuthScaffold(onBack = { viewModel.setScreen(AuthScreen.Login) }) {
         AuthHeader(
             logoSize = 56,
             title = "Recuperar senha",
@@ -399,8 +417,7 @@ fun NewPasswordScreen(viewModel: AuthViewModel, onBack: () -> Unit) {
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
-    AuthScaffold {
-        AuthBackButton(onBack)
+    AuthScaffold(onBack = onBack) {
         AuthHeader(
             logoSize = 56,
             title = "Nova senha",
@@ -446,10 +463,11 @@ fun ProfileScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
+            .statusBarsPadding()
             .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AuthBackButton(onBack)
+        AuthTopBar(onBack)
         Spacer(Modifier.weight(1f))
 
         FigmaIcon(R.drawable.v3_logo, "LeafCare", 64)
