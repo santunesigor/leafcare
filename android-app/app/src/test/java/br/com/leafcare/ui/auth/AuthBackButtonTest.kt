@@ -155,4 +155,20 @@ class AuthBackButtonTest {
             "Button must be enabled after cooldown"
         }
     }
+
+    @Test fun forgotPassword_whileSending_showsSendingDisabled() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val backend = FakeBackend()
+        // Hold the request open to observe the in-flight UI state.
+        backend.resetGate = { kotlinx.coroutines.awaitCancellation() }
+        val vm = AuthViewModel(app, AuthRepository(backend), FakeRecoveryPendingStore())
+        vm.setEmail("a@b.com")
+        compose.setContent { LeafCareTheme { ForgotPasswordScreen(vm) } }
+
+        compose.onNodeWithText("Enviar e-mail").performClick()
+        compose.waitForIdle()
+
+        assert(vm.resetSending.value)
+        compose.onNodeWithText("Enviando...").assertExists().assertIsDisplayed()
+    }
 }

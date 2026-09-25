@@ -37,6 +37,7 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     var failExchange: Boolean = false
     var failImport: Boolean = false
     var failReset: Exception? = null
+    var resetGate: (suspend () -> Unit)? = null
 
     override suspend fun loadFromStorage(): Boolean = session != null
 
@@ -63,6 +64,7 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     }
 
     override suspend fun requestPasswordRecovery(email: String, redirectUrl: String) {
+        resetGate?.invoke()
         failReset?.let { throw it }
         resetRequests += email to redirectUrl
     }

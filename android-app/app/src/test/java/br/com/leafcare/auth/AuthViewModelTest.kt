@@ -311,6 +311,42 @@ class AuthViewModelTest {
         assertTrue(error.contains("segundos"))
     }
 
+    @Test fun twentyRapidTaps_sendExactlyOneRequest() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+
+        repeat(20) { viewModel.requestPasswordReset() }
+        advanceUntilIdle()
+
+        assertEquals(1, backend.resetRequests.size)
+    }
+
+    @Test fun restart_preservesRetryAt() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+        val stored = recoveryStore.lastRecoveryRequestAt
+        assertTrue(stored > 0L)
+
+        // New ViewModel instance, same persisted store: same countdown.
+        val restarted = AuthViewModel(
+            Application(),
+            AuthRepository(FakeBackend()),
+            recoveryStore
+        )
+        assertEquals(
+            cooldownRemainingSeconds(stored),
+            restarted.refreshCooldown()
+        )
+        assertTrue(restarted.recoveryRequestSent.value)
+    }
+
+    @Test fun cooldownRemainingSeconds_roundsUp() {
+        val now = 1_700_000_060_000L
+        // 0.4s left still shows 1s; the button only enables at zero.
+        assertEquals(1, cooldownRemainingSeconds(now - 59_600L, now = now))
+        assertEquals(0, cooldownRemainingSeconds(now - 60_000L, now = now))
+        assertEquals(0, cooldownRemainingSeconds(now - 60_001L, now = now))
+    }
     @Test fun doubleSubmit_sendsExactlyOneRequest() = runTest(dispatcher) {
         viewModel.setEmail("a@b.com")
 

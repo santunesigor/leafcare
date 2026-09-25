@@ -129,4 +129,13 @@ class AuthErrorSanitizerTest {
             AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, raw)
         )
     }
+
+    @Test fun globalSendLimit_mapsToGlobalMessage() {
+        val raw = Exception("Status 429 over quota: sending temporarily limited globally")
+
+        assertEquals(
+            "O envio de e-mails está temporariamente limitado. Aguarde alguns minutos e tente novamente.",
+            AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, raw)
+        )
+    }
 }

@@ -439,10 +439,13 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 // When the server reports its own countdown, surface it so the
                 // UI can align the local cooldown with the same number.
                 val seconds = extractRateLimitSeconds(original)
-                return if (seconds != null) {
-                    "Você solicitou um link recentemente. Aguarde $seconds segundos para solicitar outro."
-                } else {
-                    "Você solicitou um e-mail recentemente. Aguarde um pouco antes de tentar novamente."
+                return when {
+                    seconds != null ->
+                        "Você solicitou um link recentemente. Aguarde $seconds segundos para solicitar outro."
+                    isGlobalSendLimit(raw) ->
+                        "O envio de e-mails está temporariamente limitado. Aguarde alguns minutos e tente novamente."
+                    else ->
+                        "Você solicitou um e-mail recentemente. Aguarde um pouco antes de tentar novamente."
                 }
             }
             if (isUnauthorizedAddress(raw)) {
@@ -512,6 +515,14 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 (raw.contains("mail") || raw.contains("email") ||
                     raw.contains("smtp") || raw.contains("send"))
         }
+
+        /**
+         * Global send-limit wording (as opposed to the per-address cooldown
+         * with its own countdown). Narrow on purpose.
+         */
+        private fun isGlobalSendLimit(raw: String): Boolean {
+            return raw.contains("temporarily limited") || raw.contains("global")
+        }
     }
 }
 
@@ -539,6 +550,7 @@ internal const val RECOVERY_COOLDOWN_SECONDS = 60
 /**
  * Remaining cooldown seconds from a stored request timestamp.
  * Pure function of [lastRequestAt] and [now] (epoch millis).
+ * Rounds UP so the button never enables before retryAt (0.4s left shows 1s).
  */
 internal fun cooldownRemainingSeconds(
     lastRequestAt: Long,
@@ -546,8 +558,9 @@ internal fun cooldownRemainingSeconds(
     now: Long = System.currentTimeMillis()
 ): Int {
     if (lastRequestAt <= 0L) return 0
-    val elapsed = ((now - lastRequestAt) / 1000).toInt()
-    return (cooldownSeconds - elapsed).coerceAtLeast(0)
+    val remainingMs = lastRequestAt + cooldownSeconds * 1000L - now
+    if (remainingMs <= 0L) return 0
+    return ((remainingMs + 999L) / 1000L).toInt()
 }
 
 /**

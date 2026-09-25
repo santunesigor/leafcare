@@ -211,7 +211,13 @@ private fun AuthButton(
         )
     ) {
         if (loading) {
-            CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.5.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.5.dp)
+                Text(label)
+            }
         } else {
             Text(label)
         }
@@ -424,6 +430,7 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
 
         AuthButton(
             label = when {
+                sending -> "Enviando..."
                 cooldownSeconds > 0 -> "Enviar novamente em ${cooldownSeconds}s"
                 recoveryRequestSent -> "Enviar novamente"
                 else -> "Enviar e-mail"
