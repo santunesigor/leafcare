@@ -214,15 +214,27 @@ Only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` go into the Android app (via 
 ## 10. Email Auth Policy (MVP temporário)
 
 > **MVP atual: cadastro por e-mail e senha SEM confirmação de e-mail.**
-> Motivo: o domínio corporativo necessário para SMTP transacional ainda não
-> foi fornecido. Não é limitação do Android. Quando houver domínio/SMTP,
-> reativar confirmação e recovery por OTP in-app (o app já suportou esse
-> fluxo via `verifyEmailOtp` no supabase-kt 2.1.0).
+> A recuperação de senha usa o link seguro padrão do Supabase com retorno
+> ao app (sem SMTP customizado, sem templates customizados, sem domínio
+> próprio). Motivo: o domínio corporativo para SMTP transacional ainda não
+> foi fornecido. Não é limitação do Android.
 
 Dashboard → **Authentication → Providers → Email**:
 **Confirm email = OFF** para novos cadastros entrarem direto.
 
-Não alterar SMTP. Não configurar domínio. Não depender de template
-customizado. Não tentar mudar configuração hospedada por SQL.
+### Redirect allowlist (obrigatório para o recovery)
+
+O e-mail de recuperação redireciona para o app. Registrar exatamente:
+
+Dashboard → **Authentication → URL Configuration → Redirect URLs**,
+adicionar:
+
+```text
+leafcare://auth/reset-password
+```
+
+Sem essa allowlist, o Supabase rejeita o `redirect_to` e o link não volta
+ao LeafCare. Não alterar SMTP. Não configurar domínio. Não tentar mudar
+configuração hospedada por SQL.
 
 No secrets go into templates or docs.

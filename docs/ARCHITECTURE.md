@@ -101,7 +101,7 @@ Flow emite lista atualizada → HistoryScreen
 
 - **Jetpack Compose** — UI declarativa, Material3, `Navigation Compose` para rotas (`history`, `camera`, `result/{id}`, `profile`)
 - **MainActivity** — `ComponentActivity`, `enableEdgeToEdge()`, auth gate por estado de sessão (`Loading`/`Main`/`Auth` via função pura `appGateDestination`); `MainAppNavHost` recebe o mesmo `AuthViewModel`
-- **Auth flow** — `AuthNavHost` renderiza por `uiState.currentScreen` (Login/SignUp/ForgotPassword/Profile); sem `NavHost` aninhado; mensagens isoladas por tela; gate com bootstrap explícito (sem piscar Login)
+- **Auth flow** — `AuthNavHost` renderiza por `uiState.currentScreen` (Login/SignUp/ForgotPassword/NewPassword/Profile); rota `change-password` no app autenticado reutiliza a tela de nova senha; mensagens isoladas por tela; gate com bootstrap explícito (sem piscar Login)
 - **Profile** — Rota `profile` com `ProfileScreen` (nome, e-mail, sair); voltar = `popBackStack`; logout descarta o `NavHost` principal (Back nunca retorna à área autenticada)
 - **Navigation** — Transições em escala rápida centralizada (linguagem do modal de ajuda), sem crossfade genérico
 - **LeafCareViewModel** — `AndroidViewModel`; expõe `analyses: Flow<List<AnalysisEntity>>`, `ui: StateFlow<UiState>`, `results: Flow<String>` (navegação), `threshold: MutableStateFlow<Float>`; encapsula acesso ao `Repository` e `Catalog`; agenda sync após analyze/delete
@@ -172,7 +172,7 @@ Flow emite lista atualizada → HistoryScreen
 - **Conta obrigatória** — `AuthRepository` + `AuthViewModel`; `MainActivity` é o auth gate (`session != null → app`)
 - **Supabase 2.1.0** (`supabase-kt`/`gotrue-kt`, Ktor OkHttp); `SupabaseClientHolder` instala `Auth` (+`Postgrest`, `Storage`); config via `local.properties` → `BuildConfig` (`SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`, nunca commitada; build falha com placeholder)
 - **Cadastro sem confirmação web** — sessão direta; `display_name` vai em user metadata (trigger cria `profiles`); ramo defensivo sem sessão nunca usa browser
-- **Recuperação de senha indisponível nesta versão** — tela informa indisponibilidade (sem envio, sem browser); reativar OTP in-app com domínio/SMTP corporativo
+- **Recuperação por link seguro** — e-mail do Supabase com `redirect_to leafcare://auth/reset-password` (allowlist no dashboard); app importa sessão (PKCE `exchangeCodeForSession` ou tokens via `importAuthToken`) e abre "Nova senha"; sem WebView, sem localhost, sem domínio próprio
 - **Sessão persistida** — restore no boot; offline após login anterior; logout limpa e descarta o `NavHost` (Back nunca volta)
 - **Erros sanitizados** — `sanitizeError()` converte dumps HTTP em mensagens fixas; nunca expõe URL, headers, tokens ou chaves na UI ou em logs
 

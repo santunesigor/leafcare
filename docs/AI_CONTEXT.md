@@ -197,10 +197,12 @@ Recursos mínimos:
 - perfil básico.
 
 > **Política temporária do MVP:** cadastro por e-mail + senha **sem**
-> confirmação de e-mail, e tela de recuperação informando indisponibilidade
-> (sem envio, sem browser). Motivo: o domínio corporativo para SMTP
-> transacional ainda não foi fornecido. Quando houver domínio/SMTP, reativar
-> confirmação e recovery por OTP in-app. Não é limitação do Android.
+> confirmação de e-mail; recuperação por link seguro com retorno ao app
+> (`leafcare://auth/reset-password` na allowlist) e troca de senha no Perfil
+> autenticado. Motivo: o domínio corporativo para SMTP transacional ainda
+> não foi fornecido (sem SMTP customizado, sem templates customizados).
+> Quando houver domínio/SMTP, reativar confirmação por OTP in-app.
+> Não é limitação do Android.
 
 Não adicionar login social sem solicitação explícita.
 

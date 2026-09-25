@@ -6,8 +6,8 @@ Formato por fase do `docs/MVP_ROADMAP.md`. Sem versão/tag final ainda
 ## MVP atual — política de Auth temporária
 
 - Cadastro direto por e-mail + senha, sem confirmação (sem SMTP corporativo)
-- Recovery informa indisponibilidade, sem envio e sem browser
-- Telas/OTP de confirmação e recovery removidos do fluxo (reativar com domínio/SMTP)
+- Recovery por link seguro com deep link de retorno + troca de senha autenticada no Perfil
+- Telas OTP de confirmação fora do fluxo (reativar com domínio/SMTP)
 
 ## Fase 7 — QA e segurança (técnico)
 

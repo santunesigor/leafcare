@@ -52,8 +52,8 @@ Para cada item: `[ ] passo` → **Resultado esperado** → *Evidência/observaç
 
 ## H. Recovery
 
-- [ ] "Esqueci minha senha" → tela informa indisponibilidade.
-- **Resultado esperado:** mensagem curta "Recuperação de senha indisponível nesta versão.", sem envio, sem browser, sem pedir código; voltar funciona.
+- [ ] "Esqueci minha senha" → informar e-mail → abrir o link do e-mail → app abre "Nova senha" → definir senha → entrar.
+- **Resultado esperado:** e-mail do Supabase com link; toque abre o LeafCare (deep link); nova senha entra no app. Sem WebView, sem localhost.
 - *Evidência/observação:* (nota anterior: sem SMTP corporativo o Supabase não envia código; fluxo OTP reativa com domínio/SMTP) O Supabase me enviou um link, nao um código, por isso nao consigo recuperar senha / Se voce consegur fazer todo o processo in-app com o e-mail apenas mandando código, faça também para a confirmação de e-mail, ai voltamos com essa feature. / Depois de voltar da tela o aviso continua em baixo, faça o seguinte, reviso como esses avisos funcioname e os faça ficar apenas na tela onde foram criados.
 
 ## I. Análise online

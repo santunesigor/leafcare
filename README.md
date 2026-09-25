@@ -10,7 +10,7 @@ O produtor captura ou seleciona uma foto e o modelo roda **direto no celular** (
 
 ## Visão geral
 
-- **Conta obrigatória** (Supabase Auth: cadastro, login, logout, perfil com nome e e-mail)
+- **Conta obrigatória** (Supabase Auth: cadastro, login, logout, perfil com nome e e-mail, recovery por link com retorno ao app)
 - **Offline-first** — classificação, histórico, câmera e galeria funcionam sem internet após autenticação anterior
 - **Inferência local** — MobileNetV3Small via LiteRT/TFLite, float32, sem rede
 - **Histórico local** — Room/SQLite (fotos em armazenamento privado)
@@ -46,7 +46,7 @@ Doenças foliares no fumo causam perdas significativas. O diagnóstico precoce d
 | **Top-3 + threshold** | 3 hipóteses; abaixo do limiar → "Inconclusivo" |
 | **Orientação fotográfica** | Tela de ajuda com 4 exemplos (correta, desfocada, distante, pouca luz) |
 | **Histórico Room** | Busca, filtros, exclusão com confirmação; fonte única da UI |
-| **Conta e perfil** | Cadastro/login/logout, perfil com nome e e-mail |
+| **Conta e perfil** | Cadastro/login/logout, perfil, troca de senha autenticada, recovery por link |
 | **Sync offline-first** | WorkManager (só com rede, backoff, sobrevive a restart); upsert idempotente por UUID; tombstones; retry |
 | **Fotos privadas** | Bucket `analysis-photos` privado em `{user_id}/{analysis_id}.jpg`; cache local |
 | **Restore** | Login em aparelho novo reconstrói o histórico (texto + fotos em background) |
