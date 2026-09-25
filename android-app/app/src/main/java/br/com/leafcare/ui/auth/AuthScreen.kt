@@ -36,7 +36,9 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -187,10 +189,16 @@ private fun AuthField(
 
 /** Primary green button in the LeafButton style, with loading/disabled state. */
 @Composable
-private fun AuthButton(label: String, loading: Boolean, onClick: () -> Unit) {
+private fun AuthButton(
+    label: String,
+    loading: Boolean,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    val active = enabled && !loading
     Button(
-        onClick = { if (!loading) onClick() },
-        enabled = !loading,
+        onClick = { if (active) onClick() },
+        enabled = active,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp),
@@ -380,9 +388,20 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val resetSending by viewModel.resetSending.collectAsStateWithLifecycle()
+    val cooldownSeconds by viewModel.cooldownSeconds.collectAsStateWithLifecycle()
+    val recoveryRequestSent by viewModel.recoveryRequestSent.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
     val sending = isLoading || resetSending
+
+    // Ticks the persisted resend cooldown while this screen is visible.
+    LaunchedEffect(Unit) {
+        viewModel.refreshCooldown()
+        while (true) {
+            delay(1000)
+            viewModel.refreshCooldown()
+        }
+    }
 
     AuthScaffold(onBack = { viewModel.setScreen(AuthScreen.Login) }) {
         AuthHeader(
@@ -403,7 +422,16 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
         AuthMessages(error, infoMessage)
         Spacer(Modifier.height(24.dp))
 
-        AuthButton(label = "Enviar e-mail", loading = sending, onClick = { viewModel.requestPasswordReset() })
+        AuthButton(
+            label = when {
+                cooldownSeconds > 0 -> "Enviar novamente em ${cooldownSeconds}s"
+                recoveryRequestSent -> "Enviar novamente"
+                else -> "Enviar e-mail"
+            },
+            loading = sending,
+            enabled = cooldownSeconds == 0,
+            onClick = { viewModel.requestPasswordReset() }
+        )
         Spacer(Modifier.height(12.dp))
 
         AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }

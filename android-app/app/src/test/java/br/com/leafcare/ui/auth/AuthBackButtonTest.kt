@@ -1,6 +1,7 @@
 package br.com.leafcare.ui.auth
 
 import android.app.Application
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -112,8 +113,9 @@ class AuthBackButtonTest {
         compose.waitForIdle()
 
         assertEquals(1, backend.signOutCalls)
-        assertEquals(AuthScreen.Login, vm.uiState.value.currentScreen)
+        assertEquals(AuthScreen.ForgotPassword, vm.uiState.value.currentScreen)
         compose.onNodeWithText("Cancelar recuperação?").assertDoesNotExist()
+        compose.onNodeWithText("Recuperação cancelada. Solicite um novo link.").assertExists()
     }
 
     @Test fun profileChangePassword_backHasNoDialog() {
@@ -122,5 +124,35 @@ class AuthBackButtonTest {
         }
         compose.onNodeWithContentDescription("Voltar").performClick()
         compose.onNodeWithText("Cancelar recuperação?").assertDoesNotExist()
+    }
+
+    @Test fun forgotPassword_cooldownDisablesButtonWithCountdown() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val store = FakeRecoveryPendingStore()
+        store.lastRecoveryRequestAt = System.currentTimeMillis() - 10_000L
+        val vm = AuthViewModel(app, AuthRepository(FakeBackend()), store)
+        compose.setContent { LeafCareTheme { ForgotPasswordScreen(vm) } }
+
+        val button = compose.onNodeWithText("Enviar novamente em", substring = true)
+        button.assertExists().assertIsDisplayed()
+        assert(button.fetchSemanticsNode().config.contains(SemanticsProperties.Disabled)) {
+            "Cooldown button must be disabled"
+        }
+    }
+
+    @Test fun forgotPassword_afterCooldown_showsResendEnabled() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val store = FakeRecoveryPendingStore()
+        store.lastRecoveryRequestAt = System.currentTimeMillis() - 61_000L
+        val vm = AuthViewModel(app, AuthRepository(FakeBackend()), store)
+        compose.setContent { LeafCareTheme { ForgotPasswordScreen(vm) } }
+
+        compose.onNodeWithText("Enviar novamente").assertExists().assertIsDisplayed()
+        assert(
+            !compose.onNodeWithText("Enviar novamente").fetchSemanticsNode().config
+                .contains(SemanticsProperties.Disabled)
+        ) {
+            "Button must be enabled after cooldown"
+        }
     }
 }

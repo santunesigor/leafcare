@@ -60,6 +60,13 @@ class AuthViewModel internal constructor(
     private val _resetSending = MutableStateFlow(false)
     val resetSending: StateFlow<Boolean> = _resetSending.asStateFlow()
 
+    // Resend cooldown UI state: remaining seconds and whether an email was
+    // ever requested (persists across restarts via the store).
+    private val _cooldownSeconds = MutableStateFlow(0)
+    val cooldownSeconds: StateFlow<Int> = _cooldownSeconds.asStateFlow()
+    private val _recoveryRequestSent = MutableStateFlow(false)
+    val recoveryRequestSent: StateFlow<Boolean> = _recoveryRequestSent.asStateFlow()
+
     // Cancel-recovery confirmation dialog state (recovery NewPassword only).
     private val _showCancelDialog = MutableStateFlow(false)
     val showCancelDialog: StateFlow<Boolean> = _showCancelDialog.asStateFlow()
@@ -69,6 +76,16 @@ class AuthViewModel internal constructor(
             authRepository.sessionChecked.first { it }
             if (_bootstrap.value == AuthBootstrapState.CHECKING) {
                 _bootstrap.value = AuthBootstrapState.READY
+            } else if (_bootstrap.value == AuthBootstrapState.RECOVERY_PENDING &&
+                authRepository.session.value == null
+            ) {
+                // Pending marker but no session to continue with: the recovery
+                // cannot proceed. Go straight to ForgotPassword with guidance.
+                clearRecoveryPending()
+                setScreen(AuthScreen.ForgotPassword)
+                authRepository.setInfo(
+                    "A recuperação anterior foi interrompida. Solicite um novo link."
+                )
             }
         }
     }
@@ -216,7 +233,7 @@ class AuthViewModel internal constructor(
     }
 
     /** Request password-recovery email with the secure app link. */
-    fun requestPasswordReset() {
+    fun requestPasswordReset(now: Long = System.currentTimeMillis()) {
         // Single-submit guard: one user action = at most one POST. Checked
         // synchronously so double taps never start duplicate jobs; the
         // finally block always releases, so the button works again after
@@ -226,11 +243,30 @@ class AuthViewModel internal constructor(
         _resetSending.value = true
         viewModelScope.launch {
             try {
-                authRepository.requestPasswordReset(email = state.email.trim())
+                val result = authRepository.requestPasswordReset(email = state.email.trim())
+                if (result.isSuccess) {
+                    recoveryStore.lastRecoveryRequestAt = now
+                } else {
+                    // Align the local cooldown with a server-provided countdown.
+                    // The cause chain keeps the raw backend message (with N).
+                    findRateLimitSeconds(result.exceptionOrNull())?.let { seconds ->
+                        recoveryStore.lastRecoveryRequestAt =
+                            cooldownBaseForRemaining(seconds, now = now)
+                    }
+                }
             } finally {
                 _resetSending.value = false
+                refreshCooldown()
             }
         }
+    }
+
+    /** Recomputes the visible resend cooldown. Returns remaining seconds. */
+    fun refreshCooldown(now: Long = System.currentTimeMillis()): Int {
+        val remaining = cooldownRemainingSeconds(recoveryStore.lastRecoveryRequestAt, now = now)
+        _cooldownSeconds.value = remaining
+        _recoveryRequestSent.value = recoveryStore.lastRecoveryRequestAt > 0L
+        return remaining
     }
 
     /** Shows the cancel-recovery confirmation (recovery NewPassword only). */
@@ -284,6 +320,17 @@ class AuthViewModel internal constructor(
             val result = authRepository.completeEmailLink(link)
             if (!result.isSuccess) {
                 _bootstrap.value = AuthBootstrapState.READY
+                // Used/expired links may carry a live cooldown: surface the
+                // remainder so the user knows when a new link is allowed.
+                val remaining = refreshCooldown()
+                if (remaining > 0) {
+                    val base = authRepository.error.value.orEmpty()
+                    if (base.isNotBlank()) {
+                        authRepository.setError(
+                            "$base\nVocê poderá solicitar outro em $remaining segundos."
+                        )
+                    }
+                }
                 return@launch
             }
             isolateCurrentUser()
@@ -304,8 +351,9 @@ class AuthViewModel internal constructor(
 
     /**
      * Cancels an in-progress password recovery: the recovery session is
-     * signed out, the pending marker is cleared and the user returns to
-     * Login. Never lands in the authenticated app.
+     * signed out, the pending marker is cleared and the user returns
+     * directly to ForgotPassword (never App, never Login first). The
+     * send cooldown is preserved so a new link can be requested when allowed.
      */
     fun cancelRecovery() {
         viewModelScope.launch {
@@ -313,7 +361,8 @@ class AuthViewModel internal constructor(
             clearRecoveryPending()
             clearForms()
             _showCancelDialog.value = false
-            setScreen(AuthScreen.Login)
+            setScreen(AuthScreen.ForgotPassword)
+            authRepository.setInfo("Recuperação cancelada. Solicite um novo link.")
         }
     }
 
@@ -506,6 +555,9 @@ sealed interface AuthNavigationEvent {    data class NavigateToAuth(val initialS
 internal interface RecoveryPendingStore {
     var isPending: Boolean
     fun clear()
+
+    /** Epoch millis of the last recovery email request, 0 when none. */
+    var lastRecoveryRequestAt: Long
 }
 
 internal class PrefsRecoveryPendingStore(context: Context) : RecoveryPendingStore {
@@ -523,8 +575,15 @@ internal class PrefsRecoveryPendingStore(context: Context) : RecoveryPendingStor
         prefs.edit().remove(KEY_RECOVERY_PENDING).apply()
     }
 
+    override var lastRecoveryRequestAt: Long
+        get() = prefs.getLong(KEY_LAST_RECOVERY_REQUEST_AT, 0L)
+        set(value) {
+            prefs.edit().putLong(KEY_LAST_RECOVERY_REQUEST_AT, value).apply()
+        }
+
     companion object {
         private const val KEY_RECOVERY_PENDING = "recovery_pending"
+        private const val KEY_LAST_RECOVERY_REQUEST_AT = "last_recovery_request_at"
     }
 }
 

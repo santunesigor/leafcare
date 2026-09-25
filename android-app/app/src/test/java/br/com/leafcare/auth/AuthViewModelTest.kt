@@ -29,6 +29,7 @@ import org.junit.Test
 /** In-memory [RecoveryPendingStore] for tests. */
 internal class FakeRecoveryPendingStore(initial: Boolean = false) : RecoveryPendingStore {
     override var isPending: Boolean = initial
+    override var lastRecoveryRequestAt: Long = 0L
     override fun clear() {
         isPending = false
     }
@@ -236,6 +237,80 @@ class AuthViewModelTest {
         job.cancel()
     }
 
+    @Test fun cooldownRemainingSeconds_countsDown() {
+        val now = 1_700_000_060_000L
+        assertEquals(60, cooldownRemainingSeconds(now, now = now))
+        assertEquals(18, cooldownRemainingSeconds(now - 42_000L, now = now))
+        assertEquals(0, cooldownRemainingSeconds(now - 61_000L, now = now))
+        assertEquals(0, cooldownRemainingSeconds(0L, now = now))
+    }
+
+    @Test fun cooldownBaseForRemaining_alignsWithServerCountdown() {
+        val now = 1_700_000_060_000L
+        val base = cooldownBaseForRemaining(18, now = now)
+
+        assertEquals(18, cooldownRemainingSeconds(base, now = now))
+    }
+
+    @Test fun extractRateLimitSeconds_readsServerCountdown() {
+        assertEquals(
+            25,
+            extractRateLimitSeconds("For security purposes, you can only request this after 25 seconds.")
+        )
+        assertNull(extractRateLimitSeconds("some other error"))
+    }
+
+    @Test fun findRateLimitSeconds_walksCauseChain() {
+        val root = IllegalStateException("after 21 seconds")
+        val wrapped = RuntimeException("sanitized", root)
+
+        assertEquals(21, findRateLimitSeconds(wrapped))
+        assertNull(findRateLimitSeconds(RuntimeException("sanitized")))
+        assertNull(findRateLimitSeconds(null))
+    }
+
+    @Test fun successfulRequest_storesCooldownTimestamp() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+
+        assertTrue(recoveryStore.lastRecoveryRequestAt > 0L)
+        assertTrue(viewModel.cooldownSeconds.value in 1..60)
+        assertTrue(viewModel.recoveryRequestSent.value)
+    }
+
+    @Test fun rateLimitResponse_syncsCooldownFromServer() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+        backend.failReset = IllegalStateException(
+            "POST /auth/v1/recover -> 429 {\"error_code\":\"over_email_send_rate_limit\"," +
+                "\"msg\":\"For security purposes, you can only request this after 25 seconds.\"}"
+        )
+
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+
+        // Local cooldown mirrors the server countdown (~25s window).
+        assertTrue(viewModel.cooldownSeconds.value in 1..25)
+        assertEquals(
+            "Você solicitou um link recentemente. Aguarde 25 segundos para solicitar outro.",
+            viewModel.error.value
+        )
+    }
+
+    @Test fun usedLink_appendsCooldownRemainder() = runTest(dispatcher) {
+        backend.session = null
+        recoveryStore.lastRecoveryRequestAt = System.currentTimeMillis() - 42_000L
+        backend.failExchange = true
+
+        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=used-code")
+        advanceUntilIdle()
+
+        val error = viewModel.error.value.orEmpty()
+        assertTrue(error.startsWith("Link inválido ou expirado."))
+        assertTrue(error.contains("segundos"))
+    }
+
     @Test fun doubleSubmit_sendsExactlyOneRequest() = runTest(dispatcher) {
         viewModel.setEmail("a@b.com")
 
@@ -330,12 +405,14 @@ class AuthViewModelTest {
         assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
     }
 
-    @Test fun cancelRecovery_signsOutAndReturnsToLogin() = runTest(dispatcher) {
+    @Test fun cancelRecovery_signsOutAndReturnsToForgotPassword() = runTest(dispatcher) {
         backend.session = testSession()
         viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=pkce-code")
         advanceUntilIdle()
         assertEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertEquals(AuthScreen.NewPassword, viewModel.uiState.value.currentScreen)
+        // Cooldown state survives the cancel (server stays the authority).
+        recoveryStore.lastRecoveryRequestAt = 1_700_000_000_000L
 
         val events = mutableListOf<AuthNavigationEvent>()
         val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -345,12 +422,18 @@ class AuthViewModelTest {
         viewModel.cancelRecovery()
         advanceUntilIdle()
 
-        // Recovery session revoked, marker cleared, back at Login (never App).
+        // Recovery session revoked, marker cleared, straight to ForgotPassword
+        // (never App, never Login first), cooldown preserved.
         assertEquals(1, backend.signOutCalls)
         assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertFalse(recoveryStore.isPending)
         assertNull(viewModel.session.value)
-        assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
+        assertEquals(AuthScreen.ForgotPassword, viewModel.uiState.value.currentScreen)
+        assertEquals(
+            "Recuperação cancelada. Solicite um novo link.",
+            viewModel.infoMessage.value
+        )
+        assertEquals(1_700_000_000_000L, recoveryStore.lastRecoveryRequestAt)
         assertTrue(events.none { it is AuthNavigationEvent.NavigateToApp })
         job.cancel()
     }

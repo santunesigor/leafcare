@@ -254,7 +254,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
 
             backend.requestPasswordRecovery(email.trim(), PASSWORD_RECOVERY_REDIRECT)
 
-            _infoMessage.value = "Enviamos um e-mail de recuperação. Toque no link para continuar."
+            _infoMessage.value = "E-mail de recuperação enviado. Verifique sua caixa de entrada."
             Result.success(Unit)
         } catch (e: Exception) {
             val message = sanitizeError(AuthOperation.PASSWORD_RESET, e)
@@ -367,6 +367,12 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         }
     }
 
+    /** Shows an informational message, replacing any error. */
+    fun setInfo(message: String) {
+        _error.value = null
+        _infoMessage.value = message
+    }
+
     /** Clears the current informational message */
     fun clearInfo() {
         _infoMessage.value = null
@@ -419,7 +425,8 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
          * supabase-kt error messages embed the full request/response dump.
          */
         internal fun sanitizeError(operation: AuthOperation, e: Exception): String {
-            val raw = e.message.orEmpty().lowercase().replace('_', ' ')
+            val original = e.message.orEmpty()
+            val raw = original.lowercase().replace('_', ' ')
             if (raw.contains("already registered")) return "Este e-mail já está cadastrado"
             if (raw.contains("weak password")) return "Senha muito fraca. Use pelo menos 6 caracteres."
             if (raw.contains("invalid email")) return "E-mail inválido"
@@ -428,8 +435,15 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             }
             if (raw.contains("email not confirmed")) return "Confirme seu e-mail antes de entrar"
             if (raw.contains("invalid or has expired")) return "Link inválido ou expirado."
-            if (isRateLimited(e, raw)) {
-                return "Você solicitou um e-mail recentemente. Aguarde um pouco antes de tentar novamente."
+            if (isRateLimited(e, original, raw)) {
+                // When the server reports its own countdown, surface it so the
+                // UI can align the local cooldown with the same number.
+                val seconds = extractRateLimitSeconds(original)
+                return if (seconds != null) {
+                    "Você solicitou um link recentemente. Aguarde $seconds segundos para solicitar outro."
+                } else {
+                    "Você solicitou um e-mail recentemente. Aguarde um pouco antes de tentar novamente."
+                }
             }
             if (isUnauthorizedAddress(raw)) {
                 return "Envio indisponível para esse endereço nesta configuração de teste."
@@ -468,13 +482,16 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         /**
          * Rate-limit detection. supabase-kt 2.1.0 exposes no statusCode or
          * errorCode accessor on RestException (only error/description), so
-         * the check combines those fields with the raw message. HTTP 429
-         * (or explicit rate-limit wording) maps to a friendly wait message.
+         * the check combines those fields with the raw message. The
+         * `over_email_send_rate_limit` code is matched before underscore
+         * normalization; HTTP 429 wording is the fallback.
          */
-        private fun isRateLimited(e: Exception, raw: String): Boolean {
+        private fun isRateLimited(e: Exception, original: String, raw: String): Boolean {
+            val lowerOriginal = original.lowercase()
+            if (lowerOriginal.contains("over_email_send_rate_limit")) return true
             if (e is RestException) {
                 val fields = "${e.error} ${e.description}".lowercase()
-                if (fields.contains("429") ||
+                if (fields.contains("over_email_send_rate_limit") ||
                     fields.contains("rate limit") ||
                     fields.contains("too many requests")
                 ) {
@@ -515,6 +532,55 @@ internal const val PASSWORD_RECOVERY_REDIRECT = "leafcare://auth/reset-password"
 
 /** Deep-link target for the Supabase signup-confirmation email. */
 internal const val SIGNUP_REDIRECT_URL = "leafcare://auth/confirm-email"
+
+/** Default resend cooldown, seconds. The server stays the authority. */
+internal const val RECOVERY_COOLDOWN_SECONDS = 60
+
+/**
+ * Remaining cooldown seconds from a stored request timestamp.
+ * Pure function of [lastRequestAt] and [now] (epoch millis).
+ */
+internal fun cooldownRemainingSeconds(
+    lastRequestAt: Long,
+    cooldownSeconds: Int = RECOVERY_COOLDOWN_SECONDS,
+    now: Long = System.currentTimeMillis()
+): Int {
+    if (lastRequestAt <= 0L) return 0
+    val elapsed = ((now - lastRequestAt) / 1000).toInt()
+    return (cooldownSeconds - elapsed).coerceAtLeast(0)
+}
+
+/**
+ * Base timestamp that yields [remainingSeconds] of cooldown at [now].
+ * Used to align the local cooldown with a server-provided countdown.
+ */
+internal fun cooldownBaseForRemaining(
+    remainingSeconds: Int,
+    cooldownSeconds: Int = RECOVERY_COOLDOWN_SECONDS,
+    now: Long = System.currentTimeMillis()
+): Long = now - (cooldownSeconds - remainingSeconds).coerceAtLeast(0) * 1000L
+
+/**
+ * Extracts a server-provided countdown ("...after N seconds") if present.
+ * Used only as complementary info; error-type detection never depends on it.
+ */
+internal fun extractRateLimitSeconds(raw: String): Int? {
+    val match = Regex("""after\s+(\d+)\s+seconds?""", RegexOption.IGNORE_CASE).find(raw)
+    return match?.groupValues?.getOrNull(1)?.toIntOrNull()
+}
+
+/**
+ * Finds a server-provided rate-limit countdown walking the cause chain
+ * (the sanitized UI message no longer carries the raw wording).
+ */
+internal fun findRateLimitSeconds(throwable: Throwable?): Int? {
+    var current = throwable
+    while (current != null) {
+        extractRateLimitSeconds(current.message.orEmpty())?.let { return it }
+        current = current.cause
+    }
+    return null
+}
 
 /** Custom exception for auth errors */
 class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
