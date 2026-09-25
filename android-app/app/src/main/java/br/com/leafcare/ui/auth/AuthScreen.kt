@@ -64,10 +64,7 @@ fun AuthNavHost(viewModel: AuthViewModel) {
     when (uiState.currentScreen) {
         AuthScreen.Login -> LoginScreen(viewModel)
         AuthScreen.SignUp -> SignUpScreen(viewModel)
-        AuthScreen.ConfirmEmail -> ConfirmEmailScreen(viewModel)
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
-        AuthScreen.RecoveryCode -> RecoveryCodeScreen(viewModel)
-        AuthScreen.NewPassword -> NewPasswordScreen(viewModel)
         AuthScreen.Profile -> ProfileScreen(viewModel, onBack = { viewModel.setScreen(AuthScreen.Login) })
     }
 }
@@ -328,144 +325,14 @@ fun SignUpScreen(viewModel: AuthViewModel) {
 }
 
 @Composable
-fun ConfirmEmailScreen(viewModel: AuthViewModel) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
-    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
-
-    AuthScaffold {
-        AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
-        AuthHeader(
-            logoSize = 56,
-            title = "Confirmar e-mail",
-            subtitle = "Enviamos um código de confirmação para ${uiState.email}."
-        )
-
-        AuthField(
-            value = uiState.signupCode,
-            onValueChange = { viewModel.setSignupCode(it) },
-            label = "Código",
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Done,
-            onImeDone = { viewModel.verifySignupCode() }
-        )
-
-        AuthMessages(error, infoMessage)
-        Spacer(Modifier.height(24.dp))
-
-        AuthButton(label = "Confirmar", loading = isLoading, onClick = { viewModel.verifySignupCode() })
-        Spacer(Modifier.height(12.dp))
-
-        AuthLinkButton("Reenviar código") { viewModel.resendSignupCode() }
-    }
-}
-
-@Composable
 fun ForgotPasswordScreen(viewModel: AuthViewModel) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
-    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
-
     AuthScaffold {
         AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
         AuthHeader(
             logoSize = 56,
             title = "Recuperar senha",
-            subtitle = "Informe seu e-mail e enviaremos um código de confirmação."
+            subtitle = "Recuperação de senha indisponível nesta versão."
         )
-
-        AuthField(
-            value = uiState.email,
-            onValueChange = { viewModel.setEmail(it) },
-            label = "E-mail",
-            keyboardType = KeyboardType.Email,
-            imeAction = ImeAction.Done,
-            onImeDone = { viewModel.requestPasswordReset() }
-        )
-
-        AuthMessages(error, infoMessage)
-        Spacer(Modifier.height(24.dp))
-
-        AuthButton(label = "Enviar código", loading = isLoading, onClick = { viewModel.requestPasswordReset() })
-        Spacer(Modifier.height(12.dp))
-
-        AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }
-    }
-}
-
-@Composable
-fun RecoveryCodeScreen(viewModel: AuthViewModel) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
-    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
-
-    AuthScaffold {
-        AuthBackButton { viewModel.setScreen(AuthScreen.ForgotPassword) }
-        AuthHeader(
-            logoSize = 56,
-            title = "Digite o código",
-            subtitle = "Enviamos um código de 6 dígitos para o seu e-mail."
-        )
-
-        AuthField(
-            value = uiState.recoveryCode,
-            onValueChange = { viewModel.setRecoveryCode(it) },
-            label = "Código",
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Done,
-            onImeDone = { viewModel.verifyRecoveryCode() }
-        )
-
-        AuthMessages(error, infoMessage)
-        Spacer(Modifier.height(24.dp))
-
-        AuthButton(label = "Confirmar código", loading = isLoading, onClick = { viewModel.verifyRecoveryCode() })
-        Spacer(Modifier.height(12.dp))
-
-        AuthLinkButton("Reenviar código") { viewModel.requestPasswordReset() }
-    }
-}
-
-@Composable
-fun NewPasswordScreen(viewModel: AuthViewModel) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
-    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
-
-    AuthScaffold {
-        AuthBackButton { viewModel.setScreen(AuthScreen.Login) }
-        AuthHeader(
-            logoSize = 56,
-            title = "Nova senha",
-            subtitle = "Defina uma nova senha para a sua conta."
-        )
-
-        AuthField(
-            value = uiState.newPassword,
-            onValueChange = { viewModel.setNewPassword(it) },
-            label = "Nova senha (mín. 6 caracteres)",
-            keyboardType = KeyboardType.Password,
-            password = true
-        )
-        Spacer(Modifier.height(16.dp))
-        AuthField(
-            value = uiState.confirmNewPassword,
-            onValueChange = { viewModel.setConfirmNewPassword(it) },
-            label = "Confirmar nova senha",
-            keyboardType = KeyboardType.Password,
-            password = true,
-            imeAction = ImeAction.Done,
-            onImeDone = { viewModel.updatePassword() }
-        )
-
-        AuthMessages(error, infoMessage)
-        Spacer(Modifier.height(24.dp))
-
-        AuthButton(label = "Salvar nova senha", loading = isLoading, onClick = { viewModel.updatePassword() })
         Spacer(Modifier.height(12.dp))
 
         AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }

@@ -27,14 +27,6 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     var lastSignUp: Triple<String, String, String>? = null
     var signInCalls = 0
     var signOutCalls = 0
-    val resetEmails = mutableListOf<String>()
-    var verifyRecoveryCalls = 0
-    var lastVerify: Pair<String, String>? = null
-    var updatePasswordCalls = 0
-    var lastNewPassword: String? = null
-    var verifySignupCalls = 0
-    var lastSignupVerify: Pair<String, String>? = null
-    val resendSignupEmails = mutableListOf<String>()
 
     override suspend fun loadFromStorage(): Boolean = session != null
 
@@ -53,35 +45,12 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
         signOutCalls++
         session = null
     }
-
-    override suspend fun resetPasswordForEmail(email: String) {
-        resetEmails += email
-    }
-
-    override suspend fun verifyRecoveryCode(email: String, code: String) {
-        verifyRecoveryCalls++
-        lastVerify = email to code
-    }
-
-    override suspend fun updatePassword(newPassword: String) {
-        updatePasswordCalls++
-        lastNewPassword = newPassword
-    }
-
-    override suspend fun verifySignupCode(email: String, code: String) {
-        verifySignupCalls++
-        lastSignupVerify = email to code
-    }
-
-    override suspend fun resendSignupCode(email: String) {
-        resendSignupEmails += email
-    }
 }
 
 /**
  * Repository behavior tests with a fake [AuthBackend]: no network, no Android framework.
  * Covers the auth runtime behavior: no `!!` on session, defensive signup branch,
- * display_name pass-through, in-app OTP recovery, logout and password reset.
+ * display_name pass-through and logout.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AuthRepositoryTest {
@@ -142,7 +111,7 @@ class AuthRepositoryTest {
         assertEquals(1, backend.signUpCalls)
     }
 
-    @Test fun signUp_withoutSessionGoesToConfirmationWithoutCrash() = runTest(testDispatcher) {
+    @Test fun signUp_withoutSessionIsDefensiveWithoutCrash() = runTest(testDispatcher) {
         val repository = repositoryWithSession(null)
 
         // Must not throw (previous code crashed on `session!!` here).
@@ -152,48 +121,7 @@ class AuthRepositoryTest {
         assertTrue(result.exceptionOrNull() is SignupWithoutSessionException)
         assertNull(repository.session.value)
         assertFalse(repository.hasPersistedSession())
-        assertEquals("Enviamos um código de confirmação para seu e-mail.", repository.infoMessage.value)
-    }
-
-    @Test fun verifySignupCode_blankCodeFailsWithoutBackendCall() = runTest(testDispatcher) {
-        val repository = repositoryWithSession(null)
-
-        val result = repository.verifySignupCode("a@b.com", "  ")
-
-        assertTrue(result.isFailure)
-        assertEquals(0, backend.verifySignupCalls)
-    }
-
-    @Test fun verifySignupCode_successAuthenticates() = runTest(testDispatcher) {
-        val session = testSession()
-        val repository = repositoryWithSession(session)
-
-        val result = repository.verifySignupCode("a@b.com", "123456")
-
-        assertTrue(result.isSuccess)
-        assertEquals(1, backend.verifySignupCalls)
-        assertEquals("a@b.com" to "123456", backend.lastSignupVerify)
-        assertEquals(session, repository.session.value)
-        assertTrue(repository.hasPersistedSession())
-    }
-
-    @Test fun resendSignupCode_recordsEmailAndInforms() = runTest(testDispatcher) {
-        val repository = repositoryWithSession(null)
-
-        val result = repository.resendSignupCode("a@b.com")
-
-        assertTrue(result.isSuccess)
-        assertEquals(listOf("a@b.com"), backend.resendSignupEmails)
-        assertNotNull(repository.infoMessage.value)
-    }
-
-    @Test fun resendSignupCode_blankEmailFails() = runTest(testDispatcher) {
-        val repository = repositoryWithSession(null)
-
-        val result = repository.resendSignupCode("  ")
-
-        assertTrue(result.isFailure)
-        assertTrue(backend.resendSignupEmails.isEmpty())
+        assertEquals("Cadastro concluído. Entre com seu e-mail e senha.", repository.infoMessage.value)
     }
 
     @Test fun restoreMarksSessionChecked() = runTest(testDispatcher) {
@@ -243,66 +171,5 @@ class AuthRepositoryTest {
         assertNull(repository.session.value)
         assertNull(repository.user.value)
         assertFalse(repository.hasPersistedSession())
-    }
-
-    @Test fun requestPasswordReset_recordsEmailAndInforms() = runTest(testDispatcher) {
-        val repository = repositoryWithSession(null)
-
-        val result = repository.requestPasswordReset("a@b.com")
-
-        assertTrue(result.isSuccess)
-        assertEquals(listOf("a@b.com"), backend.resetEmails)
-        assertNotNull(repository.infoMessage.value)
-    }
-
-    @Test fun requestPasswordReset_blankEmailFails() = runTest(testDispatcher) {
-        val repository = repositoryWithSession(null)
-
-        val result = repository.requestPasswordReset("  ")
-
-        assertTrue(result.isFailure)
-        assertTrue(backend.resetEmails.isEmpty())
-    }
-
-    @Test fun verifyRecoveryCode_blankCodeFailsWithoutBackendCall() = runTest(testDispatcher) {
-        val repository = repositoryWithSession(null)
-
-        val result = repository.verifyRecoveryCode("a@b.com", "  ")
-
-        assertTrue(result.isFailure)
-        assertEquals(0, backend.verifyRecoveryCalls)
-    }
-
-    @Test fun verifyRecoveryCode_successReflectsSession() = runTest(testDispatcher) {
-        val session = testSession()
-        val repository = repositoryWithSession(session)
-
-        val result = repository.verifyRecoveryCode("a@b.com", "123456")
-
-        assertTrue(result.isSuccess)
-        assertEquals(1, backend.verifyRecoveryCalls)
-        assertEquals("a@b.com" to "123456", backend.lastVerify)
-        assertEquals(session, repository.session.value)
-        assertEquals("Código confirmado. Defina sua nova senha.", repository.infoMessage.value)
-    }
-
-    @Test fun updatePassword_shortPasswordFailsWithoutBackendCall() = runTest(testDispatcher) {
-        val repository = repositoryWithSession(testSession())
-
-        val result = repository.updatePassword("123")
-
-        assertTrue(result.isFailure)
-        assertEquals(0, backend.updatePasswordCalls)
-    }
-
-    @Test fun updatePassword_successForwardsNewPassword() = runTest(testDispatcher) {
-        val repository = repositoryWithSession(testSession())
-
-        val result = repository.updatePassword("nova-senha-123")
-
-        assertTrue(result.isSuccess)
-        assertEquals(1, backend.updatePasswordCalls)
-        assertEquals("nova-senha-123", backend.lastNewPassword)
-        assertEquals("Senha alterada com sucesso.", repository.infoMessage.value)
     }
 }

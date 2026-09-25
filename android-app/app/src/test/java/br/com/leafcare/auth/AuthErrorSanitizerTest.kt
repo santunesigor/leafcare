@@ -60,9 +60,9 @@ class AuthErrorSanitizerTest {
     }
 
     @Test fun nullMessage_mapsToFallbackWithoutNullText() {
-        val message = AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, Exception())
+        val message = AuthRepository.sanitizeError(AuthOperation.SIGN_IN, Exception())
 
-        assertEquals("Não foi possível enviar a recuperação. Tente novamente.", message)
+        assertEquals("Não foi possível entrar. Tente novamente.", message)
         assertFalse(message.contains("null", ignoreCase = true))
     }
 
@@ -70,52 +70,6 @@ class AuthErrorSanitizerTest {
         assertEquals(
             "Não foi possível sair. Tente novamente.",
             AuthRepository.sanitizeError(AuthOperation.SIGN_OUT, Exception("boom"))
-        )
-    }
-
-    @Test fun expiredOtp_mapsToCodeMessage() {
-        val raw = Exception("Status 400 body={\"error\":\"Token has expired or is invalid\"}")
-
-        assertEquals(
-            "Código inválido ou expirado.",
-            AuthRepository.sanitizeError(AuthOperation.RECOVERY_VERIFY, raw)
-        )
-    }
-
-    @Test fun recoveryVerifyFallback_isFixedMessage() {
-        assertEquals(
-            "Não foi possível confirmar o código. Tente novamente.",
-            AuthRepository.sanitizeError(AuthOperation.RECOVERY_VERIFY, Exception("boom"))
-        )
-    }
-
-    @Test fun updatePasswordFallback_isFixedMessage() {
-        assertEquals(
-            "Não foi possível definir a nova senha. Tente novamente.",
-            AuthRepository.sanitizeError(AuthOperation.UPDATE_PASSWORD, Exception("boom"))
-        )
-    }
-
-    @Test fun signupVerifyFallback_isFixedMessage() {
-        assertEquals(
-            "Não foi possível confirmar o código. Tente novamente.",
-            AuthRepository.sanitizeError(AuthOperation.SIGNUP_VERIFY, Exception("boom"))
-        )
-    }
-
-    @Test fun signupResendFallback_isFixedMessage() {
-        assertEquals(
-            "Não foi possível reenviar o código. Tente novamente.",
-            AuthRepository.sanitizeError(AuthOperation.SIGNUP_RESEND, Exception("boom"))
-        )
-    }
-
-    @Test fun expiredSignupCode_mapsToCodeMessage() {
-        val raw = Exception("Status 400 body={\"error\":\"Token has expired or is invalid\"}")
-
-        assertEquals(
-            "Código inválido ou expirado.",
-            AuthRepository.sanitizeError(AuthOperation.SIGNUP_VERIFY, raw)
         )
     }
 }

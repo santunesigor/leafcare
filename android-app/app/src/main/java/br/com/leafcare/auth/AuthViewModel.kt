@@ -84,37 +84,13 @@ class AuthViewModel(
         _uiState.value = _uiState.value.copy(displayName = displayName)
     }
 
-    /** Updates recovery code field */
-    fun setRecoveryCode(recoveryCode: String) {
-        _uiState.value = _uiState.value.copy(recoveryCode = recoveryCode)
-    }
-
-    /** Updates signup confirmation code field */
-    fun setSignupCode(signupCode: String) {
-        _uiState.value = _uiState.value.copy(signupCode = signupCode)
-    }
-
-    /** Updates new password field */
-    fun setNewPassword(newPassword: String) {
-        _uiState.value = _uiState.value.copy(newPassword = newPassword)
-    }
-
-    /** Updates new password confirmation field */
-    fun setConfirmNewPassword(confirmNewPassword: String) {
-        _uiState.value = _uiState.value.copy(confirmNewPassword = confirmNewPassword)
-    }
-
     /** Clears all form fields */
     fun clearForms() {
         _uiState.value = _uiState.value.copy(
             email = "",
             password = "",
             confirmPassword = "",
-            displayName = "",
-            signupCode = "",
-            recoveryCode = "",
-            newPassword = "",
-            confirmNewPassword = ""
+            displayName = ""
         )
     }
 
@@ -131,11 +107,11 @@ class AuthViewModel(
                 password = state.password,
                 displayName = state.displayName.trim()
             )
-            // Signup without session means email confirmation is pending:
-            // stay in Auth on the ConfirmEmail screen (message preserved).
-            // No web/browser involved.
+            // Signup without session is defensive-only (confirmation is OFF
+            // in this MVP): stay in Auth on the Login screen so the user
+            // can sign in. The message is preserved for this screen.
             if (result.exceptionOrNull() is SignupWithoutSessionException) {
-                setScreen(AuthScreen.ConfirmEmail, clearMessages = false)
+                setScreen(AuthScreen.Login, clearMessages = false)
                 return@launch
             }
             val destination = navigationForAuthResult(result.isSuccess)
@@ -187,72 +163,6 @@ class AuthViewModel(
         }
     }
 
-    /** Request password-reset code (in-app OTP, no browser) */
-    fun requestPasswordReset() {
-        val state = _uiState.value
-        viewModelScope.launch {
-            val result = authRepository.requestPasswordReset(email = state.email.trim())
-            if (result.isSuccess) {
-                setScreen(AuthScreen.RecoveryCode, clearMessages = false)
-            }
-        }
-    }
-
-    /** Verify the recovery code received by email (in-app, no browser) */
-    fun verifyRecoveryCode() {
-        val state = _uiState.value
-        viewModelScope.launch {
-            val result = authRepository.verifyRecoveryCode(
-                email = state.email.trim(),
-                code = state.recoveryCode.trim()
-            )
-            if (result.isSuccess) {
-                setScreen(AuthScreen.NewPassword, clearMessages = false)
-            }
-        }
-    }
-
-    /** Verify the signup confirmation code (in-app OTP, no browser) */
-    fun verifySignupCode() {
-        val state = _uiState.value
-        viewModelScope.launch {
-            val result = authRepository.verifySignupCode(
-                email = state.email.trim(),
-                code = state.signupCode.trim()
-            )
-            if (result.isSuccess) {
-                clearForms()
-                _navigation.send(AuthNavigationEvent.NavigateToApp)
-            }
-            onAuthenticated(result)
-        }
-    }
-
-    /** Resend the signup confirmation code (in-app, no browser) */
-    fun resendSignupCode() {
-        val state = _uiState.value
-        viewModelScope.launch {
-            authRepository.resendSignupCode(email = state.email.trim())
-        }
-    }
-
-    /** Define a new password on the recovery session (in-app, no browser) */
-    fun updatePassword() {
-        val state = _uiState.value
-        if (state.newPassword != state.confirmNewPassword) {
-            authRepository.setError("As senhas não coincidem")
-            return
-        }
-        viewModelScope.launch {
-            val result = authRepository.updatePassword(password = state.newPassword)
-            if (result.isSuccess) {
-                clearForms()
-                _navigation.send(AuthNavigationEvent.NavigateToApp)
-            }
-            onAuthenticated(result)
-        }
-    }
-
     /** Clear error */
     fun clearError() {
         authRepository.clearError()
@@ -292,21 +202,14 @@ data class AuthUiState(
     val email: String = "",
     val password: String = "",
     val confirmPassword: String = "",
-    val displayName: String = "",
-    val signupCode: String = "",
-    val recoveryCode: String = "",
-    val newPassword: String = "",
-    val confirmNewPassword: String = ""
+    val displayName: String = ""
 )
 
 /** Auth screen types */
 enum class AuthScreen {
     Login,
     SignUp,
-    ConfirmEmail,
     ForgotPassword,
-    RecoveryCode,
-    NewPassword,
     Profile
 }
 

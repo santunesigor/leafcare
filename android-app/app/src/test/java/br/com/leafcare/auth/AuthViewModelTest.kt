@@ -107,7 +107,7 @@ class AuthViewModelTest {
         assertEquals(0, backend.signUpCalls)
     }
 
-    @Test fun signupWithoutSession_goesToConfirmEmailWithoutAppNavigation() = runTest(dispatcher) {
+    @Test fun signupWithoutSession_goesToLoginWithoutAppNavigation() = runTest(dispatcher) {
         backend.session = null
         viewModel.setDisplayName("Nome Teste")
         viewModel.setEmail("a@b.com")
@@ -124,11 +124,40 @@ class AuthViewModelTest {
 
         assertTrue(events.none { it is AuthNavigationEvent.NavigateToApp })
         assertEquals(
-            "Enviamos um código de confirmação para seu e-mail.",
+            "Cadastro concluído. Entre com seu e-mail e senha.",
             viewModel.infoMessage.value
         )
-        assertEquals(AuthScreen.ConfirmEmail, viewModel.uiState.value.currentScreen)
+        assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
         job.cancel()
+    }
+
+    @Test fun signupSuccess_navigatesToAppDirectly() = runTest(dispatcher) {
+        backend.session = testSession()
+        viewModel.setScreen(AuthScreen.SignUp)
+        viewModel.setDisplayName("Nome Teste")
+        viewModel.setEmail("a@b.com")
+        viewModel.setPassword("senha123")
+        viewModel.setConfirmPassword("senha123")
+
+        val events = mutableListOf<AuthNavigationEvent>()
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.navigation.collect { events.add(it) }
+        }
+
+        viewModel.signUp()
+        advanceUntilIdle()
+
+        assertTrue(events.any { it is AuthNavigationEvent.NavigateToApp })
+        job.cancel()
+    }
+
+    @Test fun authScreensContainNoOtpScreens() {
+        // Regression guard: signup confirmation and recovery OTP were removed
+        // from this MVP (no corporate SMTP domain yet).
+        assertEquals(
+            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.ForgotPassword, AuthScreen.Profile),
+            AuthScreen.values().toSet()
+        )
     }
 
     @Test fun loginErrorClearedWhenNavigatingToSignUp() = runTest(dispatcher) {
@@ -165,18 +194,20 @@ class AuthViewModelTest {
         assertNull(viewModel.error.value)
     }
 
-    @Test fun forgotPasswordErrorClearedWhenGoingBack() = runTest(dispatcher) {
-        viewModel.setScreen(AuthScreen.ForgotPassword)
-        viewModel.setEmail("")
+    @Test fun loginErrorClearedWhenNavigatingToForgotPassword() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+        viewModel.setPassword("errada")
+        backend.session = null
 
-        viewModel.requestPasswordReset()
+        viewModel.signIn()
         advanceUntilIdle()
         assertNotNull(viewModel.error.value)
 
-        viewModel.setScreen(AuthScreen.Login)
+        viewModel.setScreen(AuthScreen.ForgotPassword)
 
         assertNull(viewModel.error.value)
         assertNull(viewModel.infoMessage.value)
+        assertEquals(AuthScreen.ForgotPassword, viewModel.uiState.value.currentScreen)
     }
 
     @Test fun signOutResetsToInitialLoginScreen() = runTest(dispatcher) {
@@ -195,88 +226,6 @@ class AuthViewModelTest {
         assertEquals("", viewModel.uiState.value.email)
         assertTrue(events.any { it is AuthNavigationEvent.NavigateToAuth })
         job.cancel()
-    }
-
-    @Test fun verifySignupCodeSuccess_navigatesToApp() = runTest(dispatcher) {
-        backend.session = testSession()
-        viewModel.setEmail("a@b.com")
-        viewModel.setSignupCode("123456")
-
-        val events = mutableListOf<AuthNavigationEvent>()
-        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.navigation.collect { events.add(it) }
-        }
-
-        viewModel.verifySignupCode()
-        advanceUntilIdle()
-
-        assertEquals(1, backend.verifySignupCalls)
-        assertTrue(events.any { it is AuthNavigationEvent.NavigateToApp })
-        job.cancel()
-    }
-
-    @Test fun verifySignupCodeInvalid_showsErrorWithoutNavigation() = runTest(dispatcher) {
-        backend.session = null
-        viewModel.setScreen(AuthScreen.ConfirmEmail)
-        viewModel.setEmail("a@b.com")
-        viewModel.setSignupCode("")
-
-        val events = mutableListOf<AuthNavigationEvent>()
-        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.navigation.collect { events.add(it) }
-        }
-
-        viewModel.verifySignupCode()
-        advanceUntilIdle()
-
-        assertEquals(0, backend.verifySignupCalls)
-        assertNotNull(viewModel.error.value)
-        assertTrue(events.none { it is AuthNavigationEvent.NavigateToApp })
-        assertEquals(AuthScreen.ConfirmEmail, viewModel.uiState.value.currentScreen)
-        job.cancel()
-    }
-
-    @Test fun resendSignupCode_recordsEmailAndInforms() = runTest(dispatcher) {
-        viewModel.setScreen(AuthScreen.ConfirmEmail)
-        viewModel.setEmail("a@b.com")
-
-        viewModel.resendSignupCode()
-        advanceUntilIdle()
-
-        assertEquals(listOf("a@b.com"), backend.resendSignupEmails)
-        assertNotNull(viewModel.infoMessage.value)
-    }
-
-    @Test fun requestPasswordResetSuccess_goesToRecoveryCode() = runTest(dispatcher) {
-        viewModel.setEmail("a@b.com")
-
-        viewModel.requestPasswordReset()
-        advanceUntilIdle()
-
-        assertEquals(listOf("a@b.com"), backend.resetEmails)
-        assertEquals(AuthScreen.RecoveryCode, viewModel.uiState.value.currentScreen)
-    }
-
-    @Test fun verifyRecoveryCodeSuccess_goesToNewPassword() = runTest(dispatcher) {
-        viewModel.setEmail("a@b.com")
-        viewModel.setRecoveryCode("123456")
-
-        viewModel.verifyRecoveryCode()
-        advanceUntilIdle()
-
-        assertEquals(1, backend.verifyRecoveryCalls)
-        assertEquals(AuthScreen.NewPassword, viewModel.uiState.value.currentScreen)
-    }
-
-    @Test fun mismatchedNewPasswords_blockUpdateWithVisibleError() = runTest(dispatcher) {
-        viewModel.setNewPassword("nova-senha-123")
-        viewModel.setConfirmNewPassword("outra-senha")
-
-        viewModel.updatePassword()
-        advanceUntilIdle()
-
-        assertEquals(0, backend.updatePasswordCalls)
-        assertEquals("As senhas não coincidem", viewModel.error.value)
     }
 
     @Test fun displayNameOf_readsMetadata() {
@@ -303,22 +252,6 @@ class AuthViewModelTest {
                 )
             )
         )
-    }
-    @Test fun matchingNewPasswords_updateAndNavigateToApp() = runTest(dispatcher) {
-        viewModel.setNewPassword("nova-senha-123")
-        viewModel.setConfirmNewPassword("nova-senha-123")
-
-        val events = mutableListOf<AuthNavigationEvent>()
-        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.navigation.collect { events.add(it) }
-        }
-
-        viewModel.updatePassword()
-        advanceUntilIdle()
-
-        assertEquals(1, backend.updatePasswordCalls)
-        assertTrue(events.any { it is AuthNavigationEvent.NavigateToApp })
-        job.cancel()
     }
 
     private fun testSession() = UserSession(

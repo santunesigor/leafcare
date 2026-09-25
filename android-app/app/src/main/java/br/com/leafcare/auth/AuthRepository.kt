@@ -5,7 +5,6 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.asLiveData
 import br.com.leafcare.LeafCareApplication
 import io.github.jan.supabase.gotrue.Auth
-import io.github.jan.supabase.gotrue.OtpType
 import io.github.jan.supabase.gotrue.SignOutScope
 import io.github.jan.supabase.gotrue.providers.builtin.Email
 import io.github.jan.supabase.gotrue.SessionStatus
@@ -124,10 +123,9 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
      * The display name is sent as user metadata ("display_name") and used by the
      * database trigger to create the profile.
      *
-     * With email confirmation enabled on the hosted project, a successful
-     * sign-up returns no session: the account awaits the in-app OTP code.
-     * Returns [SignupWithoutSessionException] failure and sets [infoMessage];
-     * the user is NOT marked as authenticated. No browser involved.
+     * MVP policy: email confirmation is OFF (no corporate SMTP domain yet),
+     * so a successful sign-up returns a session and the user is authenticated
+     * directly. The null-session branch below is defensive only.
      */
     suspend fun signUp(
         email: String,
@@ -153,9 +151,9 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 _user.value = session.user
                 Result.success(session)
             } else {
-                // Email confirmation is enabled: the account waits for the
-                // in-app OTP code verified by verifySignupCode().
-                _infoMessage.value = "Enviamos um código de confirmação para seu e-mail."
+                // Defensive only: confirmation is OFF, so sign-up returns a
+                // session. If it ever doesn't, stay unauthenticated.
+                _infoMessage.value = "Cadastro concluído. Entre com seu e-mail e senha."
                 Result.failure(SignupWithoutSessionException())
             }
         } catch (e: Exception) {
@@ -225,35 +223,6 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         }
     }
 
-    /**
-     * Request a password-recovery code by email.
-     * In-app OTP flow (no browser, no deep link): the email carries a code
-     * that is verified with [verifyRecoveryCode] inside the app.
-     */
-    suspend fun requestPasswordReset(email: String): Result<Unit> {
-        _isLoading.value = true
-        _error.value = null
-        _infoMessage.value = null
-
-        return try {
-            if (email.isNullOrBlank()) {
-                _error.value = "E-mail inválido"
-                return Result.failure(IllegalArgumentException("E-mail inválido"))
-            }
-
-            backend.resetPasswordForEmail(email)
-
-            _infoMessage.value = "Se o e-mail estiver cadastrado, você receberá as instruções de recuperação."
-            Result.success(Unit)
-        } catch (e: Exception) {
-            val message = sanitizeError(AuthOperation.PASSWORD_RESET, e)
-            _error.value = message
-            Result.failure(AuthException(message, e))
-        } finally {
-            _isLoading.value = false
-        }
-    }
-
     /** Clears the current error state */
     fun clearError() {
         _error.value = null
@@ -268,141 +237,6 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
     /** Clears the current informational message */
     fun clearInfo() {
         _infoMessage.value = null
-    }
-
-    /**
-     * Verifies the signup confirmation code sent to the user's email.
-     * On success a session exists and is reflected locally; the user is
-     * authenticated. Fully in-app (OTP, no browser).
-     */
-    suspend fun verifySignupCode(email: String, code: String): Result<UserSession> {
-        _isLoading.value = true
-        _error.value = null
-        _infoMessage.value = null
-
-        return try {
-            if (email.isBlank()) {
-                _error.value = "E-mail inválido"
-                return Result.failure(IllegalArgumentException("E-mail inválido"))
-            }
-            if (code.isBlank()) {
-                _error.value = "Informe o código enviado ao seu e-mail."
-                return Result.failure(IllegalArgumentException("Código inválido"))
-            }
-
-            backend.verifySignupCode(email.trim(), code.trim())
-
-            val session = backend.loadSession()
-            if (session != null) {
-                _session.value = session
-                _user.value = session.user
-                Result.success(session)
-            } else {
-                val message = "Não foi possível concluir o cadastro. Tente novamente."
-                _error.value = message
-                Result.failure(AuthException(message))
-            }
-        } catch (e: Exception) {
-            val message = sanitizeError(AuthOperation.SIGNUP_VERIFY, e)
-            _error.value = message
-            Result.failure(AuthException(message, e))
-        } finally {
-            _isLoading.value = false
-        }
-    }
-
-    /**
-     * Resends the signup confirmation code. Fully in-app.
-     */
-    suspend fun resendSignupCode(email: String): Result<Unit> {
-        _isLoading.value = true
-        _error.value = null
-        _infoMessage.value = null
-
-        return try {
-            if (email.isBlank()) {
-                _error.value = "E-mail inválido"
-                return Result.failure(IllegalArgumentException("E-mail inválido"))
-            }
-
-            backend.resendSignupCode(email.trim())
-
-            _infoMessage.value = "Enviamos um novo código para seu e-mail."
-            Result.success(Unit)
-        } catch (e: Exception) {
-            val message = sanitizeError(AuthOperation.SIGNUP_RESEND, e)
-            _error.value = message
-            Result.failure(AuthException(message, e))
-        } finally {
-            _isLoading.value = false
-        }
-    }
-
-    /**
-     * Verifies the recovery code sent to the user's email.
-     * On success a recovery session exists and is reflected locally;
-     * the UI proceeds to new-password entry. Fully in-app.
-     */
-    suspend fun verifyRecoveryCode(email: String, code: String): Result<Unit> {
-        _isLoading.value = true
-        _error.value = null
-        _infoMessage.value = null
-
-        return try {
-            if (email.isBlank()) {
-                _error.value = "E-mail inválido"
-                return Result.failure(IllegalArgumentException("E-mail inválido"))
-            }
-            if (code.isBlank()) {
-                _error.value = "Informe o código enviado ao seu e-mail."
-                return Result.failure(IllegalArgumentException("Código inválido"))
-            }
-
-            backend.verifyRecoveryCode(email.trim(), code.trim())
-
-            val session = backend.loadSession()
-            if (session != null) {
-                _session.value = session
-                _user.value = session.user
-            }
-            _infoMessage.value = "Código confirmado. Defina sua nova senha."
-            Result.success(Unit)
-        } catch (e: Exception) {
-            val message = sanitizeError(AuthOperation.RECOVERY_VERIFY, e)
-            _error.value = message
-            Result.failure(AuthException(message, e))
-        } finally {
-            _isLoading.value = false
-        }
-    }
-
-    /**
-     * Sets a new password on the current (recovery) session.
-     * Fully in-app.
-     */
-    suspend fun updatePassword(password: String): Result<Unit> {
-        _isLoading.value = true
-        _error.value = null
-        _infoMessage.value = null
-
-        return try {
-            val validationError = validatePasswordInput(password)
-            if (validationError != null) {
-                _error.value = validationError
-                return Result.failure(IllegalArgumentException(validationError))
-            }
-
-            backend.updatePassword(password)
-
-            _infoMessage.value = "Senha alterada com sucesso."
-            Result.success(Unit)
-        } catch (e: Exception) {
-            val message = sanitizeError(AuthOperation.UPDATE_PASSWORD, e)
-            _error.value = message
-            Result.failure(AuthException(message, e))
-        } finally {
-            _isLoading.value = false
-        }
     }
 
     /** Checks if there's a persisted session (without requiring network) */
@@ -438,15 +272,6 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         }
 
         /**
-         * Pure new-password validation. Returns the user-facing error message,
-         * or null when the input is valid.
-         */
-        internal fun validatePasswordInput(password: String): String? {
-            if (password.length < 6) return "A senha deve ter pelo menos 6 caracteres"
-            return null
-        }
-
-        /**
          * Converts backend exceptions into short user-facing messages.
          * The raw error (URL, headers, tokens, HTTP body) is NEVER included:
          * supabase-kt error messages embed the full request/response dump.
@@ -460,7 +285,6 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 return "E-mail ou senha incorretos"
             }
             if (raw.contains("email not confirmed")) return "Confirme seu e-mail antes de entrar"
-            if (raw.contains("expired or is invalid")) return "Código inválido ou expirado."
             if (raw.contains("invalid api key")) {
                 return "Não foi possível conectar ao serviço. Verifique a configuração do aplicativo."
             }
@@ -469,11 +293,6 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 AuthOperation.SIGN_UP -> "Não foi possível criar sua conta. Tente novamente."
                 AuthOperation.SIGN_IN -> "Não foi possível entrar. Tente novamente."
                 AuthOperation.SIGN_OUT -> "Não foi possível sair. Tente novamente."
-                AuthOperation.PASSWORD_RESET -> "Não foi possível enviar a recuperação. Tente novamente."
-                AuthOperation.RECOVERY_VERIFY -> "Não foi possível confirmar o código. Tente novamente."
-                AuthOperation.UPDATE_PASSWORD -> "Não foi possível definir a nova senha. Tente novamente."
-                AuthOperation.SIGNUP_VERIFY -> "Não foi possível confirmar o código. Tente novamente."
-                AuthOperation.SIGNUP_RESEND -> "Não foi possível reenviar o código. Tente novamente."
             }
         }
 
@@ -492,23 +311,18 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
 internal enum class AuthOperation {
     SIGN_UP,
     SIGN_IN,
-    SIGN_OUT,
-    PASSWORD_RESET,
-    RECOVERY_VERIFY,
-    UPDATE_PASSWORD,
-    SIGNUP_VERIFY,
-    SIGNUP_RESEND
+    SIGN_OUT
 }
 
 /** Custom exception for auth errors */
 class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * Returned (not thrown) by [AuthRepository.signUp] when the account was created
- * but email confirmation is still pending (no session yet).
+ * Returned (not thrown) by [AuthRepository.signUp] when no session exists
+ * after sign-up. Defensive only (confirmation is OFF in this MVP).
  */
 class SignupWithoutSessionException(
-    message: String = "Enviamos um código de confirmação para seu e-mail."
+    message: String = "Cadastro concluído. Entre com seu e-mail e senha."
 ) : Exception(message)
 
 /**
@@ -524,11 +338,6 @@ internal interface AuthBackend {
     suspend fun signUpWithEmail(email: String, password: String, displayName: String)
     suspend fun signInWithEmail(email: String, password: String)
     suspend fun signOut()
-    suspend fun resetPasswordForEmail(email: String)
-    suspend fun verifyRecoveryCode(email: String, code: String)
-    suspend fun updatePassword(newPassword: String)
-    suspend fun verifySignupCode(email: String, code: String)
-    suspend fun resendSignupCode(email: String)
 }
 
 /** Production [AuthBackend] backed by the supabase-kt 2.1.0 public API. */
@@ -559,27 +368,5 @@ internal class SupabaseAuthBackend(private val auth: Auth) : AuthBackend {
 
     override suspend fun signOut() {
         auth.signOut(SignOutScope.GLOBAL)
-    }
-
-    override suspend fun resetPasswordForEmail(email: String) {
-        auth.resetPasswordForEmail(email)
-    }
-
-    override suspend fun verifyRecoveryCode(email: String, code: String) {
-        auth.verifyEmailOtp(OtpType.Email.RECOVERY, email, code)
-    }
-
-    override suspend fun updatePassword(newPassword: String) {
-        auth.modifyUser {
-            password = newPassword
-        }
-    }
-
-    override suspend fun verifySignupCode(email: String, code: String) {
-        auth.verifyEmailOtp(OtpType.Email.SIGNUP, email, code)
-    }
-
-    override suspend fun resendSignupCode(email: String) {
-        auth.resendEmail(OtpType.Email.SIGNUP, email)
     }
 }
