@@ -171,4 +171,19 @@ class AuthBackButtonTest {
         assert(vm.resetSending.value)
         compose.onNodeWithText("Enviando...").assertExists().assertIsDisplayed()
     }
+
+    @Test fun forgotPassword_composeAlone_sendsNoRequest() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val backend = FakeBackend()
+        val vm = AuthViewModel(app, AuthRepository(backend), FakeRecoveryPendingStore())
+        vm.setEmail("a@b.com")
+        compose.setContent { LeafCareTheme { ForgotPasswordScreen(vm) } }
+
+        // Composition, recomposition and the cooldown-ticker LaunchedEffect
+        // must never send: only an explicit user action may POST.
+        compose.waitForIdle()
+        compose.onNodeWithText("Enviar e-mail").assertExists().assertIsDisplayed()
+
+        assertEquals(0, backend.resetRequests.size)
+    }
 }

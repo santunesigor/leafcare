@@ -434,19 +434,27 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 return "E-mail ou senha incorretos"
             }
             if (raw.contains("email not confirmed")) return "Confirme seu e-mail antes de entrar"
-            if (raw.contains("invalid or has expired")) return "Link inválido ou expirado."
-            if (isRateLimited(e, original, raw)) {
-                // When the server reports its own countdown, surface it so the
-                // UI can align the local cooldown with the same number.
-                val seconds = extractRateLimitSeconds(original)
-                return when {
-                    seconds != null ->
-                        "Você solicitou um link recentemente. Aguarde $seconds segundos para solicitar outro."
-                    isGlobalSendLimit(raw) ->
+            if (raw.contains("invalid or has expired")) {
+                return if (operation == AuthOperation.RECOVERY_VERIFY) {
+                    "Este link já foi usado ou expirou. Solicite um novo e-mail de recuperação."
+                } else {
+                    "Link inválido ou expirado."
+                }
+            }
+            classifyRateLimit(e)?.let { limit ->
+                // The server countdown (when present) is surfaced so the UI
+                // can align the local cooldown with the same number.
+                return when (limit) {
+                    is RecoveryRateLimit.UserCooldown ->
+                        "Você solicitou um link recentemente. Tente novamente em ${limit.retryAfterSeconds} segundos."
+                    RecoveryRateLimit.GlobalEmailLimit ->
                         "O envio de e-mails está temporariamente limitado. Aguarde alguns minutos e tente novamente."
-                    else ->
+                    RecoveryRateLimit.IndividualLimit ->
                         "Você solicitou um e-mail recentemente. Aguarde um pouco antes de tentar novamente."
                 }
+            }
+            if (isRecoveryServerError(operation, raw)) {
+                return "Serviço de recuperação temporariamente indisponível. Tente novamente mais tarde."
             }
             if (isUnauthorizedAddress(raw)) {
                 return "Envio indisponível para esse endereço nesta configuração de teste."
@@ -456,7 +464,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             }
             if (isNetworkError(raw)) {
                 return if (operation == AuthOperation.PASSWORD_RESET) {
-                    "Não foi possível enviar o e-mail. Verifique sua conexão e tente novamente."
+                    "Sem conexão com a internet. Verifique sua conexão e tente novamente."
                 } else {
                     "Sem conexão. Verifique sua internet."
                 }
@@ -465,7 +473,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 AuthOperation.SIGN_UP -> "Não foi possível criar sua conta. Tente novamente."
                 AuthOperation.SIGN_IN -> "Não foi possível entrar. Tente novamente."
                 AuthOperation.SIGN_OUT -> "Não foi possível sair. Tente novamente."
-                AuthOperation.PASSWORD_RESET -> "Não foi possível enviar a recuperação. Tente novamente."
+                AuthOperation.PASSWORD_RESET -> "Não foi possível enviar o e-mail de recuperação. Tente novamente."
                 AuthOperation.RECOVERY_VERIFY -> "Não foi possível concluir a recuperação. Tente novamente."
                 AuthOperation.UPDATE_PASSWORD -> "Não foi possível definir a nova senha. Tente novamente."
                 AuthOperation.SIGNUP_CONFIRM -> "Não foi possível concluir o cadastro. Tente novamente."
@@ -483,27 +491,68 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         }
 
         /**
-         * Rate-limit detection. supabase-kt 2.1.0 exposes no statusCode or
-         * errorCode accessor on RestException (only error/description), so
-         * the check combines those fields with the raw message. The
-         * `over_email_send_rate_limit` code is matched before underscore
-         * normalization; HTTP 429 wording is the fallback.
+         * Rate-limit classification. The errorCode is the primary signal;
+         * message wording only refines the subtype and the countdown.
+         * supabase-kt 2.1.0 exposes no statusCode or errorCode accessor on
+         * RestException (only error/description), so the code is matched in
+         * those fields and the raw message. Bare 429 wording without the code
+         * is treated as an individual limit without countdown (graceful).
          */
-        private fun isRateLimited(e: Exception, original: String, raw: String): Boolean {
-            val lowerOriginal = original.lowercase()
-            if (lowerOriginal.contains("over_email_send_rate_limit")) return true
-            if (e is RestException) {
-                val fields = "${e.error} ${e.description}".lowercase()
-                if (fields.contains("over_email_send_rate_limit") ||
-                    fields.contains("rate limit") ||
-                    fields.contains("too many requests")
-                ) {
-                    return true
+        internal fun classifyRateLimit(throwable: Throwable?): RecoveryRateLimit? {
+            val messages = generateSequence(throwable) { it.cause }
+                .mapNotNull { it.message }
+                .toList()
+            if (messages.isEmpty()) return null
+            val joined = messages.joinToString("\n")
+            // Countdown first: most specific signal available.
+            if (joined.lowercase().contains("over_email_send_rate_limit")) {
+                extractRateLimitSeconds(joined)?.let {
+                    return RecoveryRateLimit.UserCooldown(it)
                 }
             }
-            return raw.contains("429") ||
-                raw.contains("rate limit") ||
-                raw.contains("too many requests")
+            val lower = joined.lowercase().replace('_', ' ')
+            // Global service limit (real observed wording), with or without code.
+            if (lower.contains("email rate limit exceeded") ||
+                lower.contains("temporarily limited") ||
+                lower.contains("global")
+            ) {
+                return RecoveryRateLimit.GlobalEmailLimit
+            }
+            if (joined.lowercase().contains("over_email_send_rate_limit")) {
+                return RecoveryRateLimit.IndividualLimit
+            }
+            // Bare 429 wording without the code: graceful individual fallback.
+            return if (lower.contains("429") ||
+                lower.contains("rate limit") ||
+                lower.contains("too many requests")
+            ) {
+                RecoveryRateLimit.IndividualLimit
+            } else {
+                null
+            }
+        }
+
+        /**
+         * Best-effort server-outage detection for the recovery flows only
+         * (HTTP 5xx / explicit service wording). Runs after the rate-limit
+         * classification so a 429 is never reported as an outage, and before
+         * the network check so "gateway timeout" is not reported as offline.
+         */
+        private fun isRecoveryServerError(operation: AuthOperation, raw: String): Boolean {
+            if (operation != AuthOperation.PASSWORD_RESET &&
+                operation != AuthOperation.RECOVERY_VERIFY
+            ) {
+                return false
+            }
+            return raw.contains("500") ||
+                raw.contains("502") ||
+                raw.contains("503") ||
+                raw.contains("504") ||
+                raw.contains("service unavailable") ||
+                raw.contains("temporarily unavailable") ||
+                raw.contains("server error") ||
+                raw.contains("bad gateway") ||
+                raw.contains("gateway timeout")
         }
 
         /**
@@ -514,14 +563,6 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             return raw.contains("not authorized") &&
                 (raw.contains("mail") || raw.contains("email") ||
                     raw.contains("smtp") || raw.contains("send"))
-        }
-
-        /**
-         * Global send-limit wording (as opposed to the per-address cooldown
-         * with its own countdown). Narrow on purpose.
-         */
-        private fun isGlobalSendLimit(raw: String): Boolean {
-            return raw.contains("temporarily limited") || raw.contains("global")
         }
     }
 }
@@ -536,6 +577,19 @@ internal enum class AuthOperation {
     UPDATE_PASSWORD,
     SIGNUP_CONFIRM,
     SIGNUP_RESEND
+}
+
+/**
+ * Recovery email rate-limit classification.
+ *
+ * - [UserCooldown]: per-address cooldown with a server-provided countdown.
+ * - [GlobalEmailLimit]: temporary SMTP service limit, no reliable countdown.
+ * - [IndividualLimit]: rate-limited without further detail.
+ */
+internal sealed interface RecoveryRateLimit {
+    data class UserCooldown(val retryAfterSeconds: Int) : RecoveryRateLimit
+    data object GlobalEmailLimit : RecoveryRateLimit
+    data object IndividualLimit : RecoveryRateLimit
 }
 
 /** Deep-link target for the Supabase password-recovery email. */

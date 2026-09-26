@@ -15,6 +15,9 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -293,9 +296,63 @@ class AuthViewModelTest {
         // Local cooldown mirrors the server countdown (~25s window).
         assertTrue(viewModel.cooldownSeconds.value in 1..25)
         assertEquals(
-            "Você solicitou um link recentemente. Aguarde 25 segundos para solicitar outro.",
+            "Você solicitou um link recentemente. Tente novamente em 25 segundos.",
             viewModel.error.value
         )
+    }
+
+    @Test fun globalLimit_startsNoCooldownAndKeepsEmail() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+        var attempts = 0
+        backend.resetGate = { attempts++ }
+        backend.failReset = IllegalStateException(
+            "POST /auth/v1/recover -> 429 {\"error_code\":\"over_email_send_rate_limit\"," +
+                "\"msg\":\"email rate limit exceeded\"}"
+        )
+
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+
+        // No invented countdown: the service limit carries no retry time.
+        assertEquals(1, attempts)
+        assertEquals(0L, recoveryStore.lastRecoveryRequestAt)
+        assertEquals(0, viewModel.cooldownSeconds.value)
+        assertFalse(viewModel.recoveryRequestSent.value)
+        assertFalse(viewModel.resetSending.value)
+        assertEquals(
+            "O envio de e-mails está temporariamente limitado. Aguarde alguns minutos e tente novamente.",
+            viewModel.error.value
+        )
+        // The typed address is preserved for a later manual retry.
+        assertEquals("a@b.com", viewModel.uiState.value.email)
+    }
+
+    @Test fun successAfterGlobalLimit_clearsErrorAndCoolsDown() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+        var attempts = 0
+        backend.resetGate = { attempts++ }
+        backend.failReset = IllegalStateException(
+            "POST /auth/v1/recover -> 429 {\"error_code\":\"over_email_send_rate_limit\"," +
+                "\"msg\":\"email rate limit exceeded\"}"
+        )
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+        assertNotNull(viewModel.error.value)
+
+        // The gate was released and no cooldown was stored, so a later manual
+        // retry reaches the backend exactly once and succeeds like new.
+        backend.failReset = null
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+
+        assertEquals(2, attempts)
+        assertEquals(1, backend.resetRequests.size)
+        assertNull(viewModel.error.value)
+        assertEquals(
+            "E-mail de recuperação enviado. Verifique sua caixa de entrada.",
+            viewModel.infoMessage.value
+        )
+        assertTrue(viewModel.cooldownSeconds.value in 1..60)
     }
 
     @Test fun usedLink_appendsCooldownRemainder() = runTest(dispatcher) {
@@ -307,8 +364,31 @@ class AuthViewModelTest {
         advanceUntilIdle()
 
         val error = viewModel.error.value.orEmpty()
-        assertTrue(error.startsWith("Link inválido ou expirado."))
+        assertTrue(error.startsWith("Este link já foi usado ou expirou."))
         assertTrue(error.contains("segundos"))
+    }
+
+    @Test fun concurrentTaps_singleFlight() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+        val executor = Executors.newFixedThreadPool(8)
+        try {
+            val start = CountDownLatch(1)
+            val done = CountDownLatch(20)
+            repeat(20) {
+                executor.submit {
+                    start.await()
+                    viewModel.requestPasswordReset()
+                    done.countDown()
+                }
+            }
+            start.countDown()
+            assertTrue(done.await(10, TimeUnit.SECONDS))
+            advanceUntilIdle()
+        } finally {
+            executor.shutdownNow()
+        }
+
+        assertEquals(1, backend.resetRequests.size)
     }
 
     @Test fun twentyRapidTaps_sendExactlyOneRequest() = runTest(dispatcher) {
@@ -358,18 +438,40 @@ class AuthViewModelTest {
         assertEquals(1, backend.resetRequests.size)
     }
 
-    @Test fun buttonUsableAgainAfterResponse() = runTest(dispatcher) {
+    @Test fun buttonBlockedDuringActiveCooldown() = runTest(dispatcher) {
+        recoveryStore.lastRecoveryRequestAt = System.currentTimeMillis() - 10_000L
+        viewModel.setEmail("a@b.com")
+
+        // Matches the disabled button, including entries that bypass it.
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+
+        assertEquals(0, backend.resetRequests.size)
+    }
+
+    @Test fun buttonUsableAfterCooldownExpiry() = runTest(dispatcher) {
+        recoveryStore.lastRecoveryRequestAt = System.currentTimeMillis() - 61_000L
+        viewModel.setEmail("a@b.com")
+
+        viewModel.requestPasswordReset()
+        advanceUntilIdle()
+
+        assertEquals(1, backend.resetRequests.size)
+    }
+
+    @Test fun immediateRetryAfterResponse_isRefusedByCooldown() = runTest(dispatcher) {
         viewModel.setEmail("a@b.com")
 
         viewModel.requestPasswordReset()
         advanceUntilIdle()
         assertFalse(viewModel.resetSending.value)
 
-        // A later attempt is allowed; the server stays the authority.
+        // Cooldown just started: an immediate retry is refused structurally,
+        // exactly like the disabled button. No second POST.
         viewModel.requestPasswordReset()
         advanceUntilIdle()
 
-        assertEquals(2, backend.resetRequests.size)
+        assertEquals(1, backend.resetRequests.size)
     }
 
     @Test fun requestPasswordReset_showsInfoAndStays() = runTest(dispatcher) {
@@ -490,7 +592,10 @@ class AuthViewModelTest {
         assertNotEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertFalse(recoveryStore.isPending)
         assertNull(viewModel.session.value)
-        assertEquals("Link inválido ou expirado.", viewModel.error.value)
+        assertEquals(
+            "Este link já foi usado ou expirou. Solicite um novo e-mail de recuperação.",
+            viewModel.error.value
+        )
     }
 
     @Test fun recoverySuccess_persistsPendingMarker() = runTest(dispatcher) {

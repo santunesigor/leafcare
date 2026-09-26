@@ -261,7 +261,7 @@ class AuthRepositoryTest {
 
         assertTrue(result.isFailure)
         assertEquals(
-            "Não foi possível enviar o e-mail. Verifique sua conexão e tente novamente.",
+            "Sem conexão com a internet. Verifique sua conexão e tente novamente.",
             repository.error.value
         )
     }
@@ -340,7 +340,10 @@ class AuthRepositoryTest {
         val result = repository.completeEmailLink(AuthDeeplink.RecoveryCode("expired"))
 
         assertTrue(result.isFailure)
-        assertEquals("Link inválido ou expirado.", repository.error.value)
+        assertEquals(
+            "Este link já foi usado ou expirou. Solicite um novo e-mail de recuperação.",
+            repository.error.value
+        )
         assertNull(repository.session.value)
         assertFalse(repository.hasPersistedSession())
     }

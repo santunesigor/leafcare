@@ -75,7 +75,7 @@ class AuthErrorSanitizerTest {
 
     @Test fun passwordResetFallback_isFixedMessage() {
         assertEquals(
-            "Não foi possível enviar a recuperação. Tente novamente.",
+            "Não foi possível enviar o e-mail de recuperação. Tente novamente.",
             AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, Exception("boom"))
         )
     }
@@ -98,8 +98,37 @@ class AuthErrorSanitizerTest {
         val raw = Exception("Status 400 body={\"msg\":\"Email link is invalid or has expired\"}")
 
         assertEquals(
-            "Link inválido ou expirado.",
+            "Este link já foi usado ou expirou. Solicite um novo e-mail de recuperação.",
             AuthRepository.sanitizeError(AuthOperation.RECOVERY_VERIFY, raw)
+        )
+    }
+
+    @Test fun passwordResetOffline_mapsToConnectionMessage() {
+        val raw = Exception("Unable to resolve host \"nhkqfanjfcivcbndivav.supabase.co\"")
+
+        assertEquals(
+            "Sem conexão com a internet. Verifique sua conexão e tente novamente.",
+            AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, raw)
+        )
+    }
+
+    @Test fun recoveryServerOutage_mapsToUnavailableMessage() {
+        val raw503 = Exception("POST /auth/v1/recover -> 503 Service Unavailable")
+
+        assertEquals(
+            "Serviço de recuperação temporariamente indisponível. Tente novamente mais tarde.",
+            AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, raw503)
+        )
+        assertEquals(
+            "Serviço de recuperação temporariamente indisponível. Tente novamente mais tarde.",
+            AuthRepository.sanitizeError(AuthOperation.RECOVERY_VERIFY, raw503)
+        )
+        // A 429 rate limit is never reported as a server outage.
+        assertEquals(
+            RecoveryRateLimit.GlobalEmailLimit,
+            AuthRepository.classifyRateLimit(
+                IllegalStateException("POST /auth/v1/recover -> 429 email rate limit exceeded")
+            )
         )
     }
 
@@ -131,11 +160,54 @@ class AuthErrorSanitizerTest {
     }
 
     @Test fun globalSendLimit_mapsToGlobalMessage() {
-        val raw = Exception("Status 429 over quota: sending temporarily limited globally")
+        // Real observed shape: same errorCode, service-side wording, no N.
+        val raw = Exception("POST /auth/v1/recover -> 429 " +
+            "{\"error_code\":\"over_email_send_rate_limit\"," +
+            "\"msg\":\"email rate limit exceeded\"}")
 
         assertEquals(
             "O envio de e-mails está temporariamente limitado. Aguarde alguns minutos e tente novamente.",
             AuthRepository.sanitizeError(AuthOperation.PASSWORD_RESET, raw)
         )
+    }
+
+    @Test fun classifyRateLimit_codeWithCountdown() {
+        assertEquals(
+            RecoveryRateLimit.UserCooldown(25),
+            AuthRepository.classifyRateLimit(
+                IllegalStateException("429 {\"error_code\":\"over_email_send_rate_limit\"," +
+                    "\"msg\":\"after 25 seconds\"}")
+            )
+        )
+    }
+
+    @Test fun classifyRateLimit_codeGlobal() {
+        assertEquals(
+            RecoveryRateLimit.GlobalEmailLimit,
+            AuthRepository.classifyRateLimit(
+                IllegalStateException("over_email_send_rate_limit: email rate limit exceeded")
+            )
+        )
+    }
+
+    @Test fun classifyRateLimit_codeAlone() {
+        assertEquals(
+            RecoveryRateLimit.IndividualLimit,
+            AuthRepository.classifyRateLimit(
+                IllegalStateException("something over_email_send_rate_limit happened")
+            )
+        )
+    }
+
+    @Test fun classifyRateLimit_bare429WithoutCode() {
+        assertEquals(
+            RecoveryRateLimit.IndividualLimit,
+            AuthRepository.classifyRateLimit(IllegalStateException("429 Too Many Requests"))
+        )
+    }
+
+    @Test fun classifyRateLimit_otherAndNull() {
+        assertNull(AuthRepository.classifyRateLimit(IllegalStateException("boom")))
+        assertNull(AuthRepository.classifyRateLimit(null))
     }
 }

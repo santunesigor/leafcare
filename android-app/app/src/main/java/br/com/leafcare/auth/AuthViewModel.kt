@@ -8,6 +8,7 @@ import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import br.com.leafcare.LeafCareApplication
 import io.github.jan.supabase.gotrue.user.UserSession
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,8 +56,9 @@ class AuthViewModel internal constructor(
     )
     internal val bootstrap: StateFlow<AuthBootstrapState> = _bootstrap.asStateFlow()
 
-    // Password-reset submit guard: one user action = at most one POST.
-    // Synchronous check + try/finally, so double taps never duplicate jobs.
+    // Password-reset submit gate: CAS-atomic single-flight plus a UI mirror.
+    // The atomic gate (not the boolean flow) is the correctness mechanism.
+    private val resetGate = AtomicBoolean(false)
     private val _resetSending = MutableStateFlow(false)
     val resetSending: StateFlow<Boolean> = _resetSending.asStateFlow()
 
@@ -234,30 +236,46 @@ class AuthViewModel internal constructor(
 
     /** Request password-recovery email with the secure app link. */
     fun requestPasswordReset(now: Long = System.currentTimeMillis()) {
-        // Single-submit guard: one user action = at most one POST. Checked
-        // synchronously so double taps never start duplicate jobs; the
-        // finally block always releases, so the button works again after
-        // the response (including 429).
-        if (_resetSending.value) return
+        // Atomic single-flight: exactly one in-flight submission even under
+        // concurrent taps from any thread. CAS (not check-then-act) closes
+        // the race where two callers both observe "free" before either marks.
+        if (!resetGate.compareAndSet(false, true)) return
+        // A live local cooldown also refuses: matches the disabled button,
+        // including entry points that bypass it (e.g. keyboard Done) and
+        // taps landing before recomposition disables the button.
+        // The gate is released here: nothing was started.
+        if (cooldownRemainingSeconds(recoveryStore.lastRecoveryRequestAt, now = now) > 0) {
+            resetGate.set(false)
+            return
+        }
         val state = _uiState.value
         _resetSending.value = true
-        viewModelScope.launch {
-            try {
-                val result = authRepository.requestPasswordReset(email = state.email.trim())
-                if (result.isSuccess) {
-                    recoveryStore.lastRecoveryRequestAt = now
-                } else {
-                    // Align the local cooldown with a server-provided countdown.
-                    // The cause chain keeps the raw backend message (with N).
-                    findRateLimitSeconds(result.exceptionOrNull())?.let { seconds ->
-                        recoveryStore.lastRecoveryRequestAt =
-                            cooldownBaseForRemaining(seconds, now = now)
+        try {
+            viewModelScope.launch {
+                try {
+                    val result = authRepository.requestPasswordReset(email = state.email.trim())
+                    if (result.isSuccess) {
+                        recoveryStore.lastRecoveryRequestAt = now
+                    } else if (AuthRepository.classifyRateLimit(result.exceptionOrNull()) is RecoveryRateLimit.UserCooldown) {
+                        // Align the local cooldown with a server-provided countdown.
+                        // The cause chain keeps the raw backend message (with N).
+                        findRateLimitSeconds(result.exceptionOrNull())?.let { seconds ->
+                            recoveryStore.lastRecoveryRequestAt =
+                                cooldownBaseForRemaining(seconds, now = now)
+                        }
                     }
+                } finally {
+                    _resetSending.value = false
+                    refreshCooldown()
+                    resetGate.set(false)
                 }
-            } finally {
-                _resetSending.value = false
-                refreshCooldown()
             }
+        } catch (e: Exception) {
+            // viewModelScope.launch itself cannot realistically throw, but a
+            // stuck gate would wedge the button forever: always release.
+            _resetSending.value = false
+            refreshCooldown()
+            resetGate.set(false)
         }
     }
 
