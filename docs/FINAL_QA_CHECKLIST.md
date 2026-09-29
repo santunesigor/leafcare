@@ -23,7 +23,7 @@ Para cada item: `[ ] passo` → **Resultado esperado** → *Evidência/observaç
 ## C. Cadastro
 
 - [ ] Nome + e-mail novo + senha ≥ 6 + confirmação igual → Criar conta → tela "Verifique seu e-mail".
-- **Resultado esperado:** não entra direto; abrir o link do e-mail abre o LeafCare e entra no app.
+- **Resultado esperado:** não entra direto; abrir o link de confirmação abre o LeafCare e entra no app (`leafcare://auth/confirm-email`).
 - *Evidência/observação:* Quando eu tento entrar com um email que nao esta cadastrado e clico em criar conta logo após, ele continua com o aviso de que o email ou a senha estãoincorretos, deveria limpar
 
 ## D. Perfil/nome
@@ -53,8 +53,8 @@ Para cada item: `[ ] passo` → **Resultado esperado** → *Evidência/observaç
 ## H. Recovery
 
 - [ ] "Esqueci minha senha" → informar e-mail → abrir o link do e-mail → app abre "Nova senha" → definir senha → entrar.
-- **Resultado esperado:** e-mail do Supabase com link; toque abre o LeafCare (deep link); nova senha entra no app. Sem WebView, sem localhost.
-- *Evidência/observação:* (nota anterior: sem SMTP corporativo o Supabase não envia código; fluxo OTP reativa com domínio/SMTP) O Supabase me enviou um link, nao um código, por isso nao consigo recuperar senha / Se voce consegur fazer todo o processo in-app com o e-mail apenas mandando código, faça também para a confirmação de e-mail, ai voltamos com essa feature. / Depois de voltar da tela o aviso continua em baixo, faça o seguinte, reviso como esses avisos funcioname e os faça ficar apenas na tela onde foram criados.
+- **Resultado esperado:** e-mail do Supabase com link; toque abre o LeafCare (`leafcare://auth/reset-password`); definir a nova senha conclui o recovery. Sem WebView, sem localhost.
+- *Evidência/observação:* Nota histórica sobre OTP superada: recovery e confirmação usam links/deep links no fluxo atual. O Supabase me enviou um link, nao um código, por isso nao consigo recuperar senha / Se voce consegur fazer todo o processo in-app com o e-mail apenas mandando código, faça também para a confirmação de e-mail, ai voltamos com essa feature. / Depois de voltar da tela o aviso continua em baixo, faça o seguinte, reviso como esses avisos funcioname e os faça ficar apenas na tela onde foram criados.
 
 ## I. Análise online
 
