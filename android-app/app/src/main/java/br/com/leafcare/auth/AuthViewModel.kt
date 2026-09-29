@@ -62,6 +62,10 @@ class AuthViewModel internal constructor(
     private val _resetSending = MutableStateFlow(false)
     val resetSending: StateFlow<Boolean> = _resetSending.asStateFlow()
 
+    private val resendGate = AtomicBoolean(false)
+    private val _resendSending = MutableStateFlow(false)
+    val resendSending: StateFlow<Boolean> = _resendSending.asStateFlow()
+
     // Resend cooldown UI state: remaining seconds and whether an email was
     // ever requested (persists across restarts via the store).
     private val _cooldownSeconds = MutableStateFlow(0)
@@ -403,9 +407,16 @@ class AuthViewModel internal constructor(
 
     /** Resend the signup confirmation email (in-app, no browser). */
     fun resendSignupEmail() {
+        if (!resendGate.compareAndSet(false, true)) return
         val state = _uiState.value
+        _resendSending.value = true
         viewModelScope.launch {
-            authRepository.resendSignupEmail(email = state.email.trim())
+            try {
+                authRepository.resendSignupEmail(email = state.email.trim())
+            } finally {
+                _resendSending.value = false
+                resendGate.set(false)
+            }
         }
     }
 

@@ -369,6 +369,7 @@ fun SignUpScreen(viewModel: AuthViewModel) {
 @Composable
 fun VerifyEmailScreen(viewModel: AuthViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val resendSending by viewModel.resendSending.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
@@ -382,7 +383,17 @@ fun VerifyEmailScreen(viewModel: AuthViewModel) {
         AuthMessages(error, infoMessage)
         Spacer(Modifier.height(24.dp))
 
-        AuthLinkButton("Reenviar e-mail") { viewModel.resendSignupEmail() }
+        TextButton(
+            onClick = { viewModel.resendSignupEmail() },
+            enabled = !resendSending,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (resendSending) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else {
+                Text("Reenviar e-mail", color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
+            }
+        }
         Spacer(Modifier.height(12.dp))
 
         AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }

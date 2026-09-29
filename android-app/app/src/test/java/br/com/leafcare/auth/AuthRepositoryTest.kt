@@ -38,6 +38,8 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     var failImport: Boolean = false
     var failReset: Exception? = null
     var resetGate: (suspend () -> Unit)? = null
+    var failResend: Exception? = null
+    var resendGate: (suspend () -> Unit)? = null
 
     override suspend fun loadFromStorage(): Boolean = session != null
 
@@ -81,6 +83,8 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
 
     override suspend fun resendSignupEmail(email: String) {
         resendSignupEmails += email
+        resendGate?.invoke()
+        failResend?.let { throw it }
     }
 
     override suspend fun updatePassword(newPassword: String) {

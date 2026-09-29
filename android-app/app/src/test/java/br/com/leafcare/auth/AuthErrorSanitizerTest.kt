@@ -41,6 +41,20 @@ class AuthErrorSanitizerTest {
         assertFalse(message.contains("http"))
     }
 
+    @Test fun signupResendRateLimit_mapsToFriendlyMessageWithoutCountdown() {
+        val message = AuthRepository.sanitizeError(
+            AuthOperation.SIGNUP_RESEND,
+            Exception("Status 429 error_code=over_email_send_rate_limit")
+        )
+
+        assertEquals(
+            "O reenvio está temporariamente limitado. Aguarde um pouco e tente novamente.",
+            message
+        )
+        assertFalse(message.contains("429"))
+        assertFalse(message.contains("over_email_send_rate_limit"))
+    }
+
     @Test fun invalidCredentials_mapsToLoginMessage() {
         val raw = Exception("Status 400 body={\"error\":\"invalid credentials\"}")
 

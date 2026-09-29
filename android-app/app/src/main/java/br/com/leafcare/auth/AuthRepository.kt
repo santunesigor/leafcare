@@ -442,6 +442,9 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 }
             }
             classifyRateLimit(e)?.let { limit ->
+                if (operation == AuthOperation.SIGNUP_RESEND) {
+                    return "O reenvio está temporariamente limitado. Aguarde um pouco e tente novamente."
+                }
                 // The server countdown (when present) is surfaced so the UI
                 // can align the local cooldown with the same number.
                 return when (limit) {

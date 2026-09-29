@@ -3,12 +3,14 @@ package br.com.leafcare.auth
 import android.app.Application
 import io.github.jan.supabase.gotrue.user.UserInfo
 import io.github.jan.supabase.gotrue.user.UserSession
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -389,6 +391,62 @@ class AuthViewModelTest {
         }
 
         assertEquals(1, backend.resetRequests.size)
+    }
+
+    @Test fun resendSignupEmail_concurrentTaps_singleFlightAndClearsLoading() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+        val started = CompletableDeferred<Unit>()
+        val finish = CompletableDeferred<Unit>()
+        backend.resendGate = {
+            started.complete(Unit)
+            finish.await()
+        }
+        val executor = Executors.newFixedThreadPool(8)
+        try {
+            val start = CountDownLatch(1)
+            val done = CountDownLatch(20)
+            repeat(20) {
+                executor.submit {
+                    start.await()
+                    viewModel.resendSignupEmail()
+                    done.countDown()
+                }
+            }
+            start.countDown()
+            assertTrue(done.await(10, TimeUnit.SECONDS))
+            assertTrue(viewModel.resendSending.value)
+
+            runCurrent()
+            assertTrue(started.isCompleted)
+            repeat(20) { viewModel.resendSignupEmail() }
+            assertEquals(1, backend.resendSignupEmails.size)
+
+            finish.complete(Unit)
+            advanceUntilIdle()
+        } finally {
+            executor.shutdownNow()
+        }
+
+        assertFalse(viewModel.resendSending.value)
+        assertEquals(1, backend.resendSignupEmails.size)
+    }
+
+    @Test fun resendSignupEmail_errorClearsLoadingAndAllowsRetry() = runTest(dispatcher) {
+        viewModel.setEmail("a@b.com")
+        backend.failResend = IllegalStateException("429 error_code=over_email_send_rate_limit")
+
+        viewModel.resendSignupEmail()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.resendSending.value)
+        assertTrue(viewModel.error.value.orEmpty().contains("temporariamente limitado"))
+        assertFalse(viewModel.error.value.orEmpty().contains("over_email_send_rate_limit"))
+
+        backend.failResend = null
+        viewModel.resendSignupEmail()
+        advanceUntilIdle()
+        assertEquals(2, backend.resendSignupEmails.size)
+        assertFalse(viewModel.resendSending.value)
     }
 
     @Test fun twentyRapidTaps_sendExactlyOneRequest() = runTest(dispatcher) {
