@@ -53,6 +53,17 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Configure Supabase key for Android CI
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [[ ! "$SUPABASE_PUBLISHABLE_KEY" =~ ^sb_publishable_[A-Za-z0-9_-]+$ ]]; then
+            echo "SUPABASE_PUBLISHABLE_KEY must be configured as a publishable key in GitHub Actions."
+            exit 1
+          fi
+
+          printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_PUBLISHABLE_KEY" > local.properties
+
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --no-daemon
 
