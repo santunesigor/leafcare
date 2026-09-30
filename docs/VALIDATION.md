@@ -1,5 +1,9 @@
 # Validação V3 — 10/09/2026
 
+## QA manual de Auth — 2026-09-29
+
+O usuário reportou como aprovados em dispositivo físico: cadastro → VerifyEmail → link de confirmação → app; reenvio de confirmação; recovery por link → Nova senha; salvar a nova senha e entrar com ela. O teste em segundo aparelho não foi executado por falta de outro dispositivo. Uma imagem de baixa luz (~30%) retornou “Inconclusivo”, resultado permitido pelo threshold; o MVP não exibe aviso específico de pouca luz. Os resultados manuais não alteram o histórico dos testes instrumentados abaixo.
+
 ## Benchmark adicional — 11/09/2026
 
 - Quatorze configurações novas treinadas até 24 épocas cada (12 congeladas + 12 de fine-tuning), usando exatamente o mesmo manifesto de 489/104/103 imagens.

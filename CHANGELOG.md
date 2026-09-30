@@ -1,36 +1,21 @@
-# Changelog — LeafCare MVP
+# Changelog — LeafCare
 
-Formato por fase do `docs/MVP_ROADMAP.md`. Sem versão/tag final ainda
-(atual: `versionCode 2`, `versionName 0.3.0`).
+## [Unreleased]
 
-## MVP atual — política de Auth
+## [1.0.0] - 2026-09-29
 
-- Cadastro por e-mail + senha COM confirmação por link (deep link Android)
-- Recovery por link seguro com deep link de retorno + troca de senha autenticada no Perfil
-- Signup redirect `leafcare://auth/confirm-email`; sem OTP, sem localhost
+### MVP
 
-## Fase 7 — QA e segurança (técnico)
+- Classificação offline de folhas de fumo com MobileNetV3Small, resultados Top-3 e limiar para resultado inconclusivo.
+- Captura pela câmera e seleção pela galeria, com histórico local em Room.
+- Conta Supabase Auth com confirmação por e-mail, recuperação de senha por deep link e alteração de senha autenticada no Perfil.
+- Sincronização e restauração do histórico entre sessões, com fotos privadas e isolamento por usuário.
+- QA manual dos fluxos Auth validado pelo usuário em dispositivo em 2026-09-29; demais evidências e limitações estão em `docs/FINAL_QA_CHECKLIST.md`.
 
-- Isolamento de dados entre contas (wipe na troca + worker aborta em troca/logout)
-- `WorkManagerInitializer` padrão removido (evita double-init)
-- Lint `lintDebug` verde (estilo em `values-v27`)
-- Auditoria: segredos, RLS, migrations 1→2→3, sync, offline, storage local, erros de UI
-- Físicos seguem pendentes (ver `docs/FINAL_QA_CHECKLIST.md`)
+### Limitações conhecidas
 
-## Fases 4–6 — Sincronização
-
-- Conta Supabase Auth (cadastro, login, logout, sessão persistida)
-- Room v3 como fonte da UI; sync engine + WorkManager (upsert idempotente, retry, tombstones)
-- Fotos privadas (`analysis-photos/{user_id}/{analysis_id}.jpg`, `photo_path`, `REMOTE_ONLY`)
-- Restore multi-device por UUID; isolamento entre contas
-- Sanitização de erros (nunca vaza HTTP/tokens); config via `local.properties` com trava de build
-
-## Visual V3
-
-- Telas Auth alinhadas ao V3; launcher adaptativo com as folhas reais
-- Transições em escala (linguagem do modal de ajuda); header com perfil; saudação com nome
-
-## Base (Fases 0–2)
-
-- Classificação local MobileNetV3Small (77,67% top-1); histórico Room; câmera/galeria
-- Schema Supabase versionado com RLS e bucket privado
+- O SMTP padrão do Supabase é destinado a desenvolvimento e testes; domínio e SMTP próprios ficam para pós-MVP/produção.
+- O teste em segundo aparelho não foi executado por indisponibilidade de outro dispositivo.
+- Capturas abaixo do limiar retornam “Inconclusivo”; não há aviso específico para pouca luz.
+- O APK gerado por este projeto é debug e serve para demonstração/teste, não é um pacote de produção assinado.
+- LeafCare oferece triagem visual, não diagnóstico agronômico definitivo.

@@ -44,7 +44,7 @@ arquivos de contexto versionados
 ```
 
 Baseline registrado:
-- ML: 27 testes pytest aprovados, 1 skipped; validate_bundle.py requer TensorFlow (não disponível no Python 3.14 — pendência de ambiente)
+- ML: 28 testes pytest aprovados; validate_bundle.py aprovado com 16 classes, ordem de saida verificada e modelo carregado (Python 3.12).
 - Android: testDebugUnitTest ✓, verifyModelAssets ✓, assembleDebug ✓
 
 Commit esperado:
@@ -70,7 +70,7 @@ Escopo:
 - [x] confirmar galeria;
 - [x] testar resultado inconclusivo;
 - [x] executar testes Android;
-- [!] executar testes ML (bloqueado: Python 3.14/TensorFlow);
+- [x] executar testes ML e validar bundle com Python 3.12.
 - [ ] testar em celular físico.
 
 Não fazer:
@@ -286,11 +286,7 @@ bucket é privado
 usuário só acessa suas fotos
 ```
 
-**Status**: Implementado (aguardando teste físico): upload idempotente para
-`analysis-photos/{user_id}/{analysis_id}.jpg` com `upsert=true`, `photo_path`
-associado após confirmação, `photoSyncStatus` separado com migration 2→3,
-delete remoto da foto no fluxo do tombstone (404 = concluído), 12 testes de
-fotos. Sem download (Fase 6), sem URLs assinadas no banco.
+**Status**: Upload privado implementado e exercitado no QA físico registrado nas seções J e N do checklist. A cópia local permanece disponível; URLs assinadas não são armazenadas no banco.
 
 ---
 
@@ -334,13 +330,7 @@ histórico consistente
 sem duplicações
 ```
 
-**Status**: Restauração de análises implementada (aguardando teste físico): `fetch`
-via RLS + merge por UUID no mesmo worker da Fase 4/5 (após o push), importados
-como SYNCED/REMOTE_ONLY, tombstones remotos nunca importados e aplicados sobre
-linhas SYNCED locais, pendentes locais e tombstones locais nunca sobrescritos,
-restore no login/cadastro e no boot com internet, app sempre abre offline.
-Fotos: download e cache local implementados (aguardando teste físico); sem
-conflitos avançados ainda.
+**Status**: Restore de análises e cache de fotos implementados e verificados no fluxo de reinstalação registrado nas seções O–Q do checklist. O teste com um segundo aparelho ficou N/A por indisponibilidade de dispositivo; resolução avançada de conflitos permanece pós-MVP.
 
 ---
 
@@ -396,13 +386,7 @@ Objetivo: validar o sistema completo.
 - [x] modo avião;
 - [ ] device físico.
 
-**Status QA técnico**: auditado por código/testes em 24/09/2026 (115 testes, lint
-executado). Achado crítico corrigido: Room sem `user_id` permitia vazar dados
-entre contas no mesmo aparelho — isolamento por wipe na troca de conta +
-aborte do worker em troca/logout + `WorkManagerInitializer` padrão removido
-(evita double-init). Itens acima marcados [x] = validados por código/testes;
-físicos (device, permissões, 2 usuários reais, conexão instável, reinstalação)
-permanecem pendentes.
+**Status QA**: a revisão técnica registrada em 24/09/2026 corrigiu o isolamento Room por conta. A aprovação manual dos quatro fluxos Auth foi reportada pelo usuário em 29/09/2026. Segundo aparelho: não executado por falta de dispositivo. Permissões, conexão instável e outros cenários não têm aprovação nova registrada; ver `docs/FINAL_QA_CHECKLIST.md`. A captura inconclusiva (~30%) é permitida pelo threshold; não há aviso específico de pouca luz. SMTP próprio e distribuição assinada são pós-MVP.
 
 Critério de saída: nenhum bug crítico conhecido no fluxo principal.
 
@@ -431,15 +415,12 @@ Depois:
 
 - [x] rodar todos os testes;
 - [x] gerar build final;
-- [ ] registrar versão;
-- [ ] preparar demonstração.
+- [x] registrar versao 1.0.0 (versionCode 3);
+- [x] gerar APK debug para demo/teste.
 
-**Status Fase 8 (técnico)**: documentação finalizada (README, ARCHITECTURE,
-TECHNICAL_DECISIONS, MODEL_CARD, INSTALL, SUPABASE_SETUP, CHANGELOG,
-FINAL_QA_CHECKLIST), lint verde (115 testes, 0 erros, 28 warnings só de
-versões pinadas), APK debug gerado (`versionCode 2`, `versionName 0.3.0` —
-manter; sem tag/release). **Falta só a bateria física final antes de
-qualquer release.**
+**Status Fase 8 (2026-09-29)**: os quatro fluxos Auth foram aprovados manualmente pelo usuario. Android: 199 testes, assets, lint e build aprovados. Python/ML: 28 testes; bundle valido, 16 classes, ordem de saida verificada e modelo carregado. APK debug para demo/teste, nao para producao.
+
+**Pos-MVP**: SMTP/domino proprio, assinatura e distribuicao de producao, validacao em segundo aparelho quando disponivel e melhorias futuras de UX/ML.
 
 ---
 

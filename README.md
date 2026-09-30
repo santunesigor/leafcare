@@ -184,16 +184,16 @@ python -m pytest -q
 
 | Camada | Comando | Status conhecido |
 |---|---|---|
-| Python (ML) | `pytest -q` | 28 passed |
-| Validação bundle | `python validate_bundle.py --require-model` | PASS |
-| Android unit | `./gradlew testDebugUnitTest` | PASS (115 testes) |
+| Python (ML) | `python -m pytest -q` | PASS (28 testes, 2026-09-29) |
+| Bundle validation | `python validate_bundle.py --require-model` | PASS (16 classes, output order verified, model loaded) |
+| Android unit | `./gradlew testDebugUnitTest` | PASS (199 testes, 2026-09-29) |
 | Assets ML | `./gradlew verifyModelAssets` | PASS |
 | Lint | `./gradlew lintDebug` | PASS |
-| Build debug | `./gradlew assembleDebug` | PASS (APK ~62 MB) |
+| Build debug | `./gradlew assembleDebug` | PASS (APK 56,7 MiB; demo/teste) |
 | Instrumentados | `./gradlew connectedDebugAndroidTest` | **Não executado** |
-| Manual (device) | `docs/FINAL_QA_CHECKLIST.md` | **Pendente (bateria final)** |
+| Manual (device) | `docs/FINAL_QA_CHECKLIST.md` | Auth aprovado pelo usuário; limitações registradas no checklist |
 
-> Métricas reportadas referem-se ao experimento controlado. Testes físicos finais pendentes — **não executar release** antes de `docs/FINAL_QA_CHECKLIST.md`.
+> Métricas reportadas referem-se ao experimento controlado. Os fluxos Auth foram aprovados manualmente pelo usuário em 2026-09-29. O teste em segundo aparelho não foi executado; veja as limitações no checklist. O APK debug é para demonstração/teste, não para distribuição de produção.
 
 ---
 
@@ -220,7 +220,7 @@ python -m pytest -q
 - Threshold 0,70 **não calibrado**; softmax não calibrada (OOD pode ter confiança alta)
 - Ensemble não validado em Android físico
 - Classificador de **conjunto fechado** (16 classes)
-- Testes físicos finais pendentes — sem release até `FINAL_QA_CHECKLIST.md`
+- A aprovação manual dos fluxos Auth foi reportada pelo usuário em 2026-09-29; o checklist registra itens não executados e limitações do MVP.
 
 ---
 

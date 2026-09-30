@@ -340,7 +340,7 @@ Verificar antes de novas alterações:
 
 - resíduo de threshold persistido em SharedPreferences;
 - código/documentação devem convergir para threshold controlado pelo bundle do modelo;
-- validação física completa ainda deve ser registrada;
+- os quatro fluxos de Auth em `docs/FINAL_QA_CHECKLIST.md` foram reportados aprovados pelo usuário em dispositivo em 2026-09-29; segundo aparelho permanece não executado por indisponibilidade;
 - documentação pode conter referências antigas que precisam ser atualizadas somente quando a funcionalidade correspondente for estabilizada.
 
 Não iniciar grandes refactors apenas para eliminar dívida técnica de baixo impacto.

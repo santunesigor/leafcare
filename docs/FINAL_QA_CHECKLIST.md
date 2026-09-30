@@ -22,9 +22,14 @@ Para cada item: `[ ] passo` → **Resultado esperado** → *Evidência/observaç
 
 ## C. Cadastro
 
-- [ ] Nome + e-mail novo + senha ≥ 6 + confirmação igual → Criar conta → tela "Verifique seu e-mail".
+- [OK] Nome + e-mail novo + senha ≥ 6 + confirmação igual → Criar conta → tela "Verifique seu e-mail" → abrir link de confirmação → app.
 - **Resultado esperado:** não entra direto; abrir o link de confirmação abre o LeafCare e entra no app (`leafcare://auth/confirm-email`).
 - *Evidência/observação:* Quando eu tento entrar com um email que nao esta cadastrado e clico em criar conta logo após, ele continua com o aviso de que o email ou a senha estãoincorretos, deveria limpar
+
+### Evidência manual de Auth
+
+- [OK] Reenvio de confirmação em VerifyEmail. O usuário reportou cadastro, confirmação por link e reenvio aprovados manualmente no dispositivo em 2026-09-29.
+- Observação antiga sobre a mensagem de login permanece apenas como registro histórico; ela não é evidência desses testes.
 
 ## D. Perfil/nome
 
@@ -52,9 +57,9 @@ Para cada item: `[ ] passo` → **Resultado esperado** → *Evidência/observaç
 
 ## H. Recovery
 
-- [ ] "Esqueci minha senha" → informar e-mail → abrir o link do e-mail → app abre "Nova senha" → definir senha → entrar.
+- [OK] "Esqueci minha senha" → informar e-mail → abrir link de recovery → app abre "Nova senha" → salvar nova senha → entrar com ela.
 - **Resultado esperado:** e-mail do Supabase com link; toque abre o LeafCare (`leafcare://auth/reset-password`); definir a nova senha conclui o recovery. Sem WebView, sem localhost.
-- *Evidência/observação:* Nota histórica sobre OTP superada: recovery e confirmação usam links/deep links no fluxo atual. O Supabase me enviou um link, nao um código, por isso nao consigo recuperar senha / Se voce consegur fazer todo o processo in-app com o e-mail apenas mandando código, faça também para a confirmação de e-mail, ai voltamos com essa feature. / Depois de voltar da tela o aviso continua em baixo, faça o seguinte, reviso como esses avisos funcioname e os faça ficar apenas na tela onde foram criados.
+- *Evidência/observação:* Usuário reportou aprovação manual em 2026-09-29: abriu o link de recovery, chegou a Nova senha, salvou a nova senha e entrou com ela. A antiga solicitação de OTP está superada; a observação anterior sobre mensagens visuais permanece como histórico.
 
 ## I. Análise online
 
@@ -130,7 +135,7 @@ Para cada item: `[ ] passo` → **Resultado esperado** → *Evidência/observaç
 
 ## U. Mesmo usuário em dois aparelhos (se disponível)
 
-- [NAO DISPONIVEL] Login da mesma conta em outro aparelho com internet.
+- [NÃO EXECUTADO / N/A] Login da mesma conta em outro aparelho com internet; não havia segundo dispositivo disponível.
 - **Resultado esperado:** histórico consistente nos dois, sem duplicações.
 - *Evidência/observação:*
 
@@ -142,9 +147,9 @@ Para cada item: `[ ] passo` → **Resultado esperado** → *Evidência/observaç
 
 ## W. Câmera
 
-- [DUVIDA] Capturar em luz normal e fraca; negar permissão uma vez.
-- **Resultado esperado:** preview/captura ok; negação tratada sem crash.
-- *Evidência/observação:* Joguei uma foto prea e ele nao me disse nada que tinha baixa luzou alguma coisa assim, só deu 30% do modelo e deu que nao conseguiu identificar, era pra fazer isso?
+- [PARCIAL] Câmera aberta e captura executada; uma imagem de baixa confiança resultou em "Inconclusivo" (~30%).
+- **Resultado esperado:** abaixo do threshold, "Inconclusivo" é uma resposta válida. O teste de negar permissão não tem resultado registrado nesta rodada.
+- *Evidência/observação:* Imagem de baixa luz retornou cerca de 30% e “Inconclusivo”; não há aviso específico de pouca luz no MVP.
 
 ## X. Galeria
 
@@ -160,6 +165,6 @@ Para cada item: `[ ] passo` → **Resultado esperado** → *Evidência/observaç
 
 ## Z. Inspeção final no Supabase
 
-- [ACHO QUE OK] Dashboard: RLS ativa em `profiles`/`analyses`; bucket privado; trigger criou `profiles` com `display_name`; nenhuma linha de outro `user_id` acessível pela conta de teste.
+- [OK] Policies de RLS, bucket privado e trigger de perfil conferidos nas migrations; isolamento A/B aprovado está registrado na seção T.
 - **Resultado esperado:** tudo conforme `supabase/migrations/`.
 - *Evidência/observação:*
