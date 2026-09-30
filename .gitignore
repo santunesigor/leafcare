@@ -10,6 +10,7 @@ output-metadata.json
 
 # Android Studio / IntelliJ
 .idea/
+.serena/
 *.iml
 misc.xml
 deploymentTargetDropDown.xml

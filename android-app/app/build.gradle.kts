@@ -1,5 +1,6 @@
 import groovy.json.JsonSlurper
 import java.security.MessageDigest
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -8,6 +9,20 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Supabase publishable key comes from android-app/local.properties (never committed),
+// with environment fallback for CI. project.findProperty does NOT read local.properties,
+// so the file is loaded explicitly here.
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+val supabasePublishableKey =
+    localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY")
+        ?: System.getenv("SUPABASE_PUBLISHABLE_KEY")
+        ?: "YOUR_PUBLISHABLE_KEY_HERE"
+
 android {
     namespace = "br.com.leafcare"
     compileSdk = 35
@@ -15,11 +30,19 @@ android {
         applicationId = "br.com.leafcare"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.3.0"
+        versionCode = 3
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // BuildConfig fields for Supabase configuration (from local.properties)
+        buildConfigField("String", "SUPABASE_URL", "\"https://nhkqfanjfcivcbndivav.supabase.co\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
+        // Legacy alias for backward compatibility
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabasePublishableKey\"")
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     testOptions { unitTests.isIncludeAndroidResources = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -57,7 +80,22 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert:1.4.0")
     implementation("com.google.ai.edge.litert:litert-api:1.4.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Supabase dependencies for Auth (Phase 3) and sync (Phase 4)
+    // Using supabase-kt 2.1.0 with gotrue-kt (compatible with Kotlin 2.0.21)
+    implementation("io.github.jan-tennert.supabase:supabase-kt:2.1.0")
+    implementation("io.github.jan-tennert.supabase:gotrue-kt:2.1.0")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:2.1.0")
+    implementation("io.github.jan-tennert.supabase:storage-kt:2.1.0")
+
+    // WorkManager for offline-first sync queue (Phase 4)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    // Ktor client engine required by supabase-kt 2.1.0 (Ktor 2.3.7).
+    // Without an engine, HttpClient creation crashes the app at startup.
+    implementation("io.ktor:ktor-client-okhttp:2.3.7")
+
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation(composeBom)
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
@@ -68,6 +106,17 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+val verifySupabaseConfig by tasks.registering {
+    group = "verification"
+    description = "Impede gerar APK com placeholder de chave Supabase."
+    doLast {
+        check(supabasePublishableKey.isNotBlank() && supabasePublishableKey != "YOUR_PUBLISHABLE_KEY_HERE") {
+            "SUPABASE_PUBLISHABLE_KEY não configurada em local.properties"
+        }
+    }
+}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(verifySupabaseConfig) }
 
 val verifyModelAssets by tasks.registering {
     group = "verification"

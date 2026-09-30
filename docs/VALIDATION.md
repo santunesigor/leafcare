@@ -1,5 +1,9 @@
 # Validação V3 — 10/09/2026
 
+## QA manual de Auth — 2026-09-29
+
+O usuário reportou como aprovados em dispositivo físico: cadastro → VerifyEmail → link de confirmação → app; reenvio de confirmação; recovery por link → Nova senha; salvar a nova senha e entrar com ela. O teste em segundo aparelho não foi executado por falta de outro dispositivo. Uma imagem de baixa luz (~30%) retornou “Inconclusivo”, resultado permitido pelo threshold; o MVP não exibe aviso específico de pouca luz. Os resultados manuais não alteram o histórico dos testes instrumentados abaixo.
+
 ## Benchmark adicional — 11/09/2026
 
 - Quatorze configurações novas treinadas até 24 épocas cada (12 congeladas + 12 de fine-tuning), usando exatamente o mesmo manifesto de 489/104/103 imagens.
@@ -16,7 +20,7 @@ As versões TFLite com quantização dinâmica falharam no critério de paridade
 
 ## Machine learning concluído
 
-- Dependências instaladas; 26 testes Python aprovados novamente após recuperação do pacote (14,07 segundos). Evidência: python_tests.xml.
+- Dependências instaladas; 28 testes Python aprovados (14,07 segundos). Evidência: python_tests.xml.
 - MobileNetV3Small com ImageNet: treinamento em duas etapas concluído.
 - Teste independente da otimização: 103 imagens, top 1 77,67%, top 3 97,09%, macro-F1 0,7157.
 - Exportação Keras/TFLite comparada em 20 imagens de validação: erro absoluto máximo 0,000007718801498413086 e concordância top 1 de 100%.
@@ -26,15 +30,33 @@ As versões TFLite com quantização dinâmica falharam no critério de paridade
 
 As métricas completas e curvas estão em machine-learning/artifacts. Os resultados têm as limitações descritas em DATASET.md; não são validação de campo.
 
+## Validação pós-hardening — 22/09/2026
+
+### Machine Learning
+- python -m pytest -q: **PASS** — 28 passed
+- python validate_bundle.py --require-model: **PASS**
+- status: **model_bundle_valid**
+- classes: **16**
+- model_output_order_verified: **true**
+- model SHA256: **d0447e6f3cbd62318e9d9b7cbac5fbf6038df74001fe3aeb3c467e4c7cb6090b**
+
+### Android
+- testDebugUnitTest: **PASS** — BUILD SUCCESSFUL
+- verifyModelAssets: **PASS** — BUILD SUCCESSFUL
+- assembleDebug: **PASS** — BUILD SUCCESSFUL
+
+Não foi executado connectedDebugAndroidTest.
+Não foi executado teste em dispositivo físico ou emulador Android.
+
 ## Android V3
 
-- Compilação Kotlin/Java/recursos e assembleDebug aprovados; APK V3 incluído em android-app/apk/LeafCare-V3-debug.apk.
+- Compilação Kotlin/Java/recursos e assembleDebug aprovados; APK gerado localmente.
 - verifyModelAssets aprovado. O modelo dentro do APK é idêntico ao artefato Python; as classes também estão incluídas.
-- Oito testes Android aprovados: quatro de política/pré-processamento e quatro de interface. Junto aos 26 Python, são **34 testes aprovados**.
+- Oito testes Android aprovados: quatro de política/pré-processamento e quatro de interface. Junto aos 28 Python, são **36 testes aprovados**.
 - Capturas das quatro telas renderizadas no Robolectric e inspecionadas visualmente: docs/screenshots. A ajuda contém exatamente as quatro fotos enviadas. Os registros e resultados nessas capturas são fixtures de teste, não métricas do modelo nem histórico inserido no app.
 - Pesquisa, navegação, captura/galeria/ajuda por callbacks, fechamento da ajuda e expansão das possibilidades foram exercitados nos testes de interface.
 - Manifesto mesclado sem permissão INTERNET.
-- APK SHA-256: 8797b6fd79d6eb2dbc053f79950390d92d5f01c4d602f34fe82e449f48b3d66d.
+- Binários de distribuição devem ser publicados em GitHub Releases, não versionados no Git.
 
 A captura inicial com PixelCopy expirou no ambiente sem janela gráfica física. O teste foi ajustado para desenhar a hierarquia real da Activity em Canvas e aguardar a carga da foto; os oito testes passaram após essa correção. Os XMLs finais estão em docs/android-tests.
 

@@ -4,7 +4,7 @@ Foram importadas 696 imagens brutas da seção TV3 do TLA em 16 classes. A taxon
 
 A auditoria encontrou zero arquivos inválidos e zero duplicatas exatas. O agrupamento usa classe e identificador IMG do nome, com fallback para o nome-base; a comparação dHash (distância até 4) reúne imagens semelhantes. A divisão com seed 42 resultou em 489 imagens de treino, 104 de validação e 103 de teste. O mínimo configurado foi de oito grupos por classe; isso permite a divisão, mas não garante robustez estatística.
 
-Consulte DATASET_IMPORT.json e machine-learning/data/prepared para contagens, hashes, grupos e manifestos. Os ZIPs completos não são redistribuídos.
+Consulte machine-learning/data/import_report.json e machine-learning/data/prepared para contagens, hashes, grupos e manifestos. Os ZIPs completos não são redistribuídos.
 
 ## Limitações
 

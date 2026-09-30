@@ -1,0 +1,9 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Real V3 two-leaf asset at 60dp, centered: same breathing room as the
+         login logo, far inside every launcher mask. Drawing untouched. -->
+    <item
+        android:width="60dp"
+        android:height="60dp"
+        android:gravity="center"
+        android:drawable="@drawable/v3_logo" />
+</layer-list>
