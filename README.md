@@ -36,7 +36,7 @@ O APK é gerado em `android-app/app/build/outputs/apk/debug/app-debug.apk`.
 - [Machine Learning](docs/MACHINE_LEARNING.md): modelo, métricas e pipeline.
 - [Supabase](docs/SUPABASE.md): migrations, Auth, RLS e Storage.
 - [Testes e QA](docs/TESTING.md): comandos, roteiro e evidências registradas.
-- [Terceiros e licenças](docs/THIRD_PARTY.md).
+- [Licença da fonte Inter](docs/legal/Inter-OFL.txt) e [fontes das imagens](docs/legal/referencias_manifest.csv).
 - [Histórico de versões](CHANGELOG.md).
 
 ## Estrutura

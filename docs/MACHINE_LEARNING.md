@@ -63,7 +63,7 @@ Split configurado:
 
 Os datasets completos não são redistribuídos neste repositório.
 
-A origem, licenças e limitações de imagens de referência estão em `docs/THIRD_PARTY.md`.
+As origens e licenças das imagens estão em `docs/legal/referencias_manifest.csv`.
 
 ## Contrato de entrada
 
