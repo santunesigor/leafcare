@@ -24,9 +24,12 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
- * ViewModel behavior tests with a fake [FakeBackend]: no network, plain JVM.
+ * ViewModel behavior tests with a fake [FakeBackend]: no network, Robolectric JVM.
  * The secondary [AuthViewModel] constructor allows injecting an [AuthRepository]
  * built on the fake, so screen flow, password gating and navigation decisions
  * are exercised through the real ViewModel.
@@ -41,6 +44,8 @@ internal class FakeRecoveryPendingStore(initial: Boolean = false) : RecoveryPend
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = Application::class)
 class AuthViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
