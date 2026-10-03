@@ -2,6 +2,8 @@
 
 Este documento reúne o dataset, o contrato do modelo atual, suas métricas e os comandos do pipeline.
 
+Resultados comparativos e experimentais estão centralizados em [Benchmark de Modelos](benchmarks/BENCHMARK_MODELOS.md).
+
 ## Modelo integrado
 
 Arquitetura atual:
