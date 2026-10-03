@@ -1,0 +1,40 @@
+[
+  {
+    "name": "unweighted",
+    "class_weight": null,
+    "C": 1.0,
+    "optimizer": "scikit-learn LogisticRegression (lbfgs)",
+    "max_iter": 1000,
+    "iterations": [
+      94
+    ],
+    "training_seconds": 0.3369854000011401,
+    "validation": {
+      "n_images": 104,
+      "top1_correct": 92,
+      "top1_accuracy": 0.8846153846153846,
+      "macro_f1": 0.7676460062770047,
+      "top3_correct": 102,
+      "top3_accuracy": 0.9807692307692307
+    }
+  },
+  {
+    "name": "balanced",
+    "class_weight": "balanced",
+    "C": 1.0,
+    "optimizer": "scikit-learn LogisticRegression (lbfgs)",
+    "max_iter": 1000,
+    "iterations": [
+      95
+    ],
+    "training_seconds": 0.20644009999887203,
+    "validation": {
+      "n_images": 104,
+      "top1_correct": 92,
+      "top1_accuracy": 0.8846153846153846,
+      "macro_f1": 0.7676460062770047,
+      "top3_correct": 103,
+      "top3_accuracy": 0.9903846153846154
+    }
+  }
+]

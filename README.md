@@ -94,6 +94,7 @@ Formato de entrada, ordem das classes, pré-processamento, threshold e exportaç
 - [Desenvolvimento](docs/DEVELOPMENT.md): setup e comandos Android/Python.
 - [Arquitetura](docs/ARCHITECTURE.md): módulos, banco local, inferência e sincronização.
 - [Machine Learning](docs/MACHINE_LEARNING.md): dataset, contrato do modelo, métricas e pipeline de treino/exportação.
+- [Benchmark de modelos](docs/benchmarks/BENCHMARK_MODELOS.md): comparação histórica e experimento DINOv2.
 - [Supabase](docs/SUPABASE.md): autenticação, migrations, RLS e Storage.
 - [Testes e QA](docs/TESTING.md): validações automatizadas e evidências históricas.
 - [Contexto e regras do projeto](docs/AI_CONTEXT.md): limites importantes para mudanças.
