@@ -29,6 +29,7 @@ htmlcov/
 
 # Datasets and training checkpoints
 machine-learning/data/raw/
+machine-learning/data/external/
 *.keras
 *.h5
 *.weights.h5

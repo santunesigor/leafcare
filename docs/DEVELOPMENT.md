@@ -1,26 +1,21 @@
 # Desenvolvimento
 
-Para o setup detalhado do Android, consulte [INSTALL.md](INSTALL.md). Este resumo registra os requisitos e comandos usados pelo projeto.
-
 ## Android
 
-- JDK 17
-- Android SDK 35 (compile/target); minSdk 26
-- Gradle 8.9 pelo wrapper incluído
+Requisitos: JDK 17, Android SDK 35 e Gradle 8.9 pelo wrapper.
 
-Na raiz do repositório:
+Na raiz do repositório, crie a configuração local:
 
 ```powershell
 cd android-app
 Copy-Item local.properties.example local.properties
 ```
 
-Edite `android-app/local.properties` com `sdk.dir` do Android SDK e `SUPABASE_PUBLISHABLE_KEY=<chave-publicável-do-projeto-leafcare>`. Não coloque o valor da chave neste documento; nunca use `service_role`.
+Configure `sdk.dir` e `SUPABASE_PUBLISHABLE_KEY` em `android-app/local.properties`. Não compartilhe nem versione esse arquivo. Use somente a chave publicável; nunca use `service_role`.
 
-Comandos Android:
+Comandos no Windows/PowerShell, dentro de `android-app`:
 
 ```powershell
-.\gradlew.bat clean
 .\gradlew.bat compileDebugKotlin
 .\gradlew.bat testDebugUnitTest
 .\gradlew.bat verifyModelAssets
@@ -28,11 +23,11 @@ Comandos Android:
 .\gradlew.bat assembleDebug
 ```
 
-APK debug: `android-app/app/build/outputs/apk/debug/app-debug.apk`.
+O APK debug fica em `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Python e ML
+## Python e Machine Learning
 
-Use Python 3.12. Na raiz:
+Use Python 3.12, a partir da raiz:
 
 ```powershell
 cd machine-learning
@@ -43,4 +38,6 @@ python -m pytest -q
 python validate_bundle.py --require-model
 ```
 
-`validate_bundle.py --require-model` valida bundle, classes, ordem de saída e carregamento do modelo. A distribuição do modelo para Android também é verificada por `verifyModelAssets`.
+No Linux/macOS, use `python3.12 -m venv .venv` e ative com `source .venv/bin/activate`.
+
+Mais comandos e detalhes do pipeline: [MACHINE_LEARNING.md](MACHINE_LEARNING.md). Testes e QA: [TESTING.md](TESTING.md).

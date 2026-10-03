@@ -1,234 +1,111 @@
 # LeafCare
 
-Aplicativo Android nativo para **triagem visual** de doenças e alterações em folhas de fumo, com conta, histórico sincronizado e funcionamento offline.
+## Sobre o aplicativo
 
-O produtor captura ou seleciona uma foto e o modelo roda **direto no celular** (sem depender de nuvem para classificar). Com internet, análises e fotos sincronizam com o backend e o histórico pode ser restaurado em outro aparelho.
+O LeafCare é um aplicativo Android para triagem visual de doenças e alterações em folhas de fumo. Ele analisa fotos feitas com a câmera ou escolhidas na galeria. A classificação acontece no próprio aparelho; o app não envia a imagem a um serviço para obter a previsão.
 
-> **Importante:** LeafCare é uma ferramenta de **triagem visual**, **não** um diagnóstico agronômico definitivo. Os resultados devem ser confirmados por um profissional qualificado.
+> O LeafCare é uma ferramenta de triagem e não substitui diagnóstico agronômico ou avaliação profissional.
 
----
+### Como funciona
 
-## Visão geral
+1. O app prepara a imagem e a classifica localmente com o modelo MobileNetV3Small.
+2. Mostra até três hipóteses. Se a maior pontuação ficar abaixo do limite de 0,70, o resultado é apresentado como inconclusivo.
+3. Salva a análise e o histórico no banco local Room.
+4. Depois do primeiro acesso autenticado, câmera, galeria, classificação e histórico ficam disponíveis offline. Quando há conexão, o app sincroniza o histórico e as fotos com o Supabase em segundo plano.
 
-- **Conta obrigatória** (Supabase Auth: cadastro com confirmação por link, login, logout, perfil com nome e e-mail, recovery por link com retorno ao app)
-- **Offline-first** — classificação, histórico, câmera e galeria funcionam sem internet após autenticação anterior
-- **Inferência local** — MobileNetV3Small via LiteRT/TFLite, float32, sem rede
-- **Histórico local** — Room/SQLite (fotos em armazenamento privado)
-- **Sincronização em background** — WorkManager: análises (upsert idempotente), fotos privadas, tombstones de exclusão, restore multi-device
-- **Segurança** — RLS por usuário, bucket privado, sem service_role no app, isolamento de dados entre contas no aparelho
+O Supabase cuida da autenticação e da sincronização; ele não classifica as imagens.
 
----
+### Dataset e modelo
 
-## O problema
+O modelo foi treinado com 696 imagens em 16 classes, usando a seção TV3 bruta do dataset [TLA — Tobacco Leaf Abnormality](https://doi.org/10.3389/fpls.2024.1333236). O conjunto foi dividido em treino, validação e teste (70% / 15% / 15%), com separação por grupos para reduzir vazamento entre imagens relacionadas.
 
-Doenças foliares no fumo causam perdas significativas. O diagnóstico precoce depende de profissionais que nem sempre estão disponíveis na propriedade no momento certo. Ferramentas baseadas em nuvem falham sem sinal de celular — por isso a classificação é local e a nuvem serve para conta, backup e multi-device.
+As imagens completas do dataset não são distribuídas neste repositório. O mapa de classes está em [`machine-learning/tla_class_map.yaml`](machine-learning/tla_class_map.yaml), o registro da importação em [`machine-learning/data/import_report.json`](machine-learning/data/import_report.json) e as fontes/licenças das imagens de referência em [`docs/legal/referencias_manifest.csv`](docs/legal/referencias_manifest.csv).
 
----
+No teste registrado de 103 imagens, o modelo obteve 77,67% de acurácia Top-1, Macro-F1 de 0,7157 e acurácia Top-3 de 97,09%. É um teste interno pequeno, sem validação de campo; as pontuações não são probabilidades agronômicas calibradas. Mais detalhes estão em [Machine Learning](docs/MACHINE_LEARNING.md).
 
-## A solução
+## Desenvolvimento
 
-1. Produtor cria conta ou entra (primeiro acesso exige internet)
-2. Fotografa a folha ou escolhe da galeria
-3. O modelo executa a classificação **localmente/offline**
-4. Mostra as **3 classes mais prováveis** com confiança (ou "Inconclusivo" abaixo do limiar)
-5. Salva no histórico local **imediatamente**
-6. Com internet, sincroniza análise + foto em background (sem bloquear a UI)
-7. Em outro aparelho, login restaura o histórico (texto imediato; fotos baixadas em background)
+### Requisitos
 
----
+- Android Studio, JDK 17 e Android SDK 35 para desenvolver e executar o app.
+- Python 3.12 apenas para trabalhar no pipeline de Machine Learning.
+- Uma chave publicável do Supabase para testar autenticação e sincronização. A classificação local não depende de conexão após o acesso autenticado.
 
-## Principais funcionalidades
+### Configurar e executar o app
 
-| Funcionalidade | Descrição |
-|---|---|
-| **Câmera + Galeria** | CameraX para captura; seletor de documentos do sistema para importar |
-| **Inferência local** | LiteRT 1.4.0, float32, 2 threads, sem rede |
-| **Top-3 + threshold** | 3 hipóteses; abaixo do limiar → "Inconclusivo" |
-| **Orientação fotográfica** | Tela de ajuda com 4 exemplos (correta, desfocada, distante, pouca luz) |
-| **Histórico Room** | Busca, filtros, exclusão com confirmação; fonte única da UI |
-| **Conta e perfil** | Cadastro (com confirmação por link)/login/logout, perfil, troca de senha autenticada, recovery por link |
-| **Sync offline-first** | WorkManager (só com rede, backoff, sobrevive a restart); upsert idempotente por UUID; tombstones; retry |
-| **Fotos privadas** | Bucket `analysis-photos` privado em `{user_id}/{analysis_id}.jpg`; cache local |
-| **Restore** | Login em aparelho novo reconstrói o histórico (texto + fotos em background) |
-| **Privacidade** | RLS por usuário; backup automático desativado; isolamento entre contas no aparelho |
-
----
-
-## Como funciona
-
-```
-Foto / Galeria
-      ↓
-Preprocessing (decode → EXIF → center crop → resize 224×224 → float32 RGB 0–255)
-      ↓
-MobileNetV3Small + LiteRT (local, sem rede)
-      ↓
-Top-3 + threshold (0.70 baseline)
-      ↓
-Room (estado PENDING_UPLOAD) → resultado imediato na UI
-      ↓ (background, com internet)
-Supabase: upsert analysis → upload foto → photo_path → tombstones → restore
-```
-
-**Detalhes do pré-processamento (contrato Python ↔ Android idêntico):** decode com `BitmapFactory` + `inPreferredColorSpace=SRGB`; correção EXIF (1–8); center crop quadrado; resize bilinear **half-pixel, aritmética inteira** 224×224; tensor `float32 NHWC [1,224,224,3]` faixa **0–255** (camada `Rescaling` incorporada no modelo).
-
----
-
-## Arquitetura
-
-```
-Compose UI → ViewModel → Repository → Room (fonte da UI) → Sync Engine / WorkManager → Supabase
-                                              ↓
-                                    LiteRT Interpreter (classificação local, nunca na nuvem)
-```
-
-- **MVVM pragmático**, injeção manual no `Application`
-- **Room é a fonte da UI** — Supabase nunca é observado diretamente
-- **Sync**: `PENDING_UPLOAD` → `SYNCED` → `PENDING_DELETE`/`ERROR`; fotos com `photoSyncStatus` separado (`REMOTE_ONLY` = só no servidor)
-- **Exclusões por tombstone** (`deleted_at`); deleção remota nunca ressuscita dado local
-- **Restore por UUID**; pendentes locais nunca sobrescritos; tombstones remotos respeitados
-- **Isolamento entre contas**: wipe local na troca de conta; worker aborta se a sessão mudar
-- Detalhes em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) e [docs/TECHNICAL_DECISIONS.md](docs/TECHNICAL_DECISIONS.md)
-
----
-
-## Tecnologias
-
-| Camada | Tecnologia |
-|---|---|
-| **Android** | Kotlin, Jetpack Compose, CameraX, Navigation Compose, Material3, WorkManager |
-| **Persistência** | Room / SQLite v3 (migrations 1→2→3, schema exportado) |
-| **Backend** | Supabase 2.1.0 (Auth/gotrue, PostgREST, Storage) + Ktor OkHttp |
-| **ML (treino)** | Python 3.12, TensorFlow/Keras 3, MobileNetV3Small (ImageNet) |
-| **Inferência móvel** | LiteRT 1.4.0 (float32) |
-| **Build** | Gradle 8.9, JDK 17, compile/target SDK 35, minSdk 26 |
-
----
-
-## Machine Learning (resumo)
-
-Baseline integrado: **MobileNetV3Small**, transfer learning em duas etapas, 16 classes, 696 imagens (split group-aware 489/104/103, seed 42).
-
-| Métrica (teste, 103 imgs) | Baseline no app |
-|---|---:|
-| **Top-1 accuracy** | **77,67%** |
-| **Macro-F1** | **0,7157** |
-| **Top-3 accuracy** | **97,09%** |
-| **Threshold** | 0,70 |
-
-Ensemble experimental (80,58% top-1) **não** está no app — pendente de validação móvel. Detalhes em [docs/MODEL_CARD.md](docs/MODEL_CARD.md).
-
----
-
-## Dataset
-
-- 696 imagens da seção TV3 do dataset TLA (16 classes), split group-aware seed 42
-- Classes raras com 1–2 amostras no teste (anthracnose, TSWV, black_shank, genetic_abnormality)
-- ZIPs completos não redistribuídos; pipeline em `machine-learning/`
-
----
-
-## Supabase
-
-- **Projeto:** `leafcare` (`nhkqfanjfcivcbndivav`, `sa-east-1`)
-- **Tabelas:** `profiles` (trigger `handle_new_user` via `display_name`), `analyses` (RLS por `auth.uid()`, soft-delete `deleted_at`)
-- **Storage:** bucket privado `analysis-photos` em `{user_id}/{analysis_id}.jpg`
-- **App usa:** `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` via `local.properties` → `BuildConfig` (nunca commitada)
-- **Nunca no app:** `service_role`, senhas de banco, JWT secret
-- Setup em [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md)
-
----
-
-## Estrutura do repositório
-
-```
-leafcare/
-├── android-app/          # App Android (Kotlin/Compose, Room, WorkManager, Supabase)
-├── machine-learning/     # Pipeline: import → audit → split → train → eval → export → validate
-├── supabase/             # Migrations versionadas (profiles, analyses, storage, hardening)
-├── docs/                 # Documentação técnica
-├── samples/              # Imagem de referência e fixture de pré-processamento
-├── ROADMAP.md            # Roadmap histórico (inglês)
-├── LICENSE               # MIT (código original)
-└── README.md             # Este arquivo
-```
-
-**Não versionados:** datasets completos, ambientes virtuais, `local.properties`, diretórios de build, APKs, caches, checkpoints.
-
----
-
-## Instalação rápida
-
-Guia completo em [docs/INSTALL.md](docs/INSTALL.md). Resumo:
+No Windows/PowerShell, crie a configuração local e preencha `sdk.dir` e `SUPABASE_PUBLISHABLE_KEY` em `android-app/local.properties`:
 
 ```powershell
-# Android (Windows/PowerShell, JDK 17, SDK 35)
 cd android-app
 Copy-Item local.properties.example local.properties
-# edite local.properties: sdk.dir + SUPABASE_PUBLISHABLE_KEY real
-.\gradlew.bat testDebugUnitTest
+```
+
+Abra `android-app` no Android Studio para executar em um emulador ou aparelho. Também é possível instalar a versão debug em um aparelho conectado:
+
+```powershell
+.\gradlew.bat installDebug
+```
+
+Não compartilhe nem versione `local.properties`. Use somente a chave publicável; nunca inclua `service_role` ou credenciais administrativas.
+
+### Criar o APK e validar mudanças
+
+Dentro de `android-app`, gere o APK debug com:
+
+```powershell
 .\gradlew.bat assembleDebug
-# APK em app/build/outputs/apk/debug/app-debug.apk
 ```
 
-```bash
-# ML (reproduzir treino/validação)
+O arquivo fica em `android-app/app/build/outputs/apk/debug/app-debug.apk`. Antes de enviar mudanças, rode os testes e as verificações relevantes:
+
+```powershell
+.\gradlew.bat testDebugUnitTest verifyModelAssets lintDebug
+```
+
+O código Android fica em `android-app/app/src/main/java/br/com/leafcare/`: `ui/` contém as telas, `auth/` a autenticação, `data/` persistência e sincronização, e `ml/` o processamento e a inferência de imagens. A explicação dos fluxos e das relações entre esses módulos está em [Arquitetura](docs/ARCHITECTURE.md).
+
+### Treinar e integrar outro modelo
+
+O dataset completo não está no repositório. Para treinar, disponibilize os dados locais esperados em `machine-learning/data/raw/` e use Python 3.12. No PowerShell:
+
+```powershell
 cd machine-learning
-python3.12 -m venv .venv && pip install -r requirements.txt
-python -m pytest -q
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python prepare_dataset.py --config config.yaml
+python train.py --config config.yaml
+python evaluate.py --config config.yaml
+python export_tflite.py --config config.yaml
+python validate_bundle.py --require-model
 ```
 
----
+A exportação atualiza o bundle usado pelo app em `android-app/app/src/main/assets/`. Depois de alterar o modelo, valide também o contrato Android:
 
-## Testes
+```powershell
+cd ../android-app
+.\gradlew.bat verifyModelAssets testDebugUnitTest
+```
 
-| Camada | Comando | Status conhecido |
-|---|---|---|
-| Python (ML) | `python -m pytest -q` | PASS (28 testes, 2026-09-29) |
-| Bundle validation | `python validate_bundle.py --require-model` | PASS (16 classes, output order verified, model loaded) |
-| Android unit | `./gradlew testDebugUnitTest` | PASS (199 testes, 2026-09-29) |
-| Assets ML | `./gradlew verifyModelAssets` | PASS |
-| Lint | `./gradlew lintDebug` | PASS |
-| Build debug | `./gradlew assembleDebug` | PASS (APK 56,7 MiB; demo/teste) |
-| Instrumentados | `./gradlew connectedDebugAndroidTest` | **Não executado** |
-| Manual (device) | `docs/FINAL_QA_CHECKLIST.md` | Auth aprovado pelo usuário; limitações registradas no checklist |
+Formato de entrada, ordem das classes, pré-processamento, threshold e exportação precisam permanecer consistentes entre Python e Android. O passo a passo e as restrições do pipeline estão em [Machine Learning](docs/MACHINE_LEARNING.md).
 
-> Métricas reportadas referem-se ao experimento controlado. Os fluxos Auth foram aprovados manualmente pelo usuário em 2026-09-29. O teste em segundo aparelho não foi executado; veja as limitações no checklist. O APK debug é para demonstração/teste, não para distribuição de produção.
+## Documentação do projeto
 
----
+- [Desenvolvimento](docs/DEVELOPMENT.md): setup e comandos Android/Python.
+- [Arquitetura](docs/ARCHITECTURE.md): módulos, banco local, inferência e sincronização.
+- [Machine Learning](docs/MACHINE_LEARNING.md): dataset, contrato do modelo, métricas e pipeline de treino/exportação.
+- [Supabase](docs/SUPABASE.md): autenticação, migrations, RLS e Storage.
+- [Testes e QA](docs/TESTING.md): validações automatizadas e evidências históricas.
+- [Contexto e regras do projeto](docs/AI_CONTEXT.md): limites importantes para mudanças.
+- [Licença da fonte Inter](docs/legal/Inter-OFL.txt) e [fontes das imagens](docs/legal/referencias_manifest.csv).
+- [Histórico de versões](CHANGELOG.md).
 
-## Documentação
+## Estrutura
 
-| Documento | Descrição |
-|---|---|
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitetura Android + nuvem, sync, contratos |
-| [TECHNICAL_DECISIONS.md](docs/TECHNICAL_DECISIONS.md) | Decisões técnicas com justificativa e trade-offs |
-| [MODEL_CARD.md](docs/MODEL_CARD.md) | Modelo integrado: dados, métricas, limitações |
-| [INSTALL.md](docs/INSTALL.md) | Instalação reproduzível (Android + ML) |
-| [SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) | Projeto, migrations, RLS, Storage, config Android |
-| [FINAL_QA_CHECKLIST.md](docs/FINAL_QA_CHECKLIST.md) | Bateria final de testes físicos (A–Z) |
-| [MVP_ROADMAP.md](docs/MVP_ROADMAP.md) | Fases 0–8 e estado real de cada uma |
-| [CHANGELOG.md](CHANGELOG.md) | Histórico de mudanças do MVP |
-
----
-
-## Limitações
-
-- Dataset pequeno (696 imagens); classes raras instáveis
-- **Sem validação independente em campo** no Sul do Brasil
-- **Sem validação agronômica completa** (`reviewed: false`)
-- Threshold 0,70 **não calibrado**; softmax não calibrada (OOD pode ter confiança alta)
-- Ensemble não validado em Android físico
-- Classificador de **conjunto fechado** (16 classes)
-- A aprovação manual dos fluxos Auth foi reportada pelo usuário em 2026-09-29; o checklist registra itens não executados e limitações do MVP.
-
----
-
-## Licença e atribuições
-
-- **Código original:** licença [MIT](LICENSE)
-- **Datasets, imagens, fontes, pesos ImageNet e terceiros:** licenças próprias — **não** cobertos pelo MIT ([docs/THIRD_PARTY.md](docs/THIRD_PARTY.md))
-
----
-
-*LeafCare — triagem visual offline-first para o produtor no campo. Conta, sincronização e histórico multi-device sobre classificação 100% local.*
+```text
+android-app/       aplicativo Android
+machine-learning/  dados de referência, pipeline e artefatos do modelo
+supabase/          migrations do backend
+docs/              arquitetura, setup e evidências de QA
+samples/           imagens e fixtures de validação
+```
