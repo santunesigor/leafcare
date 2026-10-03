@@ -30,6 +30,7 @@ htmlcov/
 # Datasets and training checkpoints
 machine-learning/data/raw/
 machine-learning/data/external/
+machine-learning/experiments/dinov2/.cache/
 *.keras
 *.h5
 *.weights.h5

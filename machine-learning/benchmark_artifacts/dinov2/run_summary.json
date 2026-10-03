@@ -1,0 +1,22 @@
+{
+  "status": "completed",
+  "model": "DINOv2 ViT-S/14 frozen linear probe",
+  "selected_probe": "balanced",
+  "validation_macro_f1": 0.7676460062770047,
+  "test_top1_accuracy": 0.8446601941747572,
+  "test_top1_correct": 87,
+  "test_macro_f1": 0.7496864002011061,
+  "test_top3_accuracy": 0.970873786407767,
+  "test_top3_correct": 100,
+  "temperature": 1.2188140244963424,
+  "threshold": 0.5738224628797678,
+  "coverage": 0.9029126213592233,
+  "accepted_accuracy": 0.9032258064516129,
+  "desktop_single_image_ms_median": 15.122050001082243,
+  "desktop_single_image_ms_p95": 15.45907999825431,
+  "desktop_timing_note": "Batch 1 backbone forward; excludes decode/preprocessing/host-to-device copy. Este tempo não representa latência em aparelho Android.",
+  "android_inference": "não medido",
+  "mobile_export": "não tentado",
+  "test_opened_after_freezing_model_temperature_and_threshold": true,
+  "test_used_for_selection": false
+}

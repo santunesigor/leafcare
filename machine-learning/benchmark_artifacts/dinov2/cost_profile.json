@@ -1,0 +1,15 @@
+{
+  "device": "NVIDIA GeForce GTX 1050 Ti",
+  "batch_size": 8,
+  "input_shape": [
+    8,
+    3,
+    224,
+    224
+  ],
+  "input": "synthetic zeros; cost-only frozen forward_features profile",
+  "model_allocated_bytes": 88226304,
+  "peak_allocated_bytes": 136301056,
+  "peak_reserved_bytes": 174063616,
+  "limits": "PyTorch allocator only; excludes CUDA context and host RAM; not an Android estimate"
+}

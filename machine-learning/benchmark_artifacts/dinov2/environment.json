@@ -1,0 +1,33 @@
+{
+  "python": "3.12.10",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "torch": "2.5.1+cu121",
+  "torchvision": "0.20.1+cu121",
+  "scikit_learn": "1.5.2",
+  "numpy": "1.26.4",
+  "pillow": "10.4.0",
+  "scipy": "1.13.1",
+  "cuda_runtime": "12.1",
+  "cuda_available": true,
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce GTX 1050 Ti",
+  "gpu_memory_bytes": 4294836224,
+  "checkpoint_sha256": "b938bf1bc15cd2ec0feacfe3a1bb553fe8ea9ca46a7e1d8d00217f29aef60cd9",
+  "checkpoint_bytes": 88283115,
+  "dinov2_repository_revision": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+  "gpu_memory_profile": {
+    "device": "NVIDIA GeForce GTX 1050 Ti",
+    "batch_size": 8,
+    "input_shape": [
+      8,
+      3,
+      224,
+      224
+    ],
+    "input": "synthetic zeros; cost-only frozen forward_features profile",
+    "model_allocated_bytes": 88226304,
+    "peak_allocated_bytes": 136301056,
+    "peak_reserved_bytes": 174063616,
+    "limits": "PyTorch allocator only; excludes CUDA context and host RAM; not an Android estimate"
+  }
+}
