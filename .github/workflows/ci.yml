@@ -83,5 +83,5 @@ jobs:
       - name: Assemble debug
         run: ./gradlew assembleDebug --no-daemon
 
-  # Instrumented tests require a device/emulator; run locally via MANUAL_TESTS.md
+  # Instrumented tests require a device/emulator; run locally via docs/TESTING.md
   # connectedDebugAndroidTest is not run in CI

@@ -10,7 +10,7 @@
 - Captura pela câmera e seleção pela galeria, com histórico local em Room.
 - Conta Supabase Auth com confirmação por e-mail, recuperação de senha por deep link e alteração de senha autenticada no Perfil.
 - Sincronização e restauração do histórico entre sessões, com fotos privadas e isolamento por usuário.
-- QA manual dos fluxos Auth validado pelo usuário em dispositivo em 2026-09-29; demais evidências e limitações estão em `docs/FINAL_QA_CHECKLIST.md`.
+- QA manual dos fluxos Auth validado pelo usuário em dispositivo em 2026-09-29; demais evidências e limitações estão em `docs/TESTING.md`.
 
 ### Limitações conhecidas
 

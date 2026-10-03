@@ -1,57 +1,100 @@
-# Créditos e fontes
+# Terceiros, referências e atribuições
 
-Código original deste pacote: LeafCare, licença MIT. Projeto acadêmico do curso de
-Engenharia da Computação da UNISATC, com contexto de uso discutido com a BE1.
-Este crédito não implica endosso técnico nem validação agronômica das instituições.
+O código original do LeafCare é distribuído sob MIT. Bibliotecas, fontes, pesos, artigos, datasets e imagens de terceiros mantêm suas próprias licenças.
 
-## Dependências
+## Dependências principais
 
-| Dependência | Fonte/licença principal |
+| Dependência | Licença/fonte principal |
 |---|---|
-| TensorFlow, LiteRT, AndroidX, Gradle | Projetos upstream; Apache 2.0 |
-| Keras | Apache 2.0 |
+| AndroidX | Apache 2.0 |
 | Kotlin | Apache 2.0 |
-| NumPy, scikit-learn | BSD |
-| Pillow | HPND |
-| Matplotlib | PSF/BSD compatível, conforme distribuição |
-| PyYAML, pytest | MIT |
+| TensorFlow / LiteRT | Apache 2.0 |
+| Keras | Apache 2.0 |
 | Coil | Apache 2.0 |
+| Gradle | Apache 2.0 |
+| NumPy | BSD |
+| scikit-learn | BSD |
+| Pillow | HPND |
+| PyYAML | MIT |
+| pytest | MIT |
 
-Consulte os metadados distribuídos por cada dependência para o texto integral e
-licenças transitivas. Gradle Wrapper é um componente oficial do Gradle (Apache 2.0).
+Consulte os pacotes upstream para versões completas e licenças transitivas.
 
-## Referências técnicas consultadas
+## Fonte Inter
 
-- MobileNetV3Small e pré-processamento integrado:
-  https://www.tensorflow.org/api_docs/python/tf/keras/applications/MobileNetV3Small
-- Transfer learning e BatchNorm durante fine-tuning:
-  https://keras.io/guides/transfer_learning/
-- Exportação Keras 3:
-  https://keras.io/api/models/model_saving_apis/export/
-- Runtime LiteRT/Interpreter para Android:
-  https://ai.google.dev/edge/litert/android
-- Compatibilidade AGP 8.7 e Gradle 8.9:
-  https://developer.android.com/build/releases/agp-8-7-0-release-notes
-- CameraX ImageCapture:
-  https://developer.android.com/media/camera/camerax/take-photo
-- Persistência com Room:
-  https://developer.android.com/training/data-storage/room
+A interface utiliza a fonte Inter. O texto da OFL distribuído com o projeto está em:
 
-## Referência visual e dados
+```text
+docs/legal/Inter-OFL.txt
+```
 
-A fotografia em `samples/reference_frog_eye.jpg` é um recorte de Lin H., Qiang Z.,
-Tse R., Tang S.-K. e Pau G. (2024), “A few-shot learning method for tobacco
-abnormality identification”, Frontiers in Plant Science, DOI 10.3389/fpls.2024.1333236,
-figura 4, conforme atribuição do pacote de referência, sob CC BY 4.0.
-Alteração realizada no pacote anterior: recorte da figura, sem rótulos.
+## Imagem de referência em `samples/`
 
-https://creativecommons.org/licenses/by/4.0/
+`samples/reference_frog_eye.jpg` é uma imagem de referência derivada de figura publicada em:
 
-A interface usa ícones exportados do Figma fornecido pelo usuário e as quatro
-fotografias de exemplo enviadas por ele. A fonte Inter é distribuída sob OFL;
-o texto da licença está em Inter-OFL.txt. As demais referências ilustrativas
-estão descritas em referencias_manifest.csv e referencias_LICENCA_E_ATRIBUICAO.md.
+Hong Lin, Zhenping Qiang, Rita Tse, Su-Kit Tang e Giovanni Pau (2024), **A few-shot learning method for tobacco abnormality identification**, Frontiers in Plant Science.
 
-A MIT do código não substitui as licenças destas imagens. Não há redistribuição do
-dataset completo neste repositório. Os textos do catálogo são preliminares e devem
-ser revisados por um profissional antes do uso externo.
+DOI: `10.3389/fpls.2024.1333236`
+
+A figura é usada sob CC BY 4.0. Alteração realizada: recorte da figura original.
+
+Essa imagem serve para verificação técnica e não constitui teste independente de desempenho do classificador.
+
+## Referências visuais e dataset inicial
+
+Imagens de referência utilizadas durante o desenvolvimento foram obtidas/adaptadas de materiais publicados sob CC BY 4.0, incluindo:
+
+### TLA / Frontiers in Plant Science, 2024
+
+- Hong Lin
+- Zhenping Qiang
+- Rita Tse
+- Su-Kit Tang
+- Giovanni Pau
+- *A few-shot learning method for tobacco abnormality identification*
+- DOI `10.3389/fpls.2024.1333236`
+
+Atribuição sugerida:
+
+> Imagem adaptada de Lin et al. (2024), “A few-shot learning method for tobacco abnormality identification”, Frontiers in Plant Science, DOI 10.3389/fpls.2024.1333236, CC BY 4.0. Alteração: recorte da figura original.
+
+### Agronomy, 2025
+
+- Yanze Zou
+- Zhenping Qiang
+- Shuang Zhang
+- Hong Lin
+- *Semantic Segmentation of Small Target Diseases on Tobacco Leaves*
+- Agronomy 15(8), 1825
+- DOI `10.3390/agronomy15081825`
+
+Atribuição sugerida:
+
+> Imagem adaptada de Zou et al. (2025), “Semantic Segmentation of Small Target Diseases on Tobacco Leaves”, Agronomy 15(8), 1825, DOI 10.3390/agronomy15081825, CC BY 4.0. Alteração: recorte da figura original.
+
+## Manifesto de referências
+
+Metadados de referências visuais permanecem em:
+
+```text
+docs/legal/referencias_manifest.csv
+```
+
+## Dataset completo
+
+O repositório não pretende relicenciar datasets completos de terceiros sob MIT.
+
+Antes de redistribuir qualquer dataset ou fotografia original, confirme explicitamente os termos aplicáveis à fonte correspondente.
+
+## Uso acadêmico e limites
+
+As imagens e resultados do projeto não constituem validação agronômica. A adequação regional do modelo — especialmente para condições brasileiras — precisa ser comprovada com dados independentes e revisão especializada.
+
+## Referências técnicas
+
+- TensorFlow MobileNetV3Small: `https://www.tensorflow.org/api_docs/python/tf/keras/applications/MobileNetV3Small`
+- Keras transfer learning: `https://keras.io/guides/transfer_learning/`
+- LiteRT Android: `https://ai.google.dev/edge/litert/android`
+- CameraX: `https://developer.android.com/media/camera/camerax/take-photo`
+- Room: `https://developer.android.com/training/data-storage/room`
+- CC BY 4.0: `https://creativecommons.org/licenses/by/4.0/`
