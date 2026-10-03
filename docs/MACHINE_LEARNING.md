@@ -1,6 +1,6 @@
 # Machine Learning — LeafCare
 
-Este documento reúne dataset, contrato do modelo, métricas, benchmark e comandos do pipeline.
+Este documento reúne o dataset, o contrato do modelo atual, suas métricas e os comandos do pipeline.
 
 ## Modelo integrado
 
@@ -106,26 +106,9 @@ Resultado:
 
 Esse teste mede paridade de implementação/conversão; não mede generalização em campo.
 
-## Benchmark
+## Seleção do modelo
 
-`machine-learning/benchmark.py` compara configurações experimentais como:
-
-- MobileNetV3Small;
-- MobileNetV3Large;
-- MobileNetV2;
-- EfficientNet;
-- diferentes taxas de dropout;
-- diferentes estratégias de augmentation;
-- diferentes optimizers;
-- diferentes quantidades de camadas liberadas no fine-tuning.
-
-Os artefatos ficam em:
-
-```text
-machine-learning/benchmark_artifacts/
-```
-
-O repositório também contém experimentos de ensemble. Eles são **experimentais** e não substituem automaticamente o modelo embarcado no Android.
+Durante o desenvolvimento, foram comparadas arquiteturas e configurações na validação. O aplicativo usa o MobileNetV3Small descrito nesta documentação; as métricas apresentadas são do modelo integrado.
 
 ## Pipeline
 

@@ -21,7 +21,7 @@ O app já inclui captura/importação de imagens, classificação local, resulta
 
 O bundle integrado é MobileNetV3Small, float32, 16 classes, entrada `[1,224,224,3]` RGB no intervalo 0–255 e threshold baseline 0.70. As métricas registradas são Top-1 77,67%, Macro-F1 0,7157 e Top-3 97,09%.
 
-Não implemente o ensemble experimental, nem altere modelo, treinamento, dataset, ordem das classes ou threshold sem solicitação explícita. Confiança softmax não é certeza agronômica. Detalhes e comandos estão em [MACHINE_LEARNING.md](MACHINE_LEARNING.md).
+Não altere modelo, treinamento, dataset, ordem das classes ou threshold sem solicitação explícita. Confiança softmax não é certeza agronômica. Detalhes e comandos estão em [MACHINE_LEARNING.md](MACHINE_LEARNING.md).
 
 ## Segurança e autenticação
 
