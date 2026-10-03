@@ -4,7 +4,7 @@
 
 O LeafCare é um aplicativo Android para triagem visual de doenças e alterações em folhas de fumo. Ele analisa fotos feitas com a câmera ou escolhidas na galeria. A classificação acontece no próprio aparelho; o app não envia a imagem a um serviço para obter a previsão.
 
-O LeafCare é uma ferramenta de triagem e não substitui diagnóstico agronômico ou avaliação profissional.
+> O LeafCare é uma ferramenta de triagem e não substitui diagnóstico agronômico ou avaliação profissional.
 
 ### Como funciona
 
@@ -17,7 +17,7 @@ O Supabase cuida da autenticação e da sincronização; ele não classifica as 
 
 ### Dataset e modelo
 
-O modelo foi treinado com 696 imagens em 16 classes, usando a seção TV3 bruta do dataset [TLA — Tobacco Leaf Abnormality](https://doi.org/10.3389/fpls.2024.1333236). O conjunto foi dividido em treino, validação e teste (70% / 15% / 15%), com separação por grupos para reduzir vazamento entre imagens relacionadas. O conjunto TTDD foi auditado, mas não entrou nesse treinamento.
+O modelo foi treinado com 696 imagens em 16 classes, usando a seção TV3 bruta do dataset [TLA — Tobacco Leaf Abnormality](https://doi.org/10.3389/fpls.2024.1333236). O conjunto foi dividido em treino, validação e teste (70% / 15% / 15%), com separação por grupos para reduzir vazamento entre imagens relacionadas.
 
 As imagens completas do dataset não são distribuídas neste repositório. O mapa de classes está em [`machine-learning/tla_class_map.yaml`](machine-learning/tla_class_map.yaml), o registro da importação em [`machine-learning/data/import_report.json`](machine-learning/data/import_report.json) e as fontes/licenças das imagens de referência em [`docs/legal/referencias_manifest.csv`](docs/legal/referencias_manifest.csv).
 
