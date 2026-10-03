@@ -15,7 +15,6 @@
     <string name="empty_search_title">Nenhuma análise encontrada</string>
     <string name="empty_search_subtitle">Experimente outra pesquisa ou filtro.</string>
     <string name="camera_button_desc">Abrir câmera</string>
-    <string name="gallery_button_desc">Abrir galeria</string>
 
     <!-- Threshold (read-only display) -->
     <string name="confidence_threshold_label">Confiança mínima: %1$s (definida pelo modelo)</string>

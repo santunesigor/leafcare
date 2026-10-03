@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -156,15 +157,15 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
             }
             if (state.busy) {
                 AlertDialog(onDismissRequest = {}, confirmButton = {},
-                    title = { Text("Analisando no celular") },
+                    title = { Text(stringResource(R.string.analyzing_title)) },
                     text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         CircularProgressIndicator(Modifier.size(30.dp))
-                        Text("Aguarde. A foto permanece neste aparelho.") } })
+                        Text(stringResource(R.string.analyzing_message)) } })
             }
             state.error?.let { message ->
                 AlertDialog(onDismissRequest = vm::clearError,
-                    title = { Text("Não foi possível concluir") }, text = { Text(message) },
-                    confirmButton = { TextButton(onClick = vm::clearError) { Text("Entendi") } }) }
+                    title = { Text(stringResource(R.string.error_dialog_title)) }, text = { Text(message) },
+                    confirmButton = { TextButton(onClick = vm::clearError) { Text(stringResource(R.string.error_button)) } }) }
         }
     }
 }
