@@ -63,6 +63,8 @@ Split configurado:
 
 Os datasets completos não são redistribuídos neste repositório.
 
+As imagens para o treinamento estão nesta [pasta do Google Drive](https://drive.google.com/drive/folders/1jMaqmAc-BQj3aDC6c50RuNQIAPneVd2A). Baixe a pasta `raw` e coloque-a em `machine-learning/data/raw/`.
+
 As origens e licenças das imagens estão em `docs/legal/referencias_manifest.csv`.
 
 ## Contrato de entrada
