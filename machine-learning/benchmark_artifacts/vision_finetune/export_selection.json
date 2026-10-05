@@ -1,0 +1,9 @@
+{
+  "models": [
+    "dinov2_vitb14",
+    "tinyvit_11m"
+  ],
+  "metric": "validation Macro-F1; ties Top-1/Top-3",
+  "android_reference_device": "Samsung Galaxy A06",
+  "test_used_for_selection": false
+}

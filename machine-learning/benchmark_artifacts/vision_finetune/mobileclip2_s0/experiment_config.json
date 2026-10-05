@@ -1,0 +1,96 @@
+{
+  "name": "MobileCLIP2-S0 image encoder",
+  "loader": "open_clip",
+  "repo": "apple/MobileCLIP2-S0",
+  "revision": "3136ea51c8ed56b9f9abfab04cb816735aaad6cb",
+  "license": "Apple ML Research Model TOU",
+  "pretraining": "DFNDR-2B",
+  "model_id": "mobileclip2_s0_finetune",
+  "base_model_id": "mobileclip2_s0",
+  "recipe": {
+    "seed": 42,
+    "batch_size": 8,
+    "warmup_epochs": 3,
+    "finetune_epochs": 15,
+    "patience": 5,
+    "head_warmup_lr": 0.001,
+    "head_finetune_lr": 0.0001,
+    "backbone_lr": 1e-05,
+    "weight_decay": 0.0001,
+    "optimizer": "AdamW",
+    "class_weight": "balanced from training counts only",
+    "augmentation": "horizontal/vertical flip p=.5, bilinear rotation +/-12 degrees (white fill), brightness/contrast .1, saturation .05; official eval resize/crop/normalization follows",
+    "batch_norm": "running statistics frozen during both stages",
+    "scope": "all CNN/TinyViT parameters; DINOv2 last two blocks + final norm",
+    "selection": "validation Macro-F1, Top-1, Top-3; keep earlier checkpoint on ties",
+    "initialization": "selected historical linear probe copied to float32 Linear head"
+  },
+  "method": "fine-tuning from linear probe; selected stage: finetune",
+  "selected_epoch": 4,
+  "selected_stage": "finetune",
+  "epochs_executed": 9,
+  "training_seconds": 105.89469330200154,
+  "class_order": [
+    "anthracnose",
+    "black_shank",
+    "brown_spot",
+    "cmv",
+    "frog_eye",
+    "genetic_abnormality",
+    "healthy",
+    "nematodes",
+    "potato_tuber_moth",
+    "pvy",
+    "sunscald",
+    "target_spot",
+    "tmv",
+    "tswv",
+    "weather_fleck",
+    "wildfire"
+  ],
+  "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+  "split_counts": {
+    "train": 489,
+    "validation": 104,
+    "test": 103
+  },
+  "pretrained_sha256": "bc3bc861baa680df2f9e3dc1aa0acbe5a21af21032df385026dda70c33505aa6",
+  "initial_probe_sha256": "d4178ea67c24f1c56e411020332952a59d045439fbda1a2a17df8452d6f1953c",
+  "checkpoint_sha256": "4abfd64ecdfacc6d92f58ff7978ee2c84f85dadcb197d543f6b4b70b0638e2ba",
+  "checkpoint_bytes": 45965288,
+  "checkpoint_local": "experiments/vision/.cache/finetune/mobileclip2_s0.safetensors",
+  "feature": "image embedding",
+  "preprocessing": {
+    "transform": "Compose(\n    Resize(size=256, interpolation=bicubic, max_size=None, antialias=True)\n    CenterCrop(size=(256, 256))\n    <function _convert_to_rgb at 0x7b5e6d527b00>\n    ToTensor()\n    Normalize(mean=(0, 0, 0), std=(1, 1, 1))\n)",
+    "mean": [
+      0,
+      0,
+      0
+    ],
+    "std": [
+      1,
+      1,
+      1
+    ],
+    "reparameterized": false,
+    "reparameterization_parity_checked": false
+  },
+  "input_shape": [
+    1,
+    3,
+    256,
+    256
+  ],
+  "parameters": 11415184,
+  "trainable_parameters_finetune": 11415184,
+  "temperature": 0.7101704186014282,
+  "threshold": 0.5380547642707825,
+  "test_used_for_selection": false,
+  "timing": {
+    "desktop_single_image_ms_median": 8.101031500700628,
+    "desktop_single_image_ms_p95": 8.3376225493339,
+    "peak_cuda_allocated_bytes_batch1": 128188928,
+    "note": "FP32, batch 1 encoder+linear head, 5 warmups/30 synchronized measurements. Excludes image preprocessing and calibration. Not Android latency."
+  },
+  "mobile_export_status_file": "mobile_export.json (when present)"
+}

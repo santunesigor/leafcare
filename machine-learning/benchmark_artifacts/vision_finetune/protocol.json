@@ -1,0 +1,30 @@
+{
+  "models": [
+    "mobilenetv4_medium",
+    "tinyvit_5m",
+    "tinyvit_11m",
+    "mobileclip2_s0",
+    "dinov2_vitb14"
+  ],
+  "recipe": {
+    "seed": 42,
+    "batch_size": 8,
+    "warmup_epochs": 3,
+    "finetune_epochs": 15,
+    "patience": 5,
+    "head_warmup_lr": 0.001,
+    "head_finetune_lr": 0.0001,
+    "backbone_lr": 1e-05,
+    "weight_decay": 0.0001,
+    "optimizer": "AdamW",
+    "class_weight": "balanced from training counts only",
+    "augmentation": "horizontal/vertical flip p=.5, bilinear rotation +/-12 degrees (white fill), brightness/contrast .1, saturation .05; official eval resize/crop/normalization follows",
+    "batch_norm": "running statistics frozen during both stages",
+    "scope": "all CNN/TinyViT parameters; DINOv2 last two blocks + final norm",
+    "selection": "validation Macro-F1, Top-1, Top-3; keep earlier checkpoint on ties",
+    "initialization": "selected historical linear probe copied to float32 Linear head"
+  },
+  "export_selection": "top two fine-tuning runs by validation Macro-F1, Top-1, Top-3; test not used",
+  "android_full_analysis_target_ms": 3000,
+  "android_reference_device": "Samsung Galaxy A06"
+}
