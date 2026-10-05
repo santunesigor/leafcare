@@ -70,7 +70,7 @@ MODELS = {
 }
 
 
-def load_encoder(spec, local_dinov3=None):
+def load_encoder(spec, local_dinov3=None, reparameterize=True):
     import torch
     from huggingface_hub import hf_hub_download
 
@@ -111,14 +111,15 @@ def load_encoder(spec, local_dinov3=None):
             image_mean=(0, 0, 0), image_std=(1, 1, 1))
         from timm.utils import reparameterize_model
         original = model.visual.eval()
-        visual = reparameterize_model(original)
+        visual = reparameterize_model(original) if reparameterize else original
         # Reparameterization is an inference optimization, not a new learned candidate.
         with torch.inference_mode():
             sample = torch.rand(1, 3, 256, 256)
             torch.testing.assert_close(visual(sample), original(sample), atol=1e-4, rtol=1e-4)
         # Use only the image encoder. No text prompts or text encoder at inference.
         return visual, transform, {"transform": str(transform), "mean": [0, 0, 0],
-                                   "std": [1, 1, 1], "reparameterization_parity_checked": True}, checkpoint, "image embedding"
+                                   "std": [1, 1, 1], "reparameterized": reparameterize,
+                                   "reparameterization_parity_checked": reparameterize}, checkpoint, "image embedding"
 
     from transformers import AutoImageProcessor, AutoModel
     if local_dinov3:

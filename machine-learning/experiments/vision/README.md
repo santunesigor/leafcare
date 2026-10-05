@@ -1,4 +1,4 @@
-# Benchmark de backbones pré-treinados
+# Benchmark e ajuste de backbones pré-treinados
 
 Experimento isolado: não altera `config.yaml`, o dataset, o split, o treinamento
 original ou os assets Android. Os resultados e limitações estão em
@@ -31,7 +31,7 @@ registra `access_restricted` e segue com os outros candidatos. Também aceita
 `config.json` e `preprocessor_config.json`. Não coloque tokens no código, nos
 argumentos ou nos artefatos.
 
-## Protocolo
+## Protocolo dos probes congelados
 
 - Verifica SHA256 de todas as imagens, grupos, ordem das classes e split fixo
   489/104/103; não recria o manifesto.
@@ -63,4 +63,50 @@ ausência de medição, não zero.
 Tempo mediano/P95: somente encoder, batch 1, cinco aquecimentos e 30 medições,
 CUDA sincronizada; exclui decode, preprocessing, transferências e probe. Memória
 é o pico alocado pelo PyTorch em batch 1, incluindo o modelo residente, não a RAM
-total do processo. Não houve exportação ou avaliação Android.
+total do processo. Essa rodada congelada não foi exportada ou avaliada no Android.
+
+## Ajuste supervisionado e exportação experimental
+
+Com os cinco probes públicos já registrados, execute no ambiente de treino:
+
+```bash
+experiments/vision/.venv/bin/python -m experiments.vision.finetune
+```
+
+O runner mantém o mesmo dataset/split, inicializa a cabeça a partir dos probes,
+ajusta somente com imagens de treino e seleciona épocas pela validação. A receita
+predefinida está em `finetune.py`: AdamW, batch 8, seed 42, cabeça por três épocas
+e até 15 épocas de ajuste, parada após cinco sem melhora. DINOv2 libera os dois
+últimos blocos/norm; os demais liberam todo o encoder. Uma época de ajuste apenas
+da cabeça pode vencer. Pesos ficam em `.cache/finetune/`; métricas, logits e
+histórico completo em `benchmark_artifacts/vision_finetune/`.
+
+Use um ambiente separado para a conversão [LiteRT Torch](https://github.com/google-ai-edge/litert-torch):
+
+```bash
+uv venv --python 3.12 experiments/vision/.cache/export-venv
+uv pip install --python experiments/vision/.cache/export-venv/bin/python --torch-backend cpu -r experiments/vision/requirements-export.txt
+CUDA_VISIBLE_DEVICES='' TF_ENABLE_ONEDNN_OPTS=0 TF_CPP_MIN_LOG_LEVEL=3 experiments/vision/.cache/export-venv/bin/python -m experiments.vision.export_candidates
+experiments/vision/.venv/bin/python -m experiments.vision.report
+experiments/vision/.venv/bin/python -m pytest -q tests experiments/dinov2/test_benchmark.py experiments/vision
+```
+
+Todos os ajustes predeclarados devem terminar antes de selecionar os dois
+finalistas pela validação. Para repetir uma conversão, use `--models tinyvit_11m`;
+somente finalistas são aceitos. TFLites ficam em `.cache/mobile/`, sem substituir
+assets do app. Os contratos, hashes, versões e resultados ficam nos artefatos.
+Entrada: float32 NHWC RGB 0–255; saída: probabilidades calibradas nas 16 classes.
+Normalização e temperatura ficam no grafo; resize/crop/bicubic oficiais ainda
+precisam ocorrer antes da inferência, conforme cada `preprocessing` registrado.
+Não basta copiar o arquivo para o app para reproduzir estas métricas.
+
+A conversão só passa com concordância Top-1 de 100% nas 104 imagens de validação
+e erro absoluto máximo de probabilidades ≤0,0001 contra PyTorch e logits do
+treino. Tempos LiteRT usam CPU desktop, duas threads, cinco aquecimentos/30
+amostras; a medição Python de pipeline inclui decode e preprocessing, mas não
+Room/UI. Essas medições não comprovam o limite de três segundos no Android.
+
+A referência escolhida é Samsung Galaxy A06. Para medir o fluxo completo,
+conecte esse aparelho com depuração USB e confirme sua presença em `adb devices
+-l`. A medição em dispositivo continua pendente; o app já possui carregamento
+animado durante a análise. Não houve alteração de UI ou do Supabase.

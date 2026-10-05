@@ -27,7 +27,8 @@ FIELDS = [
     "test_top1", "test_macro_f1", "test_top3", "temperature", "threshold",
     "test_coverage", "test_accepted_accuracy", "artifact_format", "artifact_bytes",
     "desktop_median_ms", "desktop_p95_ms", "timing_device", "peak_cuda_batch1_bytes",
-    "android_latency_ms", "source",
+    "android_latency_ms", "mobile_export_status", "mobile_export_bytes", "mobile_top1_agreement",
+    "mobile_desktop_median_ms", "mobile_desktop_p95_ms", "android_reference_device", "source",
 ]
 
 
@@ -126,6 +127,53 @@ def build_rows():
                 "peak_cuda_batch1_bytes": timing["peak_cuda_allocated_bytes_batch1"],
             })
         rows.append(row)
+    fine_root = ROOT / "benchmark_artifacts/vision_finetune"
+    if (fine_root / "environment.json").exists():
+        fine_environment = read(fine_root / "environment.json")
+        for path in sorted(fine_root.glob("*/run_summary.json")):
+            summary = read(path)
+            if summary["status"] != "completed":
+                continue
+            config = read(path.parent / "experiment_config.json")
+            timing = config["timing"]
+            rows.append({
+                "id": summary["model_id"], "model": summary["name"], "status": "finetune_completed",
+                "method": config["method"], "input_height": config["input_shape"][-2],
+                "input_width": config["input_shape"][-1], "parameters": config["parameters"],
+                **metrics_fields(summary["validation"], summary["test"]),
+                "temperature": config["temperature"], "threshold": config["threshold"],
+                "test_coverage": summary["test"]["coverage"],
+                "test_accepted_accuracy": summary["test"]["accepted_accuracy"],
+                "artifact_format": "selected training Safetensors checkpoint (local)",
+                "artifact_bytes": config["checkpoint_bytes"],
+                "desktop_median_ms": timing["desktop_single_image_ms_median"],
+                "desktop_p95_ms": timing["desktop_single_image_ms_p95"],
+                "timing_device": fine_environment["gpu"] or fine_environment["device"],
+                "peak_cuda_batch1_bytes": timing["peak_cuda_allocated_bytes_batch1"],
+                "source": "benchmark_artifacts/vision_finetune/" + path.parent.name + "/",
+            })
+            mobile_path = path.parent / "mobile_export.json"
+            if mobile_path.exists():
+                mobile = read(mobile_path)
+                rows[-1]["mobile_export_status"] = mobile["status"]
+                if mobile["status"] == "completed":
+                    rows[-1].update({
+                        "mobile_export_bytes": mobile["bytes"],
+                        "mobile_top1_agreement": mobile["parity"]["top1_agreement"],
+                        "mobile_desktop_median_ms": mobile["desktop_tflite_ms_median"],
+                        "mobile_desktop_p95_ms": mobile["desktop_tflite_ms_p95"],
+                        "android_reference_device": mobile["android_reference_device"],
+                        "android_latency_ms": mobile["android_full_analysis_ms"],
+                    })
+    # Preserve mobile attributes already known for historical TFLite bundles.
+    # No parity, P95 or Android measurement is inferred from those records.
+    for row in rows:
+        if row["status"] != "finetune_completed" and "TFLite" in row.get("artifact_format", ""):
+            row.update({
+                "mobile_export_status": "integrated" if row["status"] == "integrated" else "historical_export",
+                "mobile_export_bytes": row["artifact_bytes"],
+                "mobile_desktop_median_ms": row.get("desktop_median_ms"),
+            })
     # Publish by validation only; test measurements never determine table ranking.
     return sorted(rows, key=lambda r: r.get("validation_macro_f1", -1), reverse=True)
 
