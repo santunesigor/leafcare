@@ -1,0 +1,10 @@
+{
+  "split": "validation",
+  "n_images": 104,
+  "top1_agreement": 1.0,
+  "max_abs_error": 7.033348083496094e-06,
+  "recorded_training_top1_agreement": 1.0,
+  "recorded_training_max_abs_error": 3.159046173095703e-06,
+  "max_abs_error_limit": 0.0001,
+  "passed": true
+}

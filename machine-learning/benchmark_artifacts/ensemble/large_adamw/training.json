@@ -1,0 +1,45 @@
+{
+  "recipe": {
+    "id": "large_adamw",
+    "architecture": "MobileNetV3Large",
+    "seed": 44,
+    "dropout": 0.3,
+    "optimizer": "AdamW",
+    "weight_decay": 1e-05,
+    "learning_rate": 0.0007,
+    "fine_tune_last_layers": 40,
+    "epochs_frozen": 12,
+    "epochs_finetune": 12,
+    "patience": 3
+  },
+  "selected_stage": "finetune",
+  "validation_loss": {
+    "frozen": 0.6927931308746338,
+    "finetune": 0.48255932331085205
+  },
+  "class_weights": {
+    "0": 5.09375,
+    "1": 4.366071428571429,
+    "2": 0.8732142857142857,
+    "3": 0.8732142857142857,
+    "4": 0.8732142857142857,
+    "5": 4.366071428571429,
+    "6": 0.8732142857142857,
+    "7": 1.0538793103448276,
+    "8": 0.8732142857142857,
+    "9": 1.2225,
+    "10": 0.63671875,
+    "11": 0.8732142857142857,
+    "12": 0.6644021739130435,
+    "13": 4.366071428571429,
+    "14": 0.7454268292682927,
+    "15": 0.4851190476190476
+  },
+  "parameters": 3011728,
+  "seconds": 272.30143219599995,
+  "keras_sha256": "db2439d4022dbdc84dc8ab6c858302239fe91dddbf37481b71aec527a8524ca1",
+  "imagenet_weights_sha256": "65e0b3d8856c638d279ce21988f6dec2d4b82d32edbdeb826b1dba4019ee24ee",
+  "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+  "test_used_for_selection": false,
+  "trained_at": "2026-10-05T20:46:24.903359+00:00"
+}

@@ -8,6 +8,8 @@ def evaluate(config):
     manifest = load_manifest(config)
     output = location(config, "output_dir")
     metadata = read_json(output / "training_metadata.json")
+    if metadata["architecture"] == "MobileNetV3Ensemble":
+        raise ValueError("Use train_ensemble.py --export-only para avaliar o ensemble TFLite com seu limiar calibrado.")
     if metadata["manifest_sha256"] != sha256(location(config, "prepared_dir") / "manifest.json"):
         raise ValueError("Manifesto diferente do utilizado no treinamento.")
     if metadata["classes"] != manifest["classes"] or metadata["keras_sha256"] != sha256(output / "model.keras"):

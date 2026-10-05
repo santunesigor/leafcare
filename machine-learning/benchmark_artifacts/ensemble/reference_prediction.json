@@ -1,0 +1,40 @@
+{
+  "image": "samples/reference_frog_eye.jpg",
+  "image_sha256": "5f4357a3f71c46a3cf52815ed2363351ca386d6f438845904c209174da6c9341",
+  "probabilities": [
+    0.06410036981105804,
+    8.228781211983005e-09,
+    2.589875158776067e-08,
+    3.7113446182956977e-07,
+    0.935748279094696,
+    1.4766292188994612e-08,
+    4.385118490546347e-09,
+    1.4859693919788697e-07,
+    6.436248440877534e-07,
+    7.243894373232251e-08,
+    1.0820249229936962e-07,
+    1.120251454267418e-06,
+    4.385118490546347e-09,
+    4.385118490546347e-09,
+    3.5532627862266963e-06,
+    0.0001453238946851343
+  ],
+  "class_order": [
+    "anthracnose",
+    "black_shank",
+    "brown_spot",
+    "cmv",
+    "frog_eye",
+    "genetic_abnormality",
+    "healthy",
+    "nematodes",
+    "potato_tuber_moth",
+    "pvy",
+    "sunscald",
+    "target_spot",
+    "tmv",
+    "tswv",
+    "weather_fleck",
+    "wildfire"
+  ]
+}

@@ -1,31 +1,225 @@
 {
-  "seed": 42,
-  "dataset_dir": "data/raw",
-  "prepared_dir": "data/prepared",
-  "output_dir": "artifacts",
-  "catalog_file": "disease_catalog.json",
-  "groups_csv": "data/groups.csv",
-  "image_size": 224,
-  "max_image_pixels": 16000000,
-  "split": {
-    "train": 0.7,
-    "validation": 0.15,
-    "test": 0.15
+  "pipeline": "train_ensemble.py",
+  "base_config": {
+    "seed": 42,
+    "dataset_dir": "data/raw",
+    "prepared_dir": "data/prepared",
+    "output_dir": "artifacts",
+    "catalog_file": "disease_catalog.json",
+    "groups_csv": "data/groups.csv",
+    "image_size": 224,
+    "max_image_pixels": 16000000,
+    "split": {
+      "train": 0.7,
+      "validation": 0.15,
+      "test": 0.15
+    },
+    "near_duplicate_hamming": 4,
+    "minimum_groups_per_class": 8,
+    "batch_size": 16,
+    "epochs_frozen": 25,
+    "epochs_finetune": 20,
+    "fine_tune_last_layers": 30,
+    "learning_rate_frozen": 0.001,
+    "learning_rate_finetune": 1e-05,
+    "early_stopping_patience": 6,
+    "class_weight_ratio_threshold": 1.5,
+    "confidence_threshold": 0.7,
+    "export": {
+      "parity_max_abs_error": 0.0001,
+      "parity_images": 20,
+      "android_assets_dir": "../android-app/app/src/main/assets"
+    }
   },
-  "near_duplicate_hamming": 4,
-  "minimum_groups_per_class": 8,
-  "batch_size": 16,
-  "epochs_frozen": 25,
-  "epochs_finetune": 20,
-  "fine_tune_last_layers": 30,
-  "learning_rate_frozen": 0.001,
-  "learning_rate_finetune": 1e-05,
-  "early_stopping_patience": 6,
-  "class_weight_ratio_threshold": 1.5,
-  "confidence_threshold": 0.7,
-  "export": {
-    "parity_max_abs_error": 0.0001,
-    "parity_images": 20,
-    "android_assets_dir": "../android-app/app/src/main/assets"
+  "ensemble": {
+    "architecture": "MobileNetV3Ensemble",
+    "composition_fixed_before_training": true,
+    "members": [
+      {
+        "recipe": {
+          "id": "small_adam",
+          "architecture": "MobileNetV3Small",
+          "seed": 42,
+          "dropout": 0.25,
+          "optimizer": "Adam",
+          "learning_rate": 0.001,
+          "fine_tune_last_layers": 30,
+          "epochs_frozen": 25,
+          "epochs_finetune": 20,
+          "patience": 6
+        },
+        "selected_stage": "finetune",
+        "validation_loss": {
+          "frozen": 0.5757412910461426,
+          "finetune": 0.5279606580734253
+        },
+        "class_weights": {
+          "0": 5.09375,
+          "1": 4.366071428571429,
+          "2": 0.8732142857142857,
+          "3": 0.8732142857142857,
+          "4": 0.8732142857142857,
+          "5": 4.366071428571429,
+          "6": 0.8732142857142857,
+          "7": 1.0538793103448276,
+          "8": 0.8732142857142857,
+          "9": 1.2225,
+          "10": 0.63671875,
+          "11": 0.8732142857142857,
+          "12": 0.6644021739130435,
+          "13": 4.366071428571429,
+          "14": 0.7454268292682927,
+          "15": 0.4851190476190476
+        },
+        "parameters": 948352,
+        "seconds": 302.1821306109996,
+        "keras_sha256": "03219df0752c639316f06ebbe1b0262b0ea9b0f535326cb01a3f3114b4d85e23",
+        "imagenet_weights_sha256": "c2a327f579b9ce98c71b966808d86f5787184a19e741b72aaa1ecc94f2351a0a",
+        "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+        "test_used_for_selection": false,
+        "trained_at": "2026-10-05T20:39:45.614620+00:00"
+      },
+      {
+        "recipe": {
+          "id": "small_rmsprop",
+          "architecture": "MobileNetV3Small",
+          "seed": 54,
+          "dropout": 0.25,
+          "optimizer": "RMSprop",
+          "momentum": 0.9,
+          "learning_rate": 0.0007,
+          "fine_tune_last_layers": 30,
+          "epochs_frozen": 12,
+          "epochs_finetune": 12,
+          "patience": 3
+        },
+        "selected_stage": "finetune",
+        "validation_loss": {
+          "frozen": 0.5283772349357605,
+          "finetune": 0.5048739910125732
+        },
+        "class_weights": {
+          "0": 5.09375,
+          "1": 4.366071428571429,
+          "2": 0.8732142857142857,
+          "3": 0.8732142857142857,
+          "4": 0.8732142857142857,
+          "5": 4.366071428571429,
+          "6": 0.8732142857142857,
+          "7": 1.0538793103448276,
+          "8": 0.8732142857142857,
+          "9": 1.2225,
+          "10": 0.63671875,
+          "11": 0.8732142857142857,
+          "12": 0.6644021739130435,
+          "13": 4.366071428571429,
+          "14": 0.7454268292682927,
+          "15": 0.4851190476190476
+        },
+        "parameters": 948352,
+        "seconds": 123.10844996000014,
+        "keras_sha256": "11c119238fb22fabdad90d9b4d633822cc7ba9097f4b193a2a8acbcb13cf8881",
+        "imagenet_weights_sha256": "c2a327f579b9ce98c71b966808d86f5787184a19e741b72aaa1ecc94f2351a0a",
+        "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+        "test_used_for_selection": false,
+        "trained_at": "2026-10-05T20:41:49.689555+00:00"
+      },
+      {
+        "recipe": {
+          "id": "large_adamw",
+          "architecture": "MobileNetV3Large",
+          "seed": 44,
+          "dropout": 0.3,
+          "optimizer": "AdamW",
+          "weight_decay": 1e-05,
+          "learning_rate": 0.0007,
+          "fine_tune_last_layers": 40,
+          "epochs_frozen": 12,
+          "epochs_finetune": 12,
+          "patience": 3
+        },
+        "selected_stage": "finetune",
+        "validation_loss": {
+          "frozen": 0.6927931308746338,
+          "finetune": 0.48255932331085205
+        },
+        "class_weights": {
+          "0": 5.09375,
+          "1": 4.366071428571429,
+          "2": 0.8732142857142857,
+          "3": 0.8732142857142857,
+          "4": 0.8732142857142857,
+          "5": 4.366071428571429,
+          "6": 0.8732142857142857,
+          "7": 1.0538793103448276,
+          "8": 0.8732142857142857,
+          "9": 1.2225,
+          "10": 0.63671875,
+          "11": 0.8732142857142857,
+          "12": 0.6644021739130435,
+          "13": 4.366071428571429,
+          "14": 0.7454268292682927,
+          "15": 0.4851190476190476
+        },
+        "parameters": 3011728,
+        "seconds": 272.30143219599995,
+        "keras_sha256": "db2439d4022dbdc84dc8ab6c858302239fe91dddbf37481b71aec527a8524ca1",
+        "imagenet_weights_sha256": "65e0b3d8856c638d279ce21988f6dec2d4b82d32edbdeb826b1dba4019ee24ee",
+        "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+        "test_used_for_selection": false,
+        "trained_at": "2026-10-05T20:46:24.903359+00:00"
+      }
+    ],
+    "temperature": 0.8351045566863412,
+    "calibration": {
+      "method": "temperature scaling minimizing validation NLL",
+      "before": {
+        "temperature": 1.0,
+        "negative_log_likelihood": 0.43951237201690674,
+        "expected_calibration_error_15_bins": 0.0880117035255982
+      },
+      "optimized": {
+        "temperature": 0.8351045566863412,
+        "negative_log_likelihood": 0.42889389395713806,
+        "expected_calibration_error_15_bins": 0.09594675096181722
+      },
+      "applied": true,
+      "selected_temperature": 0.8351045566863412
+    },
+    "threshold": 0.6316283345222473,
+    "threshold_selection": {
+      "target_accepted_accuracy": 0.9,
+      "selected_validation_accepted_accuracy": 0.9010989010989011,
+      "selected_validation_accepted": 91,
+      "selected_validation_coverage": 0.875,
+      "target_reached": true,
+      "fallback": null,
+      "runtime": "TFLite float32",
+      "boundary": "midpoint between rejected and accepted confidence",
+      "applied_threshold": 0.6316283345222473
+    },
+    "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+    "class_order": [
+      "anthracnose",
+      "black_shank",
+      "brown_spot",
+      "cmv",
+      "frog_eye",
+      "genetic_abnormality",
+      "healthy",
+      "nematodes",
+      "potato_tuber_moth",
+      "pvy",
+      "sunscald",
+      "target_spot",
+      "tmv",
+      "tswv",
+      "weather_fleck",
+      "wildfire"
+    ],
+    "parameters": 4908432,
+    "keras_sha256": "515a00f1e4f4b70d3ddd81d824cb2ae06a8402e60c4c02889bb52e2782377c7a",
+    "test_used_for_selection": false,
+    "selection_note": "Fixed historical winning composition, new ImageNet transfer training; validation-only checkpoint/calibration selection"
   }
 }

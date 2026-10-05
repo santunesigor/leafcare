@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "mobilenetv4_medium_finetune",
+  "name": "MobileNetV4 Conv Medium fine-tuning",
+  "selected_stage": "finetune",
+  "selected_epoch": 5,
+  "validation": {
+    "top1_accuracy": 0.8365384615384616,
+    "macro_f1": 0.7430080378546403,
+    "top3_accuracy": 0.9807692307692307
+  },
+  "test": {
+    "top1_accuracy": 0.7572815533980582,
+    "macro_f1": 0.6219627240234825,
+    "top3_accuracy": 0.9320388349514563,
+    "coverage": 0.7766990291262136,
+    "accepted_accuracy": 0.8625
+  },
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

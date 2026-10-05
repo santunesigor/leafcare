@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "tinyvit_5m_finetune",
+  "name": "TinyViT-5M fine-tuning",
+  "selected_stage": "finetune",
+  "selected_epoch": 5,
+  "validation": {
+    "top1_accuracy": 0.875,
+    "macro_f1": 0.7112927260218282,
+    "top3_accuracy": 0.9615384615384616
+  },
+  "test": {
+    "top1_accuracy": 0.8252427184466019,
+    "macro_f1": 0.7970336954711955,
+    "top3_accuracy": 0.970873786407767,
+    "coverage": 0.883495145631068,
+    "accepted_accuracy": 0.8681318681318682
+  },
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

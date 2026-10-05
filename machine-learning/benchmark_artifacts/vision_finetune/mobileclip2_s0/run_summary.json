@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "mobileclip2_s0_finetune",
+  "name": "MobileCLIP2-S0 image encoder fine-tuning",
+  "selected_stage": "finetune",
+  "selected_epoch": 4,
+  "validation": {
+    "top1_accuracy": 0.8269230769230769,
+    "macro_f1": 0.7376271876271876,
+    "top3_accuracy": 0.9519230769230769
+  },
+  "test": {
+    "top1_accuracy": 0.7961165048543689,
+    "macro_f1": 0.6871755114629033,
+    "top3_accuracy": 0.970873786407767,
+    "coverage": 0.8058252427184466,
+    "accepted_accuracy": 0.891566265060241
+  },
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

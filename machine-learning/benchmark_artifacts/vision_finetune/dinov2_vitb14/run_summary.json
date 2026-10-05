@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "dinov2_vitb14_finetune",
+  "name": "DINOv2 ViT-B/14 fine-tuning",
+  "selected_stage": "finetune",
+  "selected_epoch": 7,
+  "validation": {
+    "top1_accuracy": 0.9230769230769231,
+    "macro_f1": 0.8068952922077922,
+    "top3_accuracy": 0.9807692307692307
+  },
+  "test": {
+    "top1_accuracy": 0.8349514563106796,
+    "macro_f1": 0.7200562114184405,
+    "top3_accuracy": 1.0,
+    "coverage": 0.941747572815534,
+    "accepted_accuracy": 0.8762886597938144
+  },
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

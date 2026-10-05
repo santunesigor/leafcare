@@ -1,0 +1,17 @@
+true_class\predicted_class,anthracnose,black_shank,brown_spot,cmv,frog_eye,genetic_abnormality,healthy,nematodes,potato_tuber_moth,pvy,sunscald,target_spot,tmv,tswv,weather_fleck,wildfire
+anthracnose,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0
+black_shank,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0
+brown_spot,0,0,4,0,0,0,0,0,0,0,0,3,0,0,0,1
+cmv,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0
+frog_eye,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0
+genetic_abnormality,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0
+healthy,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0
+nematodes,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0
+potato_tuber_moth,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0
+pvy,0,0,0,0,0,0,1,1,0,3,0,0,0,0,0,0
+sunscald,0,0,1,0,0,0,0,0,0,0,8,1,0,0,0,0
+target_spot,0,0,1,0,0,0,0,0,0,0,0,6,0,0,0,0
+tmv,0,0,0,0,0,0,0,0,0,0,0,0,10,0,0,0
+tswv,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0
+weather_fleck,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0
+wildfire,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,12

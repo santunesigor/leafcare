@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "tinyvit_11m_finetune",
+  "name": "TinyViT-11M fine-tuning",
+  "selected_stage": "head_warmup",
+  "selected_epoch": 1,
+  "validation": {
+    "top1_accuracy": 0.875,
+    "macro_f1": 0.7785855263157895,
+    "top3_accuracy": 0.9807692307692307
+  },
+  "test": {
+    "top1_accuracy": 0.8058252427184466,
+    "macro_f1": 0.7143972551141669,
+    "top3_accuracy": 0.9611650485436893,
+    "coverage": 0.9223300970873787,
+    "accepted_accuracy": 0.8631578947368421
+  },
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

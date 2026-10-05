@@ -6,27 +6,33 @@ Resultados comparativos e experimentais estão centralizados em [Benchmark de Mo
 
 ## Modelo integrado
 
-Arquitetura atual:
+Arquitetura atual: **ensemble de dois MobileNetV3Small e um MobileNetV3Large**,
+retreinados a partir dos pesos ImageNet. Cada membro produz 16 probabilidades;
+o grafo calcula a média e aplica `softmax(log(clip(média, 1e-7, 1)) / temperatura)`.
+As três redes e a calibração estão no mesmo `leafcare.tflite`. O Android executa
+um único Interpreter e mantém classificação offline, Top-3 e histórico local.
 
-```text
-MobileNetV3Small
-```
+A receita está em `machine-learning/train_ensemble.py`, fixada antes da avaliação:
 
-Treinamento baseado em transfer learning e fine-tuning.
+| Membro | Seed | Otimizador | LR inicial | Dropout | Camadas finais liberadas | Épocas máximas: cabeça / ajuste |
+|---|---:|---|---:|---:|---:|---:|
+| Small Adam | 42 | Adam | 0,001 | 0,25 | 30 | 25 / 20 |
+| Small RMSprop | 54 | RMSprop, momentum 0,9 | 0,0007 | 0,25 | 30 | 12 / 12 |
+| Large AdamW | 44 | AdamW, weight decay 0,00001 | 0,0007 | 0,30 | 40 | 12 / 12 |
 
-Configuração principal em `machine-learning/config.yaml`:
+Batch 16; LR de ajuste 0,00001; BatchNorm congelada; pesos de classe calculados
+somente no treino. Augmentation padrão do pipeline existente: flips, rotação,
+zoom e contraste. Cada membro escolhe o checkpoint de menor perda de validação,
+com preferência pela fase congelada em empate. Temperatura minimiza NLL na
+validação; limiar maximiza cobertura com pelo menos 90% de acerto nessa partição,
+ou prioriza acerto/cobertura se a meta não for alcançada. O limiar é definido a
+partir das saídas TFLite, no intervalo entre a última previsão rejeitada e a
+primeira aceita. Tudo é congelado antes da inferência de teste.
 
-```yaml
-seed: 42
-image_size: 224
-batch_size: 16
-epochs_frozen: 25
-epochs_finetune: 20
-fine_tune_last_layers: 30
-learning_rate_frozen: 0.001
-learning_rate_finetune: 0.00001
-confidence_threshold: 0.70
-```
+A composição veio do ensemble vencedor da validação histórica. Esta é uma
+**nova execução**, com augmentation padrão atual; suas métricas não devem ser
+substituídas pelos números do benchmark antigo. Configuração, hashes, históricos,
+versões e previsões estão em `benchmark_artifacts/ensemble/`.
 
 ## Classes
 
@@ -78,41 +84,40 @@ As origens e licenças das imagens estão em `docs/legal/referencias_manifest.cs
 | Cor | RGB |
 | Faixa | `0–255` |
 | Resize | center crop + bilinear |
-| Normalização | embutida na MobileNetV3 |
-| Saída | 16 scores float32 |
+| Normalização | rescaling embutido em cada MobileNetV3 |
+| Saída | 16 probabilidades float32, média e temperatura embutidas |
 
 ## Métricas do modelo integrado
 
-Dados registrados em `machine-learning/artifacts/metrics.json`:
+Dados desta nova execução, medidos no TFLite final e registrados em `machine-learning/artifacts/metrics.json`. O ensemble acertou 84/103 imagens, contra 80/103 do MobileNetV3Small anterior. Validação: Top-1 87,50%, Macro-F1 0,8179 e Top-3 99,04%.
 
 | Métrica | Valor |
 |---|---:|
 | Imagens de teste | 103 |
-| Accuracy Top-1 | 0,7767 |
-| Macro-F1 | 0,7157 |
-| Accuracy Top-3 | 0,9709 |
-| Threshold | 0,70 |
-| Cobertura | 0,7670 |
-| Accuracy nos resultados aceitos | 0,8987 |
+| Accuracy Top-1 | 0,8155 |
+| Macro-F1 | 0,7371 |
+| Accuracy Top-3 | 0,9903 |
+| Threshold | 0,631628 |
+| Temperatura | 0,835105 |
+| Cobertura | 0,7961 |
+| Accuracy nos resultados aceitos | 0,9268 |
 
 ### Atenção às classes raras
 
 Algumas classes possuem apenas 1 ou 2 exemplos no conjunto de teste. Métricas individuais dessas classes têm alta variância e não devem ser interpretadas como estimativas estáveis de desempenho real.
 
-## Conversão TFLite
+## Conversão e seleção
 
-A exportação registrada validou 20 imagens do conjunto de validação.
+A exportação usa somente operadores TFLite built-in, float32. Confere todas as
+104 imagens de validação: Top-1 idêntico entre Keras/TFLite e erro absoluto máximo
+≤0,0001. Também compara o grafo com a fórmula NumPy de média/calibração.
+Os assets só são substituídos após passar nessa verificação.
 
-Resultado:
-
-- concordância Top-1 Keras/TFLite: `1.0`;
-- maior erro absoluto observado: `7.718801498413086e-06`.
-
-Esse teste mede paridade de implementação/conversão; não mede generalização em campo.
-
-## Seleção do modelo
-
-Durante o desenvolvimento, foram comparadas arquiteturas e configurações na validação. O aplicativo usa o MobileNetV3Small descrito nesta documentação; as métricas apresentadas são do modelo integrado.
+Paridade mede implementação, não generalização de campo. A composição foi fixada
+pela validação histórica; nesta rodada não há busca de membros nem seleção pelo
+teste. O teste de 103 imagens já era conhecido e continua sendo uma comparação
+interna. A referência MobileNetV3Small anterior foi preservada em
+`benchmark_artifacts/ensemble/baseline_reference.json`.
 
 ## Pipeline
 
@@ -154,22 +159,20 @@ A preparação gera manifestos e dados de auditoria em `data/prepared/`.
 ### Treinamento
 
 ```bash
-python train.py --config config.yaml
+python train_ensemble.py --train-only
 ```
 
 ### Avaliação
 
-```bash
-python evaluate.py --config config.yaml
-```
+A avaliação do novo ensemble ocorre em `train_ensemble.py --export-only`, depois de congelar a seleção e verificar a conversão. `evaluate.py` permanece disponível para o pipeline legado de um único MobileNetV3Small.
 
 ### Exportação
 
 ```bash
-python export_tflite.py --config config.yaml
+python train_ensemble.py --export-only
 ```
 
-O export copia os assets finais necessários para:
+A exportação instala o ensemble em `artifacts/` e copia o TFLite/metadados para:
 
 ```text
 android-app/app/src/main/assets/
@@ -204,6 +207,7 @@ machine-learning/artifacts/
 ├── metrics.json
 ├── confusion_matrix.json
 ├── confusion_matrix.png
+├── model.keras               # local, ignorado pelo Git
 ├── history.json
 ├── accuracy.png
 ├── loss.png
@@ -228,7 +232,22 @@ Ao alterar o modelo:
 - poucas imagens para algumas classes;
 - possível diferença entre imagens acadêmicas e condições reais de campo;
 - ausência de validação externa suficiente no Brasil;
-- threshold do modelo integrado não calibrado;
+- temperatura e threshold ajustados somente na validação pequena, sem garantia de calibração em campo;
 - confiança softmax não representa certeza agronômica;
 - conjunto fechado de 16 classes;
 - necessidade de revisão de rótulos, sintomas e recomendações por especialista.
+
+## Teste no Android
+
+O APK 1.1.0 usa o ensemble como padrão. A animação de carregamento existente
+acompanha a análise; a sincronização continua em segundo plano. Cada registro
+salva o hash do novo TFLite e o limiar do bundle; análises antigas preservam seu
+hash/limiar original. Nenhum schema Room/Supabase foi alterado.
+
+A referência é Samsung Galaxy A06, com meta de até três segundos do início da
+análise até o resultado disponível, incluindo decode, preprocessing, inferência,
+Room e UI. A medição no aparelho continua pendente de conexão física; os tempos
+de CPU desktop não comprovam essa meta. A integração foi solicitada pelo usuário
+para teste no app, sem validação externa de campo.
+
+O TFLite integrado tem 17,22 MiB e 4,908,432 parâmetros. A maior diferença Keras/TFLite foi 6.795e-06, com Top-1 idêntico nas 104 imagens. Em CPU desktop Intel Core i5-13400, duas threads, cinco aquecimentos e 30 amostras: inferência mediana/P95 4,42/4,79 ms; pipeline Python 9,68/10,46 ms, sem Room/UI. Esses tempos não são do A06.

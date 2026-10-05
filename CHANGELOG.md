@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- APK 1.1.0 (versionCode 4): ensemble de dois MobileNetV3Small e um MobileNetV3Large como classificador padrão, em um único TFLite float32 com média e calibração embutidas.
+- Novo treinamento reproduzível em `train_ensemble.py`, preservando dataset/split e avaliando o TFLite final; métricas e paridade em `benchmark_artifacts/ensemble/`.
+- Benchmark ampliado com backbones congelados, ajustes supervisionados e exportações experimentais. APK debug disponibilizado pela CI em branches de experimentos.
+- Inferência, Top-3, resultado inconclusivo e histórico continuam locais/offline. Medição de até três segundos no Galaxy A06 pendente de aparelho conectado.
+
 ## [1.0.0] - 2026-09-29
 
 ### MVP

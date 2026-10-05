@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "tinyvit_11m",
+  "name": "TinyViT-11M",
+  "selected_probe": "unweighted",
+  "validation": {
+    "top1_accuracy": 0.8557692307692307,
+    "macro_f1": 0.7566258394383394,
+    "top3_accuracy": 0.9807692307692307
+  },
+  "test": {
+    "top1_accuracy": 0.8349514563106796,
+    "macro_f1": 0.7492288961038961,
+    "top3_accuracy": 0.970873786407767,
+    "coverage": 0.9611650485436893,
+    "accepted_accuracy": 0.8585858585858586
+  },
+  "total_seconds": 8.569489460000113,
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

@@ -1,0 +1,102 @@
+{
+  "name": "TinyViT-5M",
+  "loader": "timm",
+  "architecture": "tiny_vit_5m_224.dist_in22k_ft_in1k",
+  "repo": "timm/tiny_vit_5m_224.dist_in22k_ft_in1k",
+  "revision": "b46989c2a2c95e7612b919a6f5e2cd7dcf4f1271",
+  "license": "Apache-2.0 (timm checkpoint)",
+  "pretraining": "ImageNet-22k distilled; fine-tuned ImageNet-1k",
+  "model_id": "tinyvit_5m_finetune",
+  "base_model_id": "tinyvit_5m",
+  "recipe": {
+    "seed": 42,
+    "batch_size": 8,
+    "warmup_epochs": 3,
+    "finetune_epochs": 15,
+    "patience": 5,
+    "head_warmup_lr": 0.001,
+    "head_finetune_lr": 0.0001,
+    "backbone_lr": 1e-05,
+    "weight_decay": 0.0001,
+    "optimizer": "AdamW",
+    "class_weight": "balanced from training counts only",
+    "augmentation": "horizontal/vertical flip p=.5, bilinear rotation +/-12 degrees (white fill), brightness/contrast .1, saturation .05; official eval resize/crop/normalization follows",
+    "batch_norm": "running statistics frozen during both stages",
+    "scope": "all CNN/TinyViT parameters; DINOv2 last two blocks + final norm",
+    "selection": "validation Macro-F1, Top-1, Top-3; keep earlier checkpoint on ties",
+    "initialization": "selected historical linear probe copied to float32 Linear head"
+  },
+  "method": "fine-tuning from linear probe; selected stage: finetune",
+  "selected_epoch": 5,
+  "selected_stage": "finetune",
+  "epochs_executed": 10,
+  "training_seconds": 77.4156486469983,
+  "class_order": [
+    "anthracnose",
+    "black_shank",
+    "brown_spot",
+    "cmv",
+    "frog_eye",
+    "genetic_abnormality",
+    "healthy",
+    "nematodes",
+    "potato_tuber_moth",
+    "pvy",
+    "sunscald",
+    "target_spot",
+    "tmv",
+    "tswv",
+    "weather_fleck",
+    "wildfire"
+  ],
+  "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+  "split_counts": {
+    "train": 489,
+    "validation": 104,
+    "test": 103
+  },
+  "pretrained_sha256": "6887cbcb87b340515b477b1582bdada6a7cafff15720dd1a9c102b3aaa579c82",
+  "initial_probe_sha256": "5610dbe185c60fd4298bb037563958d5fd326ad76c80e7e2b5e03686ee147ccf",
+  "checkpoint_sha256": "ae01d97c361424ce7e69c87ecf901f491a92085031a9543b05398094eebd06ed",
+  "checkpoint_bytes": 20379696,
+  "checkpoint_local": "experiments/vision/.cache/finetune/tinyvit_5m.safetensors",
+  "feature": "pooled pre-logits features",
+  "preprocessing": {
+    "input_size": [
+      3,
+      224,
+      224
+    ],
+    "interpolation": "bicubic",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "crop_pct": 0.95,
+    "crop_mode": "center"
+  },
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "parameters": 5076900,
+  "trainable_parameters_finetune": 5076900,
+  "temperature": 1.0914191767616113,
+  "threshold": 0.5494465827941895,
+  "test_used_for_selection": false,
+  "timing": {
+    "desktop_single_image_ms_median": 4.170479998720111,
+    "desktop_single_image_ms_p95": 5.287252349626215,
+    "peak_cuda_allocated_bytes_batch1": 77521920,
+    "note": "FP32, batch 1 encoder+linear head, 5 warmups/30 synchronized measurements. Excludes image preprocessing and calibration. Not Android latency."
+  },
+  "mobile_export_status_file": "mobile_export.json (when present)"
+}

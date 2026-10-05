@@ -1,0 +1,30 @@
+[
+  {
+    "name": "unweighted",
+    "class_weight": null,
+    "C": 1.0,
+    "iterations": [
+      29
+    ],
+    "training_seconds": 0.032485400999576086,
+    "validation": {
+      "top1_accuracy": 0.7115384615384616,
+      "macro_f1": 0.48755213668097297,
+      "top3_accuracy": 0.9326923076923077
+    }
+  },
+  {
+    "name": "balanced",
+    "class_weight": "balanced",
+    "C": 1.0,
+    "iterations": [
+      21
+    ],
+    "training_seconds": 0.03341808100049093,
+    "validation": {
+      "top1_accuracy": 0.7307692307692307,
+      "macro_f1": 0.6342787206128924,
+      "top3_accuracy": 0.9519230769230769
+    }
+  }
+]

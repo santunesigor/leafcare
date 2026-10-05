@@ -1,0 +1,51 @@
+{
+  "members": [
+    {
+      "id": "small_adam",
+      "architecture": "MobileNetV3Small",
+      "seed": 42,
+      "dropout": 0.25,
+      "optimizer": "Adam",
+      "learning_rate": 0.001,
+      "fine_tune_last_layers": 30,
+      "epochs_frozen": 25,
+      "epochs_finetune": 20,
+      "patience": 6
+    },
+    {
+      "id": "small_rmsprop",
+      "architecture": "MobileNetV3Small",
+      "seed": 54,
+      "dropout": 0.25,
+      "optimizer": "RMSprop",
+      "momentum": 0.9,
+      "learning_rate": 0.0007,
+      "fine_tune_last_layers": 30,
+      "epochs_frozen": 12,
+      "epochs_finetune": 12,
+      "patience": 3
+    },
+    {
+      "id": "large_adamw",
+      "architecture": "MobileNetV3Large",
+      "seed": 44,
+      "dropout": 0.3,
+      "optimizer": "AdamW",
+      "weight_decay": 1e-05,
+      "learning_rate": 0.0007,
+      "fine_tune_last_layers": 40,
+      "epochs_frozen": 12,
+      "epochs_finetune": 12,
+      "patience": 3
+    }
+  ],
+  "fine_tuning_lr": 1e-05,
+  "batch_size": 16,
+  "checkpoint_selection": "lowest validation loss, earlier/frozen on ties",
+  "composition": "fixed historical validation-winning architectures/optimizers; all three retrained from ImageNet",
+  "augmentation": "leafcare.training.make_dataset: flip, rotation .08, zoom .10, contrast .10; member seeds",
+  "aggregation": "equal mean probabilities; temperature and threshold from validation only",
+  "class_weights": "balanced training counts only",
+  "dataset_split_unchanged": true,
+  "test_used_for_selection": false
+}
