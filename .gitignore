@@ -31,6 +31,7 @@ htmlcov/
 machine-learning/data/raw/
 machine-learning/data/external/
 machine-learning/experiments/dinov2/.cache/
+machine-learning/experiments/vision/.cache/
 *.keras
 *.h5
 *.weights.h5
