@@ -8,6 +8,15 @@ O dataset disponibilizado foi verificado contra o manifesto existente: 696 image
 
 Macro-F1 é a métrica principal por causa do desbalanceamento. A tabela é ordenada exclusivamente pela Macro-F1 de validação. O teste já foi conhecido em experimentos anteriores; seus resultados são uma comparação interna, não validação externa de campo.
 
+## Critérios para a próxima rodada
+
+- **Espera desejada: até 3 segundos no Android**, do início da análise, após a captura/seleção da foto, até o resultado disponível. A medição deve incluir leitura/decodificação, preprocessing, inferência e gravação local; registrar também a apresentação do resultado na interface. A sincronização das fotos continua em segundo plano.
+- Registrar mediana e P95 desse fluxo no aparelho de referência, que ainda não foi definido. As latências de encoder em GPU/CPU nas tabelas não comprovam o cumprimento da meta de 3 segundos no celular.
+- O app já apresenta um indicador circular animado durante a análise. A animação acompanha o trabalho real, e o resultado deve aparecer assim que estiver pronto; a meta não impõe atraso mínimo nem timeout de classificação.
+- Fotos novas de campo serão obtidas ao longo do uso e passarão por triagem posterior do bucket privado existente `analysis-photos`. Somente fotos com rótulos revisados poderão compor uma futura rodada; a previsão do app não serve como diagnóstico confirmado para treinamento.
+- Na futura triagem, registrar a origem e agrupar fotos da mesma planta/propriedade/sessão quando essa informação estiver disponível. Separar uma avaliação de campo independente antes de usar as demais fotos no treinamento.
+- A próxima comparação investigará fine-tuning dos candidatos, seguido de exportação experimental e medição Android dos finalistas. O dataset/split atual e o modelo integrado permanecem como referências; ainda não há escolha de substituição.
+
 ## Comparação
 
 `—` indica dado não registrado ou experimento não executado. Parâmetros incluem o classificador para as 16 classes; os novos modelos descartam a cabeça original e, no MobileCLIP2, o encoder textual. Fine-tuning e probe congelado são estratégias distintas: as linhas comparam configurações completas, não isolam o efeito da arquitetura.
