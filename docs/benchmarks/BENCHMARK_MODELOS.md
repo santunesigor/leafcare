@@ -2,20 +2,48 @@
 
 ## Escopo
 
-Este documento reúne o benchmark móvel histórico, DINOv2 ViT-S/14 e as rodadas de backbones congelados e ajuste supervisionado executadas em **2026-10-05**. O modelo integrado continua sendo MobileNetV3Small; nenhum asset Android, threshold do app, imagem, classe ou split foi alterado. A escolha para implantação será feita posteriormente.
+Este documento reúne o benchmark móvel histórico, DINOv2 ViT-S/14 e as rodadas de backbones congelados e ajuste supervisionado executadas em **2026-10-05**. As rodadas isoladas preservaram o modelo Android. Posteriormente, a pedido do usuário, o ensemble de dois MobileNetV3Small e um MobileNetV3Large foi retreinado e integrado como padrão. Dataset, classes e split permanecem os mesmos; os resultados desse novo bundle são registrados separadamente.
 
 O dataset disponibilizado foi verificado contra o manifesto existente: 696 imagens, 16 classes, hashes SHA256 consistentes e split fixo de 489 imagens de treino, 104 de validação e 103 de teste, sem grupos ou hashes de pixels compartilhados entre partições. Isso não comprova independência entre plantas/propriedades: os grupos de origem não têm essa identificação.
 
 Macro-F1 é a métrica principal por causa do desbalanceamento. A tabela é ordenada exclusivamente pela Macro-F1 de validação. O teste já foi conhecido em experimentos anteriores; seus resultados são uma comparação interna, não validação externa de campo.
 
-## Critérios para a próxima rodada
+## Critérios de uso no Android e dados de campo
 
 - **Espera desejada: até 3 segundos no Android**, do início da análise, após a captura/seleção da foto, até o resultado disponível. A medição deve incluir leitura/decodificação, preprocessing, inferência e gravação local; registrar também a apresentação do resultado na interface. A sincronização das fotos continua em segundo plano.
 - Registrar mediana e P95 desse fluxo no aparelho de referência **Samsung Galaxy A06**, escolhido pelo usuário. As latências de encoder em GPU/CPU nas tabelas não comprovam o cumprimento da meta de 3 segundos no celular.
 - O app já apresenta um indicador circular animado durante a análise. A animação acompanha o trabalho real, e o resultado deve aparecer assim que estiver pronto; a meta não impõe atraso mínimo nem timeout de classificação.
 - Fotos novas de campo serão obtidas ao longo do uso e passarão por triagem posterior do bucket privado existente `analysis-photos`. Somente fotos com rótulos revisados poderão compor uma futura rodada; a previsão do app não serve como diagnóstico confirmado para treinamento.
 - Na futura triagem, registrar a origem e agrupar fotos da mesma planta/propriedade/sessão quando essa informação estiver disponível. Separar uma avaliação de campo independente antes de usar as demais fotos no treinamento.
-- A rodada de fine-tuning foi executada e os dois finalistas pela validação seguiram para exportação experimental. A medição Android continua pendente de aparelho. O dataset/split atual e o modelo integrado permanecem como referências; ainda não há escolha de substituição.
+- A rodada de fine-tuning foi executada e os dois finalistas pela validação seguiram para exportação experimental. A medição Android continua pendente de aparelho. O dataset/split permanece fixo. A integração do ensemble foi solicitada depois dessas rodadas e está descrita abaixo.
+
+## Ensemble integrado — novo treinamento
+
+A pedido do usuário, a composição histórica foi retreinada a partir de ImageNet:
+dois Small (Adam/RMSprop, seeds 42/54) e um Large (AdamW, seed 44). A receita
+completa e comandos estão em [Machine Learning](../MACHINE_LEARNING.md). O
+preprocessing é o contrato Python/Kotlin do app, center crop/bilinear inteiro,
+RGB 0–255. Dataset, manifesto, hashes e split 489/104/103 foram preservados.
+
+O ensemble agora é o padrão do APK 1.1.0: um único `leafcare.tflite` contém as
+três redes, média das probabilidades e temperatura. Não há votação por rótulo
+nem seleção de rede por imagem. O limiar 0,631628 vem do bundle e
+se aplica às probabilidades já calibradas. Isso mantém inferência offline e
+preserva o hash/limiar das análises anteriores no histórico.
+
+**Resultados novos:** validação 87,50% / 0,8179 / 99,04%; teste 81,55% / 0,7371 / 99,03%. São 84/103 acertos,
+contra 80/103 do baseline anterior. O ensemble histórico acertou 83/103 e teve
+Macro-F1 0,7659; o novo acertou uma imagem a mais, mas teve Macro-F1 0,7371.
+Esse contraste não foi usado para escolher membros ou procurar outra receita.
+O conjunto é pequeno e já conhecido; não comprova generalização em campo.
+
+O TFLite de 17,22 MiB passou na paridade em todas as
+104 imagens de validação, Top-1 idêntico e erro máximo 6.795e-06.
+Inferência em CPU desktop: mediana/P95 4,42/4,79 ms;
+pipeline Python 9,68/10,46 ms,
+sem Room/UI. O teste de três segundos no A06 permanece pendente; nenhum aparelho
+foi encontrado por ADB. Resultados e versões em
+[`benchmark_artifacts/ensemble/`](../../machine-learning/benchmark_artifacts/ensemble/).
 
 ## Comparação
 
@@ -23,11 +51,12 @@ Macro-F1 é a métrica principal por causa do desbalanceamento. A tabela é orde
 
 | Modelo/configuração | Método | Entrada RGB | Parâmetros | Validação: Top-1 / Macro-F1 / Top-3 | Teste: Top-1 / Macro-F1 / Top-3 | Situação |
 |---|---|---|---:|---|---|---|
+| Ensemble MobileNetV3 integrado (novo treino) | Média de 3 redes + temperatura | 224×224 | 4.908.432 | 87,50% / 0,8179 / 99,04% | 81,55% / 0,7371 / 99,03% | No app, APK 1.1.0 |
 | Ensemble: 2 MobileNetV3Small + MobileNetV3Large | Ensemble de 3 modelos | 224×224 | 4.908.432 | 87,50% / 0,8179 / 100,00% | 80,58% / 0,7659 / 99,03% | Experimental histórico |
 | DINOv2 ViT-B/14, ajuste parcial | Fine-tuning parcial | 224×224 | 85.749.520 | 92,31% / 0,8069 / 98,08% | 83,50% / 0,7201 / 100,00% | Experimental ajustado |
 | TinyViT-11M, ajuste do classificador | Ajuste do classificador | 224×224 | 10.555.156 | 87,50% / 0,7786 / 98,08% | 80,58% / 0,7144 / 96,12% | Experimental ajustado |
 | MobileNetV3Small, dropout 0,15 | Fine-tuning | 224×224 | 948.352 | 82,69% / 0,7785 / 99,04% | — | Histórico |
-| MobileNetV3Small integrado | Fine-tuning | 224×224 | 948.352 | 82,69% / 0,7750 / 100,00% | 77,67% / 0,7157 / 97,09% | No app |
+| MobileNetV3Small anterior | Fine-tuning | 224×224 | 948.352 | 82,69% / 0,7750 / 100,00% | 77,67% / 0,7157 / 97,09% | Integrado anteriormente |
 | MobileNetV3Small, RMSprop | Fine-tuning | 224×224 | 948.352 | 82,69% / 0,7677 / 99,04% | — | Histórico |
 | DINOv2 ViT-S/14 | Probe balanceado | 224×224 | 22.068.880 | 88,46% / 0,7676 / 99,04% | 84,47% / 0,7497 / 97,09% | Experimental histórico |
 | MobileNetV3Small, sem pesos de classe | Fine-tuning | 224×224 | 948.352 | 86,54% / 0,7671 / 97,12% | — | Histórico |
@@ -60,8 +89,9 @@ As linhas abaixo possuem avaliação de teste registrada. Para os novos modelos,
 
 | Modelo | Temperatura | Limiar | Cobertura no teste | Acurácia das previsões aceitas |
 |---|---:|---:|---:|---:|
+| Ensemble MobileNetV3 integrado (novo treino) | 0,8351 | 0,6316 | 82/103 (79,61%) | 76/82 (92,68%) |
 | Ensemble: 2 MobileNetV3Small + MobileNetV3Large | 0,8421 | 0,7400 | 78/103 (75,73%) | 72/78 (92,31%) |
-| MobileNetV3Small integrado | Sem calibração | 0,7000 | 79/103 (76,70%) | 71/79 (89,87%) |
+| MobileNetV3Small anterior | Sem calibração | 0,7000 | 79/103 (76,70%) | 71/79 (89,87%) |
 | DINOv2 ViT-S/14 | 1,2188 | 0,5738 | 93/103 (90,29%) | 84/93 (90,32%) |
 | DINOv2 ViT-B/14 | 1,4049 | 0,4580 | 93/103 (90,29%) | 85/93 (91,40%) |
 | TinyViT-11M | 0,6781 | 0,5076 | 99/103 (96,12%) | 85/99 (85,86%) |
@@ -84,11 +114,12 @@ As latências históricas de TFLite foram obtidas em CPU de computador com hardw
 
 | Modelo/configuração | Artefato registrado | Tamanho (MiB) | Mediana / P95 (ms) | Dispositivo da medição | Pico CUDA batch 1 (MiB) | Android (ms) |
 |---|---|---:|---:|---|---:|---:|
+| Ensemble MobileNetV3 integrado (novo treino) | TFLite float32 único, média/calibração embutidas | 17,22 | 4,42 / 4,79 | Intel Core i5-13400, CPU, 2 threads | — | — |
 | Ensemble: 2 MobileNetV3Small + MobileNetV3Large | 3 TFLite float32 | 18,60 | — | — | — | — |
 | DINOv2 ViT-B/14, ajuste parcial | Checkpoint ajustado Safetensors | 327,13 | 37,11 / 37,17 | GTX 1650 | 409,82 | — |
 | TinyViT-11M, ajuste do classificador | Checkpoint ajustado Safetensors | 40,35 | 5,61 / 6,61 | GTX 1650 | 120,57 | — |
 | MobileNetV3Small, dropout 0,15 | Keras histórico | 9,66 | — | — | — | — |
-| MobileNetV3Small integrado | TFLite float32 | 3,59 | — | — | — | — |
+| MobileNetV3Small anterior | TFLite float32 | 3,59 | — | — | — | — |
 | MobileNetV3Small, RMSprop | TFLite float32 | 3,60 | 1,29 / — | CPU histórica; hardware não registrado | — | — |
 | DINOv2 ViT-S/14 | Checkpoint PyTorch + probe | 84,28 | 15,12 / 15,46 | GTX 1050 Ti histórica | — | — |
 | MobileNetV3Small, sem pesos de classe | Keras histórico | 8,54 | — | — | — | — |
@@ -145,21 +176,21 @@ Os cinco candidatos públicos partiram de seus probes registrados. Receita prede
 
 A melhor época foi escolhida pela Macro-F1 de validação, com desempate Top-1/Top-3 e preferência pela época anterior. O checkpoint inicial também era elegível. Temperatura e limiar foram definidos na validação antes da inferência de teste. O teste não foi usado para escolher épocas ou os dois finalistas da rodada: **DINOv2-B ajustado (Macro-F1 0,8069) e TinyViT-11M com cabeça ajustada (0,7786)**. No TinyViT-11M, a época vencedora foi a primeira do ajuste do classificador; liberar o backbone não trouxe melhora de validação.
 
-Nenhum dos cinco ajustes melhorou a Macro-F1 de teste de seu probe congelado. O DINOv2-B ajustado teve Top-1 de 83,50% e Macro-F1 de 0,7201, apesar de melhorar a validação e atingir Top-3 de 100%. Isso reforça a necessidade das fotos futuras de campo para avaliar generalização; esta rodada não indica substituição do modelo do app.
+Nenhum dos cinco ajustes melhorou a Macro-F1 de teste de seu probe congelado. O DINOv2-B ajustado teve Top-1 de 83,50% e Macro-F1 de 0,7201, apesar de melhorar a validação e atingir Top-3 de 100%. Isso reforça a necessidade das fotos futuras de campo para avaliar generalização; a rodada de ajustes dos novos backbones permaneceu experimental. A integração do ensemble foi uma etapa posterior solicitada pelo usuário.
 
 Durante a verificação da exportação, identificou-se um cache de atenção TinyViT que sobrevivia à restauração do checkpoint selecionado. O runner agora invalida esse cache, e os dois ajustes TinyViT foram repetidos com a mesma receita. Somente os resultados corrigidos entram nas tabelas.
 
 ## Leitura dos resultados
 
-- DINOv2 ViT-B/14 congelado teve a maior Top-1 de teste registrada: **90/103 (87,38%)**, contra 87/103 do DINOv2-S e 80/103 do modelo integrado. Sua Macro-F1 foi 0,7551; não superou o ensemble histórico nessa métrica.
+- DINOv2 ViT-B/14 congelado teve a maior Top-1 de teste registrada: **90/103 (87,38%)**, contra 87/103 do DINOv2-S, 84/103 do ensemble integrado e 80/103 do MobileNetV3Small anterior. Sua Macro-F1 foi 0,7551; não superou o ensemble histórico nessa métrica.
 - TinyViT-5M teve a maior Macro-F1 de teste registrada (**0,8040**) e Top-3 de 99,03%, com aproximadamente 5,08 milhões de parâmetros. Entretanto, sua Macro-F1 de validação foi 0,6912 e suas previsões aceitas tiveram apenas 85,56% de acerto no teste. Não é um vencedor confirmado.
 - MobileCLIP2-S0 teve Macro-F1 de teste 0,7920, mas Top-1 de 78,64% e cobertura de 57,28%, com 84,75% de acerto entre as previsões aceitas. Isso limita a interpretação do ganho em Macro-F1.
-- Nesta configuração congelada, MobileNetV4 não melhorou a Macro-F1 do modelo atual. Os resultados com ajuste supervisionado aparecem em linhas separadas. TinyViT-11M também não superou a versão 5M em Macro-F1 de teste.
-- A melhor Macro-F1 de validação continua sendo a do ensemble histórico (0,8179). Após o ajuste, DINOv2-B chegou a Top-3 de 100% no teste (103/103); isso não significa 100% de acerto na primeira hipótese. Nenhum modelo foi escolhido para substituir o app.
+- Nesta configuração congelada, MobileNetV4 não melhorou a Macro-F1 do MobileNetV3Small anterior. Os resultados com ajuste supervisionado aparecem em linhas separadas. TinyViT-11M também não superou a versão 5M em Macro-F1 de teste.
+- A maior Macro-F1 de validação é compartilhada pelo ensemble histórico e pelo novo integrado (0,8179). Após o ajuste, DINOv2-B chegou a Top-3 de 100% no teste (103/103); isso não significa 100% de acerto na primeira hipótese. Os novos backbones permaneceram experimentais; o ensemble foi integrado na rodada adicional descrita neste documento.
 
 ## Validações e limitações
 
-- Validação executada: 40 testes existentes e 14 novos passaram; um teste de integração TensorFlow foi ignorado no ambiente de treino por ausência dessa dependência. A validação real do bundle integrado também passou no ambiente de exportação. As duas conversões preservaram Top-1 nas 104 imagens de validação e passaram no limite de erro de probabilidades.
+- Na integração do ensemble, 37 testes Python do pipeline e 29 dos experimentos passaram. A integração TensorFlow foi executada no ambiente do ensemble. O bundle real passou na validação; o Keras combinado recarregado concordou com o TFLite na imagem de referência. As conversões preservaram Top-1 nas 104 imagens de validação e passaram no limite de erro de probabilidades.
 - A rodada verificou hashes, divisão por grupos e ordem das classes. As métricas de validação/teste dos probes e dos cinco ajustes foram recalculadas a partir dos logits versionados; previsões individuais, confusões e calibração estão disponíveis para revisão.
 - Há linhas separadas para probes congelados e ajustes supervisionados; os candidatos móveis históricos também receberam fine-tuning. Diferenças de pré-treinamento, resolução, processamento e estratégia impedem atribuir ganhos somente à arquitetura.
 - Quatro classes têm apenas uma ou duas imagens no teste. Trocas de poucos acertos podem alterar bastante a Macro-F1; a diferença entre validação e teste dos TinyViTs/MobileCLIP2 reforça essa instabilidade.

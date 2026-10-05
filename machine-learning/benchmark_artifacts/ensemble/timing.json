@@ -1,0 +1,15 @@
+{
+  "desktop_median_ms": 4.420735498570139,
+  "desktop_p95_ms": 4.787022649907158,
+  "desktop_pipeline_median_ms": 9.676769999714452,
+  "desktop_pipeline_p95_ms": 10.457753800073988,
+  "threads": 2,
+  "warmups": 5,
+  "samples": 30,
+  "device": "Intel Core i5-13400 desktop CPU",
+  "android_reference_device": "Samsung Galaxy A06",
+  "android_full_analysis_ms": null,
+  "android_target_ms": 3000,
+  "android_target_verified": false,
+  "note": "Measured complete fused ensemble. Python pipeline includes decode/preprocessing/Top-3, excludes Android Room/UI."
+}

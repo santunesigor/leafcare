@@ -19,7 +19,7 @@ O app já inclui captura/importação de imagens, classificação local, resulta
 
 ## Machine Learning
 
-O bundle integrado é MobileNetV3Small, float32, 16 classes, entrada `[1,224,224,3]` RGB no intervalo 0–255 e threshold baseline 0.70. As métricas registradas são Top-1 77,67%, Macro-F1 0,7157 e Top-3 97,09%.
+O bundle integrado é um ensemble de dois MobileNetV3Small e um MobileNetV3Large em um único TFLite float32, 16 classes e entrada `[1,224,224,3]` RGB 0–255. Média e calibração por temperatura (0,835105) estão no grafo; threshold 0,631628 definido na validação. Métricas do teste interno: Top-1 81,55%, Macro-F1 0,7371 e Top-3 99,03%. Treino/exportação padrão: `train_ensemble.py`. Medição de até três segundos no Galaxy A06 pendente de aparelho conectado.
 
 Não altere modelo, treinamento, dataset, ordem das classes ou threshold sem solicitação explícita. Confiança softmax não é certeza agronômica. Detalhes e comandos estão em [MACHINE_LEARNING.md](MACHINE_LEARNING.md).
 

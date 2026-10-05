@@ -8,8 +8,8 @@ O LeafCare é um aplicativo Android para triagem visual de doenças e alteraçõ
 
 ### Como funciona
 
-1. O app prepara a imagem e a classifica localmente com o modelo MobileNetV3Small.
-2. Mostra até três hipóteses. Se a maior pontuação ficar abaixo do limite de 0,70, o resultado é apresentado como inconclusivo.
+1. O app prepara a imagem e a classifica localmente com um ensemble de dois MobileNetV3Small e um MobileNetV3Large, reunidos em um único TFLite.
+2. Mostra até três hipóteses. Se a maior pontuação ficar abaixo do limiar calibrado definido no bundle, o resultado é apresentado como inconclusivo.
 3. Salva a análise e o histórico no banco local Room.
 4. Depois do primeiro acesso autenticado, câmera, galeria, classificação e histórico ficam disponíveis offline. Quando há conexão, o app sincroniza o histórico e as fotos com o Supabase em segundo plano.
 
@@ -21,7 +21,7 @@ O modelo foi treinado com 696 imagens em 16 classes, usando a seção TV3 bruta 
 
 As imagens completas do dataset não são distribuídas neste repositório. O mapa de classes está em [`machine-learning/tla_class_map.yaml`](machine-learning/tla_class_map.yaml), o registro da importação em [`machine-learning/data/import_report.json`](machine-learning/data/import_report.json) e as fontes/licenças das imagens de referência em [`docs/legal/referencias_manifest.csv`](docs/legal/referencias_manifest.csv).
 
-No teste registrado de 103 imagens, o modelo obteve 77,67% de acurácia Top-1, Macro-F1 de 0,7157 e acurácia Top-3 de 97,09%. É um teste interno pequeno, sem validação de campo; as pontuações não são probabilidades agronômicas calibradas. Mais detalhes estão em [Machine Learning](docs/MACHINE_LEARNING.md).
+No teste registrado de 103 imagens, o ensemble integrado obteve 81,55% de acurácia Top-1, Macro-F1 de 0,7371 e acurácia Top-3 de 99,03%. O limiar calibrado de 0,631628 foi escolhido na validação; no teste, aceitou 82/103 previsões e acertou 76 delas (92,68%). É um teste interno pequeno, sem validação de campo; as pontuações não representam certeza agronômica. Mais detalhes estão em [Machine Learning](docs/MACHINE_LEARNING.md).
 
 ## Desenvolvimento
 
@@ -74,9 +74,8 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python prepare_dataset.py --config config.yaml
-python train.py --config config.yaml
-python evaluate.py --config config.yaml
-python export_tflite.py --config config.yaml
+python train_ensemble.py --train-only
+python train_ensemble.py --export-only
 python validate_bundle.py --require-model
 ```
 

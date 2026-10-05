@@ -64,6 +64,13 @@ class LeafClassifier(private val context: Context) {
             // 3. Validar contrato de pré-processamento e schema
             require(meta.getInt("schema_version") == 1 && meta.getString("resize") == "center_crop_bilinear_integer_v1")
             require(meta.getString("normalization") == "embedded_mobilenetv3_rescaling")
+            if (meta.getString("architecture") == "MobileNetV3Ensemble") {
+                require(meta.getString("aggregation") == "mean_probabilities" && meta.getInt("member_count") == 3)
+                require(meta.getJSONArray("members").length() == 3)
+                val temperature = meta.getDouble("temperature")
+                require(temperature.isFinite() && temperature > 0.0)
+                require(meta.getString("probability_calibration") == "embedded_temperature_scaling")
+            }
 
             // 4. Carregar modelo e validar hash
             val bytes = context.assets.open("leafcare.tflite").use { it.readBytes() }
@@ -84,7 +91,8 @@ class LeafClassifier(private val context: Context) {
             inBuf = ByteBuffer.allocateDirect(inputSize * 4).order(ByteOrder.nativeOrder())
             outArr = arrayOf(FloatArray(cls.size))
 
-            defThresh = meta.optDouble("confidence_threshold", 0.70).toFloat()
+            defThresh = meta.getDouble("confidence_threshold").toFloat()
+            require(defThresh.isFinite() && defThresh in 0f..1f) { "Limiar do modelo inválido." }
         }.onFailure { availErr = it.message }
             .onSuccess {
                 metadata = meta!!

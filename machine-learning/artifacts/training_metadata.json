@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "trained",
-  "architecture": "MobileNetV3Small",
+  "architecture": "MobileNetV3Ensemble",
   "input_shape": [
     1,
     224,
@@ -37,34 +37,45 @@
     "wildfire"
   ],
   "classes_sha256": "d565d9a564eebe6e3e46c2566ca94d728b03f8d8f73b7fbef4df9a6a0295abec",
-  "confidence_threshold": 0.7,
-  "threshold_calibrated": false,
+  "confidence_threshold": 0.6316283345222473,
+  "threshold_calibrated": true,
+  "aggregation": "mean_probabilities",
+  "temperature": 0.8351045566863412,
+  "probability_calibration": "embedded_temperature_scaling",
+  "member_count": 3,
+  "members": [
+    {
+      "id": "small_adam",
+      "architecture": "MobileNetV3Small",
+      "keras_sha256": "03219df0752c639316f06ebbe1b0262b0ea9b0f535326cb01a3f3114b4d85e23"
+    },
+    {
+      "id": "small_rmsprop",
+      "architecture": "MobileNetV3Small",
+      "keras_sha256": "11c119238fb22fabdad90d9b4d633822cc7ba9097f4b193a2a8acbcb13cf8881"
+    },
+    {
+      "id": "large_adamw",
+      "architecture": "MobileNetV3Large",
+      "keras_sha256": "db2439d4022dbdc84dc8ab6c858302239fe91dddbf37481b71aec527a8524ca1"
+    }
+  ],
   "seed": 42,
   "tensorflow": "2.16.1",
   "keras": "3.3.3",
-  "trained_at": "2026-09-10T16:26:01.299180+00:00",
-  "selected_stage": "finetune",
-  "frozen_val_loss": 0.5757412314414978,
-  "finetune_val_loss": 0.5279706716537476,
-  "keras_sha256": "1534a86d8b5448d0d068b7a426584bbd8b82d6cc9d0cb16c735d4b176812e333",
+  "trained_at": "2026-10-05T20:48:22.302355+00:00",
+  "parameters": 4908432,
+  "keras_sha256": "515a00f1e4f4b70d3ddd81d824cb2ae06a8402e60c4c02889bb52e2782377c7a",
   "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
-  "class_weights": {
-    "0": 5.09375,
-    "1": 4.366071428571429,
-    "2": 0.8732142857142857,
-    "3": 0.8732142857142857,
-    "4": 0.8732142857142857,
-    "5": 4.366071428571429,
-    "6": 0.8732142857142857,
-    "7": 1.0538793103448276,
-    "8": 0.8732142857142857,
-    "9": 1.2225,
-    "10": 0.63671875,
-    "11": 0.8732142857142857,
-    "12": 0.6644021739130435,
-    "13": 4.366071428571429,
-    "14": 0.7454268292682927,
-    "15": 0.4851190476190476
+  "model_sha256": "a039eebb22284e68d903f3e9f5c0f32c1a51073e5e3f91b569f31ac5a5b6fc40",
+  "conversion_parity": {
+    "split": "validation",
+    "n_images": 104,
+    "top1_agreement": 1.0,
+    "max_abs_error": 6.794929504394531e-06,
+    "numpy_formula_max_abs_error": 2.205371856689453e-06,
+    "max_abs_error_limit": 0.0001,
+    "passed": true
   },
   "test_used_for_selection": false
 }

@@ -65,17 +65,39 @@ def build_rows():
             "timing_device": "historical desktop CPU (TFLite); hardware not recorded" if member else None,
             "source": historical["source_commit"],
         })
-    integrated = read(ROOT / "artifacts/metrics.json")
+    ensemble_root = ROOT / "benchmark_artifacts/ensemble"
+    ensemble_integrated = read(ROOT / "artifacts/model_metadata.json")["architecture"] == "MobileNetV3Ensemble"
+    previous = read(ensemble_root / "baseline_reference.json") if ensemble_integrated else None
+    integrated = previous["metrics"] if previous else read(ROOT / "artifacts/metrics.json")
     rows.append({
-        "id": "baseline_anterior", "model": "MobileNetV3Small integrado", "status": "integrated",
+        "id": "baseline_anterior", "model": "MobileNetV3Small anterior" if previous else "MobileNetV3Small integrado",
+        "status": "previous_integrated" if previous else "integrated",
         "method": "transfer learning + fine-tuning", "input_height": 224, "input_width": 224,
         "parameters": historical["baseline"]["parameters"],
         **metrics_fields(historical["baseline"], integrated), "temperature": 1.0,
         "threshold": integrated["threshold"], "test_coverage": integrated["coverage"],
         "test_accepted_accuracy": integrated["accepted_accuracy"], "artifact_format": "TFLite float32",
-        "artifact_bytes": (ROOT / "artifacts/leafcare.tflite").stat().st_size,
-        "source": "artifacts/metrics.json; historical baseline parameter count",
+        "artifact_bytes": previous["artifact_bytes"] if previous else (ROOT / "artifacts/leafcare.tflite").stat().st_size,
+        "source": "benchmark_artifacts/ensemble/baseline_reference.json" if previous else "artifacts/metrics.json; historical baseline parameter count",
     })
+    if ensemble_integrated:
+        summary = read(ensemble_root / "run_summary.json")
+        timing = read(ensemble_root / "timing.json")
+        parity = read(ensemble_root / "conversion_parity.json")
+        rows.append({
+            "id": "ensemble_integrated", "model": "Ensemble MobileNetV3 integrado (novo treino)", "status": "integrated",
+            "method": "3 freshly trained members; mean probabilities and temperature embedded",
+            "input_height": 224, "input_width": 224, "parameters": summary["parameters"],
+            **metrics_fields(summary["validation"], summary["test"]),
+            "temperature": summary["temperature"], "threshold": summary["threshold"],
+            "test_coverage": summary["test"]["coverage"], "test_accepted_accuracy": summary["test"]["accepted_accuracy"],
+            "artifact_format": "single fused TFLite float32", "artifact_bytes": summary["artifact_bytes"],
+            "desktop_median_ms": timing["desktop_median_ms"], "desktop_p95_ms": timing["desktop_p95_ms"],
+            "timing_device": timing["device"], "mobile_top1_agreement": parity["top1_agreement"],
+            "mobile_desktop_p95_ms": timing["desktop_p95_ms"],
+            "android_reference_device": timing["android_reference_device"],
+            "android_latency_ms": timing["android_full_analysis_ms"], "source": "benchmark_artifacts/ensemble/",
+        })
     ensemble = historical["ensemble"]
     rows.append({
         "id": "ensemble", "model": "Ensemble: 2 MobileNetV3Small + MobileNetV3Large", "status": "historical_experimental",

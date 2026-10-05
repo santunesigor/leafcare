@@ -60,7 +60,7 @@ def test_comparison_csv_contains_all_training_runs_and_mobile_measurements():
         reader = csv.DictReader(stream)
         assert reader.fieldnames == FIELDS
         rows = list(reader)
-    assert len(rows) == 28
+    assert len(rows) == 29
     adjusted = [row for row in rows if row["status"] == "finetune_completed"]
     assert len(adjusted) == 5
     exports = [row for row in adjusted if row["mobile_export_status"] == "completed"]
@@ -68,3 +68,9 @@ def test_comparison_csv_contains_all_training_runs_and_mobile_measurements():
     assert all(float(row["mobile_top1_agreement"]) == 1 for row in exports)
     assert all(row["android_reference_device"] == "Samsung Galaxy A06" for row in exports)
     assert all(not row["android_latency_ms"] for row in rows)
+    current = next(row for row in rows if row["id"] == "ensemble_integrated")
+    assert current["status"] == current["mobile_export_status"] == "integrated"
+    assert float(current["mobile_top1_agreement"]) == 1
+    previous = next(row for row in rows if row["id"] == "baseline_anterior")
+    assert previous["status"] == "previous_integrated"
+    assert float(previous["test_top1"]) == pytest.approx(80 / 103)

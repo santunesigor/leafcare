@@ -153,7 +153,7 @@ O objetivo é evitar divergências de pixels entre o pipeline Python e o aplicat
 
 A saída do modelo contém 16 scores. A aplicação ordena os scores e exibe as três maiores hipóteses.
 
-O threshold padrão vem do `model_metadata.json` e atualmente é `0.70`.
+O threshold padrão vem do `model_metadata.json` do ensemble, escolhido na validação. Média dos três membros e calibração por temperatura estão no grafo TFLite; o app recebe as probabilidades finais e aplica o limiar do bundle, sem recalibrar a saída.
 
 Quando a maior confiança fica abaixo do threshold, o resultado é tratado como **Inconclusivo**. Isso reduz a quantidade de previsões aceitas, mas não transforma a confiança softmax em probabilidade clínica/agronômica calibrada.
 

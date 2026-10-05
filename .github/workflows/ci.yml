@@ -80,6 +80,9 @@ jobs:
       - name: Verify model assets
         run: ./gradlew verifyModelAssets --no-daemon
 
+      - name: Run Android lint
+        run: ./gradlew lintDebug --no-daemon
+
       - name: Assemble debug
         run: ./gradlew assembleDebug --no-daemon
 
