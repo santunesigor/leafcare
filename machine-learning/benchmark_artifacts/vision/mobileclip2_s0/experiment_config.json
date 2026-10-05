@@ -1,0 +1,83 @@
+{
+  "name": "MobileCLIP2-S0 image encoder",
+  "loader": "open_clip",
+  "repo": "apple/MobileCLIP2-S0",
+  "revision": "3136ea51c8ed56b9f9abfab04cb816735aaad6cb",
+  "license": "Apple ML Research Model TOU",
+  "pretraining": "DFNDR-2B",
+  "model_id": "mobileclip2_s0",
+  "seed": 42,
+  "split_counts": {
+    "train": 489,
+    "validation": 104,
+    "test": 103
+  },
+  "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+  "class_order": [
+    "anthracnose",
+    "black_shank",
+    "brown_spot",
+    "cmv",
+    "frog_eye",
+    "genetic_abnormality",
+    "healthy",
+    "nematodes",
+    "potato_tuber_moth",
+    "pvy",
+    "sunscald",
+    "target_spot",
+    "tmv",
+    "tswv",
+    "weather_fleck",
+    "wildfire"
+  ],
+  "checkpoint_sha256": "bc3bc861baa680df2f9e3dc1aa0acbe5a21af21032df385026dda70c33505aa6",
+  "checkpoint_bytes": 299864852,
+  "image_encoder_bytes": 45508920,
+  "classifier_bytes": 63737,
+  "backbone_parameters": 11357504,
+  "trainable_parameters": 8208,
+  "feature_dimension": 512,
+  "feature": "image embedding",
+  "preprocessing": {
+    "transform": "Compose(\n    Resize(size=256, interpolation=bicubic, max_size=None, antialias=True)\n    CenterCrop(size=(256, 256))\n    <function _convert_to_rgb at 0x70537a016160>\n    ToTensor()\n    Normalize(mean=(0, 0, 0), std=(1, 1, 1))\n)",
+    "mean": [
+      0,
+      0,
+      0
+    ],
+    "std": [
+      1,
+      1,
+      1
+    ],
+    "reparameterization_parity_checked": true
+  },
+  "input_shape": [
+    1,
+    3,
+    256,
+    256
+  ],
+  "dtype": "float32",
+  "method": "frozen backbone + logistic regression; no augmentation or feature standardization",
+  "classifier_selected_on_validation": "balanced",
+  "classifier_C": 1.0,
+  "optimizer": "LBFGS",
+  "max_iter": 1000,
+  "batch_size": 8,
+  "selection_metric": "validation Macro-F1; ties Top-1, Top-3, unweighted",
+  "temperature": 0.179819354519648,
+  "threshold": 0.7018481657772111,
+  "test_used_for_selection": false,
+  "timing": {
+    "feature_extraction_seconds_train_validation": 3.827350154000669,
+    "classifier_training_seconds": 0.06590348200006702,
+    "desktop_single_image_ms_median": 5.677132000528218,
+    "desktop_single_image_ms_p95": 6.634522649437713,
+    "peak_cuda_allocated_bytes_batch1": 64235520,
+    "note": "Batch 1 encoder only, 5 warmups/30 samples, CUDA synchronized. Excludes decode, preprocessing, transfers and classifier; memory includes resident model. Not Android latency or total process RAM."
+  },
+  "android_inference": "not measured",
+  "mobile_export": "not attempted"
+}

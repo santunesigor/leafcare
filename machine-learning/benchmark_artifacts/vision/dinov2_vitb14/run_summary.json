@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "dinov2_vitb14",
+  "name": "DINOv2 ViT-B/14",
+  "selected_probe": "unweighted",
+  "validation": {
+    "top1_accuracy": 0.875,
+    "macro_f1": 0.7623701859286225,
+    "top3_accuracy": 0.9807692307692307
+  },
+  "test": {
+    "top1_accuracy": 0.8737864077669902,
+    "macro_f1": 0.7550531270200388,
+    "top3_accuracy": 0.970873786407767,
+    "coverage": 0.9029126213592233,
+    "accepted_accuracy": 0.9139784946236559
+  },
+  "total_seconds": 55.25518008899962,
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

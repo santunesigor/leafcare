@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "mobileclip2_s0",
+  "name": "MobileCLIP2-S0 image encoder",
+  "selected_probe": "balanced",
+  "validation": {
+    "top1_accuracy": 0.7307692307692307,
+    "macro_f1": 0.6342787206128924,
+    "top3_accuracy": 0.9519230769230769
+  },
+  "test": {
+    "top1_accuracy": 0.7864077669902912,
+    "macro_f1": 0.7920441422182908,
+    "top3_accuracy": 0.9611650485436893,
+    "coverage": 0.5728155339805825,
+    "accepted_accuracy": 0.847457627118644
+  },
+  "total_seconds": 6.238237647999995,
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

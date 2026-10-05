@@ -1,0 +1,90 @@
+{
+  "name": "DINOv2 ViT-B/14",
+  "loader": "timm_tokens",
+  "architecture": "vit_base_patch14_dinov2.lvd142m",
+  "repo": "timm/vit_base_patch14_dinov2.lvd142m",
+  "revision": "4685c99dabffe5affac90bd99dbffd25801ae58d",
+  "license": "Apache-2.0",
+  "pretraining": "LVD-142M",
+  "model_id": "dinov2_vitb14",
+  "seed": 42,
+  "split_counts": {
+    "train": 489,
+    "validation": 104,
+    "test": 103
+  },
+  "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+  "class_order": [
+    "anthracnose",
+    "black_shank",
+    "brown_spot",
+    "cmv",
+    "frog_eye",
+    "genetic_abnormality",
+    "healthy",
+    "nematodes",
+    "potato_tuber_moth",
+    "pvy",
+    "sunscald",
+    "target_spot",
+    "tmv",
+    "tswv",
+    "weather_fleck",
+    "wildfire"
+  ],
+  "checkpoint_sha256": "55cbb5d887b336d430e649c277b85a1429e724871f9d02ac16203235886d8c7b",
+  "checkpoint_bytes": 346334872,
+  "image_encoder_bytes": 342917304,
+  "classifier_bytes": 189362,
+  "backbone_parameters": 85724928,
+  "trainable_parameters": 24592,
+  "feature_dimension": 1536,
+  "feature": "CLS + mean patch tokens",
+  "preprocessing": {
+    "input_size": [
+      3,
+      224,
+      224
+    ],
+    "interpolation": "bicubic",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "crop_pct": 0.875,
+    "crop_mode": "center"
+  },
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "dtype": "float32",
+  "method": "frozen backbone + logistic regression; no augmentation or feature standardization",
+  "classifier_selected_on_validation": "unweighted",
+  "classifier_C": 1.0,
+  "optimizer": "LBFGS",
+  "max_iter": 1000,
+  "batch_size": 8,
+  "selection_metric": "validation Macro-F1; ties Top-1, Top-3, unweighted",
+  "temperature": 1.4049078531114076,
+  "threshold": 0.45800608488516403,
+  "test_used_for_selection": false,
+  "timing": {
+    "feature_extraction_seconds_train_validation": 18.69879547200071,
+    "classifier_training_seconds": 29.97471353400033,
+    "desktop_single_image_ms_median": 36.07251199991879,
+    "desktop_single_image_ms_p95": 38.66146039972591,
+    "peak_cuda_allocated_bytes_batch1": 361495552,
+    "note": "Batch 1 encoder only, 5 warmups/30 samples, CUDA synchronized. Excludes decode, preprocessing, transfers and classifier; memory includes resident model. Not Android latency or total process RAM."
+  },
+  "android_inference": "not measured",
+  "mobile_export": "not attempted"
+}

@@ -1,0 +1,6 @@
+{
+  "status": "access_restricted",
+  "model_id": "dinov3_vits16",
+  "name": "DINOv3 ViT-S/16",
+  "reason": "Official weights require account approval; no accessible checkpoint available. No training or metrics produced."
+}

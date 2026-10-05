@@ -309,6 +309,8 @@ def run_model(model_id, config, manifest, classes, device, local_dinov3=None):
     save_class_metrics(output / "per_class_metrics.csv", {"validation": val_metrics, "test": test_metrics}, classes)
     save_predictions(output / "predictions_test.csv", split_rows(manifest, "test"), test_y,
                      test_logits, probabilities, threshold, classes)
+    for path in output.glob("*.csv"):
+        path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
     np.savez_compressed(output / "logits.npz", validation=val_logits, test=test_logits)
     result = {
         "status": "completed", "model_id": model_id, "name": spec["name"],

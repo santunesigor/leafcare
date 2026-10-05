@@ -133,7 +133,7 @@ def build_rows():
 def main():
     rows = build_rows()
     with (OUTPUT / "comparison.csv").open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=FIELDS)
+        writer = csv.DictWriter(stream, fieldnames=FIELDS, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     print(f"Recorded {len(rows)} configurations in {OUTPUT / 'comparison.csv'}")

@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "mobilenetv4_medium",
+  "name": "MobileNetV4 Conv Medium",
+  "selected_probe": "balanced",
+  "validation": {
+    "top1_accuracy": 0.7884615384615384,
+    "macro_f1": 0.7019688644688644,
+    "top3_accuracy": 0.9519230769230769
+  },
+  "test": {
+    "top1_accuracy": 0.7669902912621359,
+    "macro_f1": 0.6752149135516275,
+    "top3_accuracy": 0.9320388349514563,
+    "coverage": 0.6699029126213593,
+    "accepted_accuracy": 0.9130434782608695
+  },
+  "total_seconds": 49.75833300299928,
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}
