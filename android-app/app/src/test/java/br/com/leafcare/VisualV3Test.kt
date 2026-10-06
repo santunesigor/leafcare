@@ -28,6 +28,27 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [34], qualifiers = "w420dp-h865dp-mdpi", application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class VisualV3Test {
+    @Test fun activeHistoryFilterCanBeRemoved() {
+        val identified = AnalysisEntity("identified", "fixture.jpg", 1788134400000, "frog_eye", "Olho-de-rã", "Cercospora nicotianae", .82f, "[]", false, .7f, 30.0, "fixture")
+        val inconclusive = identified.copy(id = "inconclusive", inconclusive = true, confidence = .4f)
+        compose.setContent {
+            LeafCareTheme {
+                HistoryContent(listOf(identified, inconclusive), .631628f, {}, {},
+                    { R.drawable.v3_example_correct }, null)
+            }
+        }
+
+        compose.onNodeWithContentDescription("Filtrar análises").performClick()
+        compose.onNodeWithText("Inconclusivas").performClick()
+        compose.onNodeWithText("Olho-de-rã").assertDoesNotExist()
+        compose.onNodeWithText("Filtro").assertExists()
+
+        compose.onNodeWithContentDescription("Remover filtro Inconclusivas").performClick()
+
+        compose.onNodeWithText("Olho-de-rã").assertExists()
+        compose.onNodeWithContentDescription("Remover filtro Inconclusivas").assertDoesNotExist()
+    }
+
     @Test fun historySearchAndNavigation() {
         var selected = false; var opened = false
         compose.activity.imageLoader.memoryCache?.clear()

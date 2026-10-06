@@ -30,6 +30,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -164,7 +166,30 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                         }
                     }
                 }
-                if (filter != stringResource(R.string.filter_all)) Text("${stringResource(R.string.filter_prefix)}$filter", style = MaterialTheme.typography.labelMedium)
+                if (filter != stringResource(R.string.filter_all)) {
+                    val all = stringResource(R.string.filter_all)
+                    val removeFilter = stringResource(R.string.filter_remove_desc, filter)
+                    Row(
+                        Modifier.padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(stringResource(R.string.filter_active_label), color = LeafColors.Muted,
+                            style = MaterialTheme.typography.bodySmall)
+                        InputChip(
+                            selected = true,
+                            onClick = { filter = all },
+                            modifier = Modifier.semantics { contentDescription = removeFilter },
+                            label = { Text(filter, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                            trailingIcon = { Icon(Icons.Default.Close, null, Modifier.size(16.dp)) },
+                            colors = InputChipDefaults.inputChipColors(
+                                selectedContainerColor = LeafColors.Pale,
+                                selectedLabelColor = LeafColors.Green,
+                                selectedTrailingIconColor = LeafColors.Green
+                            )
+                        )
+                    }
+                }
             }
             item {
                 modelError?.let { message ->
@@ -226,13 +251,21 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
             }
             if (rows.isNotEmpty()) item {
                 Text(
-                    stringResource(R.string.confidence_threshold_label, percent(threshold)),
+                    stringResource(R.string.confidence_threshold_label,
+                        String.format(Locale.forLanguageTag("pt-BR"), "%.2f%%", threshold * 100)),
                     style = MaterialTheme.typography.bodySmall,
                     color = LeafColors.Muted,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp, bottom = 4.dp)
+                )
+                Text(
+                    stringResource(R.string.confidence_threshold_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LeafColors.Muted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

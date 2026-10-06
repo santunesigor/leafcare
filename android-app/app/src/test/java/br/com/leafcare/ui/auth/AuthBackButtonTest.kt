@@ -17,6 +17,7 @@ import br.com.leafcare.auth.FakeBackend
 import br.com.leafcare.auth.FakeRecoveryPendingStore
 import br.com.leafcare.ui.LeafCareTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,6 +59,77 @@ class AuthBackButtonTest {
     @Test fun signUp_backIsTopStart() {
         compose.setContent { LeafCareTheme { SignUpScreen(viewModel()) } }
         assertBackAboveContent("Crie sua conta")
+    }
+
+    @Test fun signUp_androidBackReturnsToLoginWithoutFinishingActivity() {
+        val vm = viewModel()
+        vm.setScreen(AuthScreen.SignUp)
+        compose.setContent { LeafCareTheme { AuthNavHost(vm) } }
+        compose.onNodeWithText("Crie sua conta").assertExists()
+
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+
+        compose.onNodeWithText("Bem-vindo ao LeafCare").assertExists()
+        assertEquals(AuthScreen.Login, vm.uiState.value.currentScreen)
+        assertFalse(compose.activity.isFinishing)
+    }
+
+    @Test fun signUp_arrowReturnsToLogin() {
+        val vm = viewModel()
+        vm.setScreen(AuthScreen.SignUp)
+        compose.setContent { LeafCareTheme { AuthNavHost(vm) } }
+
+        compose.onNodeWithContentDescription("Voltar").performClick()
+
+        compose.onNodeWithText("Bem-vindo ao LeafCare").assertExists()
+    }
+
+    @Test fun forgotPassword_androidBackReturnsToLogin() {
+        val vm = viewModel()
+        vm.setScreen(AuthScreen.ForgotPassword)
+        compose.setContent { LeafCareTheme { AuthNavHost(vm) } }
+        compose.onNodeWithText("Recuperar senha").assertExists()
+
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+
+        compose.onNodeWithText("Bem-vindo ao LeafCare").assertExists()
+        assertFalse(compose.activity.isFinishing)
+    }
+
+    @Test fun verifyEmail_androidBackReturnsToSignUpThenLogin() {
+        val vm = viewModel()
+        vm.setScreen(AuthScreen.VerifyEmail)
+        compose.setContent { LeafCareTheme { AuthNavHost(vm) } }
+        compose.onNodeWithText("Verifique seu e-mail").assertExists()
+
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithText("Crie sua conta").assertExists()
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+
+        compose.onNodeWithText("Bem-vindo ao LeafCare").assertExists()
+    }
+
+    @Test fun recoveryNewPassword_androidBackAsksBeforeLeaving() {
+        compose.setContent {
+            LeafCareTheme { NewPasswordScreen(viewModel(), {}, confirmCancelRecovery = true) }
+        }
+
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+
+        compose.onNodeWithText("Cancelar recuperação?").assertExists()
+        assertFalse(compose.activity.isFinishing)
+    }
+
+    @Test fun profileChangePassword_androidBackCallsPreviousScreen() {
+        var returned = false
+        compose.setContent {
+            LeafCareTheme { NewPasswordScreen(viewModel(), { returned = true }) }
+        }
+
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+
+        assertEquals(true, returned)
+        compose.onNodeWithText("Cancelar recuperação?").assertDoesNotExist()
     }
 
     @Test fun verifyEmail_backIsTopStart() {
