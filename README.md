@@ -56,7 +56,7 @@ Dentro de `android-app`, gere o APK debug com:
 .\gradlew.bat assembleDebug
 ```
 
-O arquivo fica em `android-app/app/build/outputs/apk/debug/app-debug.apk`. Antes de enviar mudanças, rode os testes e as verificações relevantes:
+O APK para instalar fica em `android-app/app/build/outputs/apk/distribution/debug/leafcare-<versão>-<commit>.apk`, por exemplo `leafcare-1.1.1-c0458b1.apk`. O nome é gerado automaticamente pelo `assembleDebug` e usado no download da CI. Antes de enviar mudanças, rode os testes e as verificações relevantes:
 
 ```powershell
 .\gradlew.bat testDebugUnitTest verifyModelAssets lintDebug

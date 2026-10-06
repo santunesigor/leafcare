@@ -57,6 +57,25 @@ android {
 }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
+val debugApkCommit = providers.exec {
+    workingDir(rootProject.projectDir)
+    commandLine("git", "rev-parse", "--short=7", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.trim().ifBlank { "sem-git" } }
+val debugVersionName = android.defaultConfig.versionName
+val debugApkFileName = debugApkCommit.map { "leafcare-$debugVersionName-$it.apk" }
+
+val distributeDebugApk by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Disponibiliza o APK debug com versão e commit no nome."
+    dependsOn("packageDebug")
+    from(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+    into(layout.buildDirectory.dir("outputs/apk/distribution/debug"))
+    inputs.property("apkFileName", debugApkFileName)
+    rename { debugApkFileName.get() }
+}
+tasks.matching { it.name == "assembleDebug" }.configureEach { dependsOn(distributeDebugApk) }
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)

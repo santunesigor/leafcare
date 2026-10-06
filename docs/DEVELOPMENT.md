@@ -23,7 +23,9 @@ Comandos no Windows/PowerShell, dentro de `android-app`:
 .\gradlew.bat assembleDebug
 ```
 
-O APK debug fica em `app/build/outputs/apk/debug/app-debug.apk`.
+O `assembleDebug` disponibiliza o APK para instalar em `app/build/outputs/apk/distribution/debug/leafcare-<versão>-<commit>.apk`. A versão vem do `versionName` e o commit é o hash curto do `HEAD` usado no build. Sem um checkout Git, o sufixo é `sem-git`. A CI publica esse arquivo com o mesmo nome.
+
+O arquivo padrão `app/build/outputs/apk/debug/app-debug.apk` continua disponível para as ferramentas Android.
 
 ## Python e Machine Learning
 

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Build debug e download da CI disponibilizam `leafcare-<versão>-<commit>.apk` automaticamente.
 - APK 1.1.1 (versionCode 5): botão/gesto de voltar do Android acompanha a seta nas telas de conta; confirmação de e-mail volta ao cadastro e recuperação mantém a confirmação antes de sair.
 - Filtro ativo do histórico apresentado em selo removível; confiança mínima exibida com duas casas decimais e explicação de resultado inconclusivo, preservando o limiar calibrado do ensemble.
 - APK 1.1.0 (versionCode 4): ensemble de dois MobileNetV3Small e um MobileNetV3Large como classificador padrão, em um único TFLite float32 com média e calibração embutidas.
