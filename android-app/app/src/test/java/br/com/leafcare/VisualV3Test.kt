@@ -28,6 +28,58 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [34], qualifiers = "w420dp-h865dp-mdpi", application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class VisualV3Test {
+    @Test fun historyDaysCollapseIndependentlyAndKeepCounts() {
+        val recent = AnalysisEntity("recent", "fixture.jpg", 1791298800000, "frog_eye", "Olho-de-rã", "Cercospora nicotianae", .82f, "[]", false, .631628f, 30.0, "fixture")
+        val second = recent.copy(id = "second", displayName = "Mancha-marrom")
+        val previous = recent.copy(id = "previous", createdAt = 1791212400000, displayName = "Folha saudável")
+        compose.setContent {
+            LeafCareTheme {
+                HistoryContent(listOf(recent, second, previous), .631628f, {}, {},
+                    { R.drawable.v3_example_correct }, null)
+            }
+        }
+        compose.onNodeWithText("2 análises").assertExists()
+        compose.onNodeWithText("1 análise").assertExists()
+        capture("historico-dias-abertos")
+
+        compose.onNodeWithContentDescription("Recolher análises de 6 de outubro de 2026").performClick()
+
+        compose.onNodeWithText("Olho-de-rã").assertDoesNotExist()
+        compose.onNodeWithText("Mancha-marrom").assertDoesNotExist()
+        compose.onNodeWithText("Folha saudável").assertExists()
+        compose.onNodeWithText("2 análises").assertExists()
+        capture("historico-dia-recolhido")
+
+        compose.onNodeWithContentDescription("Mostrar análises de 6 de outubro de 2026").performClick()
+
+        compose.onNodeWithText("Olho-de-rã").assertExists()
+        compose.onNodeWithText("Mancha-marrom").assertExists()
+    }
+
+    @Test fun collapsedDayCountsFollowActiveFilter() {
+        val identified = AnalysisEntity("identified", "fixture.jpg", 1791298800000, "frog_eye", "Olho-de-rã", "Cercospora nicotianae", .82f, "[]", false, .631628f, 30.0, "fixture")
+        val inconclusive = identified.copy(id = "inconclusive", inconclusive = true, confidence = .4f)
+        compose.setContent {
+            LeafCareTheme {
+                HistoryContent(listOf(identified, inconclusive), .631628f, {}, {},
+                    { R.drawable.v3_example_correct }, null)
+            }
+        }
+        compose.onNodeWithContentDescription("Recolher análises de 6 de outubro de 2026").performClick()
+        compose.onNodeWithContentDescription("Filtrar análises").performClick()
+        compose.onNodeWithText("Identificadas").performClick()
+
+        compose.onNodeWithText("1 análise").assertExists()
+        compose.onNodeWithText("2 análises").assertDoesNotExist()
+        compose.onNodeWithText("Olho-de-rã").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Mostrar análises de 6 de outubro de 2026").assertExists()
+        capture("historico-filtro-dia-recolhido")
+
+        compose.onNodeWithContentDescription("Mostrar análises de 6 de outubro de 2026").performClick()
+        compose.onNodeWithText("Olho-de-rã").assertExists()
+        compose.onNodeWithText("RESULTADO INCONCLUSIVO").assertDoesNotExist()
+    }
+
     @Test fun activeHistoryFilterCanBeRemoved() {
         val identified = AnalysisEntity("identified", "fixture.jpg", 1788134400000, "frog_eye", "Olho-de-rã", "Cercospora nicotianae", .82f, "[]", false, .7f, 30.0, "fixture")
         val inconclusive = identified.copy(id = "inconclusive", inconclusive = true, confidence = .4f)

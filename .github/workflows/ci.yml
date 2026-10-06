@@ -75,6 +75,7 @@ jobs:
           path: |
             android-app/app/build/test-results/testDebugUnitTest/
             android-app/app/build/reports/tests/testDebugUnitTest/
+            android-app/app/build/reports/screenshots/
           if-no-files-found: warn
 
       - name: Verify model assets

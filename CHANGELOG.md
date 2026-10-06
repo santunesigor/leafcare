@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- APK 1.1.2 (versionCode 6): dias do histórico podem ser recolhidos/expandidos com contador, transição de cards e seta animada; removido o espaço excedente entre filtro e data.
 - Build debug e download da CI disponibilizam `leafcare-<versão>-<commit>.apk` automaticamente.
 - APK 1.1.1 (versionCode 5): botão/gesto de voltar do Android acompanha a seta nas telas de conta; confirmação de e-mail volta ao cadastro e recuperação mantém a confirmação antes de sair.
 - Filtro ativo do histórico apresentado em selo removível; confiança mínima exibida com duas casas decimais e explicação de resultado inconclusivo, preservando o limiar calibrado do ensemble.

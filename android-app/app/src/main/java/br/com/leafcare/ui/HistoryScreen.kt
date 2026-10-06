@@ -1,10 +1,14 @@
 package br.com.leafcare.ui
 
 import androidx.compose.foundation.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import br.com.leafcare.R
@@ -20,6 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -32,6 +37,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -62,6 +68,7 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
     photo: (String) -> Any, modelError: String?, onProfile: () -> Unit = {}, displayName: String? = null) {
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("Todas") }
+    var collapsedDays by rememberSaveable { mutableStateOf(listOf<String>()) }
     var showFilter by remember { mutableStateOf(false) }
     val filtered = rows.filter { row ->
         val title = if (row.inconclusive) stringResource(R.string.result_inconclusive_title) else row.displayName
@@ -170,7 +177,7 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                     val all = stringResource(R.string.filter_all)
                     val removeFilter = stringResource(R.string.filter_remove_desc, filter)
                     Row(
-                        Modifier.padding(top = 8.dp),
+                        Modifier.padding(top = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -191,8 +198,8 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                     }
                 }
             }
-            item {
-                modelError?.let { message ->
+            modelError?.let { message ->
+                item {
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                         Column(Modifier.padding(16.dp)) {
                             Text(stringResource(R.string.model_error_title), style = MaterialTheme.typography.titleMedium)
@@ -200,7 +207,6 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                         }
                     }
                 }
-
             }
             if (filtered.isEmpty()) item {
                 Column(
@@ -229,9 +235,23 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                 }
             }
             grouped.forEach { (date, records) ->
-                item(key = "date-$date") { Text(date.format(formatter).uppercase(Locale.forLanguageTag("pt-BR")), Modifier.padding(top = 18.dp), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = LeafColors.Muted) }
-                items(records, key = { it.id }) { row ->
-                    OutlinedCard(Modifier.fillMaxWidth().clickable { onResult(row.id) }, shape = RoundedCornerShape(16.dp), colors = CardDefaults.outlinedCardColors(containerColor = Color.White)) {
+                val day = date.toString()
+                val expanded = day !in collapsedDays
+                item(key = "date-$date") {
+                    HistoryDayHeader(
+                        dateLabel = date.format(formatter),
+                        count = records.size,
+                        expanded = expanded,
+                        onToggle = {
+                            collapsedDays = if (expanded) collapsedDays + day else collapsedDays - day
+                        },
+                        modifier = Modifier.animateItem(placementSpec = tween(220, easing = FastOutSlowInEasing))
+                    )
+                }
+                if (expanded) items(records, key = { it.id }) { row ->
+                    OutlinedCard(Modifier.fillMaxWidth()
+                        .animateItem(fadeInSpec = tween(160), placementSpec = tween(220, easing = FastOutSlowInEasing), fadeOutSpec = tween(120))
+                        .clickable { onResult(row.id) }, shape = RoundedCornerShape(16.dp), colors = CardDefaults.outlinedCardColors(containerColor = Color.White)) {
                         Row(Modifier.padding(10.dp).heightIn(min = 66.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             // Stable model across recompositions (same cache key); Pale shows while loading.
@@ -250,24 +270,65 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                 }
             }
             if (rows.isNotEmpty()) item {
-                Text(
-                    stringResource(R.string.confidence_threshold_label,
-                        String.format(Locale.forLanguageTag("pt-BR"), "%.2f%%", threshold * 100)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = LeafColors.Muted,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp, bottom = 4.dp)
-                )
-                Text(
-                    stringResource(R.string.confidence_threshold_help),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = LeafColors.Muted,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(Modifier.fillMaxWidth().animateItem(placementSpec = tween(220, easing = FastOutSlowInEasing))) {
+                    Text(
+                        stringResource(R.string.confidence_threshold_label,
+                            String.format(Locale.forLanguageTag("pt-BR"), "%.2f%%", threshold * 100)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LeafColors.Muted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 4.dp)
+                    )
+                    Text(
+                        stringResource(R.string.confidence_threshold_help),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LeafColors.Muted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun HistoryDayHeader(dateLabel: String, count: Int, expanded: Boolean, onToggle: () -> Unit,
+    modifier: Modifier = Modifier) {
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 0f else -90f,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "day-chevron"
+    )
+    val toggleDescription = stringResource(
+        if (expanded) R.string.history_day_collapse else R.string.history_day_expand, dateLabel
+    )
+    val sectionState = stringResource(
+        if (expanded) R.string.history_day_expanded else R.string.history_day_collapsed
+    )
+    Surface(
+        onClick = onToggle,
+        modifier = modifier.fillMaxWidth().semantics {
+            contentDescription = toggleDescription
+            stateDescription = sectionState
+        },
+        shape = RoundedCornerShape(12.dp),
+        color = LeafColors.Pale
+    ) {
+        Row(Modifier.heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(dateLabel.uppercase(Locale.forLanguageTag("pt-BR")),
+                modifier = Modifier.weight(1f), fontSize = 12.sp, lineHeight = 18.sp,
+                fontWeight = FontWeight.SemiBold, color = LeafColors.Text)
+            Surface(shape = RoundedCornerShape(8.dp), color = Color.White) {
+                Text(pluralStringResource(R.plurals.history_day_count, count, count),
+                    Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = LeafColors.Green)
+            }
+            Icon(Icons.Default.ExpandMore, null, Modifier.size(20.dp).rotate(rotation), tint = LeafColors.Green)
         }
     }
 }

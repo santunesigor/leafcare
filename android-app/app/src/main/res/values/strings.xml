@@ -4,6 +4,14 @@
     <!-- History Screen -->
     <string name="history_title">LEAFCARE</string>
     <string name="history_subtitle">Suas análises recentes</string>
+    <string name="history_day_collapse">Recolher análises de %1$s</string>
+    <string name="history_day_expand">Mostrar análises de %1$s</string>
+    <string name="history_day_expanded">Expandido</string>
+    <string name="history_day_collapsed">Recolhido</string>
+    <plurals name="history_day_count">
+        <item quantity="one">%1$d análise</item>
+        <item quantity="other">%1$d análises</item>
+    </plurals>
     <string name="search_hint">Pesquisar análise</string>
     <string name="filter_button_desc">Filtrar análises</string>
     <string name="filter_all">Todas</string>
