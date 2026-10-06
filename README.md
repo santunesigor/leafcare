@@ -94,6 +94,7 @@ Formato de entrada, ordem das classes, pré-processamento, threshold e exportaç
 - [Arquitetura](docs/ARCHITECTURE.md): módulos, banco local, inferência e sincronização.
 - [Machine Learning](docs/MACHINE_LEARNING.md): dataset, contrato do modelo, métricas e pipeline de treino/exportação.
 - [Jornada do Machine Learning](docs/explain/JORNADA_MACHINE_LEARNING.md): preparação dos dados, experimentos, decisão pelo ensemble e roadmap, em formato compatível com Obsidian.
+- [Jornada do aplicativo](docs/explain/JORNADA_APLICATIVO.md): criação do Android, telas, fluxo offline, bancos, autenticação, sincronização e evolução com fotos do bucket, em formato compatível com Obsidian.
 - [Benchmark de modelos](docs/benchmarks/BENCHMARK_MODELOS.md): comparação histórica e experimentos DINOv2, MobileNetV4, TinyViT e MobileCLIP2.
 - [Supabase](docs/SUPABASE.md): autenticação, migrations, RLS e Storage.
 - [Testes e QA](docs/TESTING.md): validações automatizadas e evidências históricas.
