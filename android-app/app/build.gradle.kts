@@ -9,9 +9,8 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-// Supabase publishable key comes from android-app/local.properties (never committed),
-// with environment fallback for CI. project.findProperty does NOT read local.properties,
-// so the file is loaded explicitly here.
+// The public client key is versioned in gradle.properties; local.properties and
+// the environment can override it for local development and CI.
 val localProperties = Properties().apply {
     val localPropertiesFile = rootProject.file("local.properties")
     if (localPropertiesFile.exists()) {
@@ -20,6 +19,7 @@ val localProperties = Properties().apply {
 }
 val supabasePublishableKey =
     localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY")
+        ?: providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY").orNull
         ?: System.getenv("SUPABASE_PUBLISHABLE_KEY")
         ?: "YOUR_PUBLISHABLE_KEY_HERE"
 
@@ -131,7 +131,7 @@ val verifySupabaseConfig by tasks.registering {
     description = "Impede gerar APK com placeholder de chave Supabase."
     doLast {
         check(supabasePublishableKey.isNotBlank() && supabasePublishableKey != "YOUR_PUBLISHABLE_KEY_HERE") {
-            "SUPABASE_PUBLISHABLE_KEY não configurada em local.properties"
+            "SUPABASE_PUBLISHABLE_KEY não configurada"
         }
     }
 }
