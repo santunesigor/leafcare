@@ -1,6 +1,7 @@
 package br.com.leafcare.ui
 
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -8,7 +9,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import br.com.leafcare.R
@@ -36,6 +36,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
@@ -270,20 +271,22 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                 }
             }
             if (rows.isNotEmpty()) item {
-                Column(Modifier.fillMaxWidth().animateItem(placementSpec = tween(220, easing = FastOutSlowInEasing))) {
+                Column(
+                    Modifier.fillMaxWidth()
+                        .animateItem(placementSpec = tween(220, easing = FastOutSlowInEasing))
+                        .padding(top = 12.dp, bottom = 8.dp)
+                ) {
                     Text(
                         stringResource(R.string.confidence_threshold_label,
                             String.format(Locale.forLanguageTag("pt-BR"), "%.2f%%", threshold * 100)),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         color = LeafColors.Muted,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = 4.dp)
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Text(
                         stringResource(R.string.confidence_threshold_help),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                         color = LeafColors.Muted,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
@@ -309,25 +312,26 @@ private fun HistoryDayHeader(dateLabel: String, count: Int, expanded: Boolean, o
         if (expanded) R.string.history_day_expanded else R.string.history_day_collapsed
     )
     Surface(
-        onClick = onToggle,
-        modifier = modifier.fillMaxWidth().semantics {
+        modifier = modifier.fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onToggle
+            )
+            .semantics {
             contentDescription = toggleDescription
             stateDescription = sectionState
         },
-        shape = RoundedCornerShape(12.dp),
-        color = LeafColors.Pale
+        color = Color.Transparent
     ) {
-        Row(Modifier.heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+        Row(Modifier.heightIn(min = 48.dp).padding(top = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(dateLabel.uppercase(Locale.forLanguageTag("pt-BR")),
-                modifier = Modifier.weight(1f), fontSize = 12.sp, lineHeight = 18.sp,
-                fontWeight = FontWeight.SemiBold, color = LeafColors.Text)
-            Surface(shape = RoundedCornerShape(8.dp), color = Color.White) {
-                Text(pluralStringResource(R.plurals.history_day_count, count, count),
-                    Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = LeafColors.Green)
-            }
+                modifier = Modifier.weight(1f), fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold, color = LeafColors.Muted)
+            Text(count.toString(), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = LeafColors.Muted)
             Icon(Icons.Default.ExpandMore, null, Modifier.size(20.dp).rotate(rotation), tint = LeafColors.Green)
         }
     }
