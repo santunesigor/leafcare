@@ -38,8 +38,8 @@ class VisualV3Test {
                     { R.drawable.v3_example_correct }, null)
             }
         }
-        compose.onNodeWithText("2 análises").assertExists()
-        compose.onNodeWithText("1 análise").assertExists()
+        compose.onNodeWithText("2").assertExists()
+        compose.onNodeWithText("1").assertExists()
         capture("historico-dias-abertos")
 
         compose.onNodeWithContentDescription("Recolher análises de 6 de outubro de 2026").performClick()
@@ -47,7 +47,7 @@ class VisualV3Test {
         compose.onNodeWithText("Olho-de-rã").assertDoesNotExist()
         compose.onNodeWithText("Mancha-marrom").assertDoesNotExist()
         compose.onNodeWithText("Folha saudável").assertExists()
-        compose.onNodeWithText("2 análises").assertExists()
+        compose.onNodeWithText("2").assertExists()
         capture("historico-dia-recolhido")
 
         compose.onNodeWithContentDescription("Mostrar análises de 6 de outubro de 2026").performClick()
@@ -69,8 +69,8 @@ class VisualV3Test {
         compose.onNodeWithContentDescription("Filtrar análises").performClick()
         compose.onNodeWithText("Identificadas").performClick()
 
-        compose.onNodeWithText("1 análise").assertExists()
-        compose.onNodeWithText("2 análises").assertDoesNotExist()
+        compose.onNodeWithText("1").assertExists()
+        compose.onNodeWithText("2").assertDoesNotExist()
         compose.onNodeWithText("Olho-de-rã").assertDoesNotExist()
         compose.onNodeWithContentDescription("Mostrar análises de 6 de outubro de 2026").assertExists()
         capture("historico-filtro-dia-recolhido")
