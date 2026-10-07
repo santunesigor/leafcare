@@ -4,6 +4,8 @@ Este documento reúne o dataset, o contrato do modelo atual, suas métricas e os
 
 Resultados comparativos e experimentais estão centralizados em [Benchmark de Modelos](benchmarks/BENCHMARK_MODELOS.md).
 
+Para a explicação da preparação dos dados, da sequência de experimentos, da escolha do ensemble e dos próximos passos, veja a [Jornada do Machine Learning](explain/JORNADA_MACHINE_LEARNING.md).
+
 ## Modelo integrado
 
 Arquitetura atual: **ensemble de dois MobileNetV3Small e um MobileNetV3Large**,

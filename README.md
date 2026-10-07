@@ -56,7 +56,7 @@ Dentro de `android-app`, gere o APK debug com:
 .\gradlew.bat assembleDebug
 ```
 
-O arquivo fica em `android-app/app/build/outputs/apk/debug/app-debug.apk`. Antes de enviar mudanças, rode os testes e as verificações relevantes:
+O APK para instalar fica em `android-app/app/build/outputs/apk/distribution/debug/leafcare-<versão>-<commit>.apk`, por exemplo `leafcare-1.1.1-c0458b1.apk`. O nome é gerado automaticamente pelo `assembleDebug` e usado no download da CI. Antes de enviar mudanças, rode os testes e as verificações relevantes:
 
 ```powershell
 .\gradlew.bat testDebugUnitTest verifyModelAssets lintDebug
@@ -93,6 +93,8 @@ Formato de entrada, ordem das classes, pré-processamento, threshold e exportaç
 - [Desenvolvimento](docs/DEVELOPMENT.md): setup e comandos Android/Python.
 - [Arquitetura](docs/ARCHITECTURE.md): módulos, banco local, inferência e sincronização.
 - [Machine Learning](docs/MACHINE_LEARNING.md): dataset, contrato do modelo, métricas e pipeline de treino/exportação.
+- [Jornada do Machine Learning](docs/explain/JORNADA_MACHINE_LEARNING.md): preparação dos dados, experimentos, decisão pelo ensemble e roadmap, em formato compatível com Obsidian.
+- [Jornada do aplicativo](docs/explain/JORNADA_APLICATIVO.md): criação do Android, telas, fluxo offline, bancos, autenticação, sincronização e evolução com fotos do bucket, em formato compatível com Obsidian.
 - [Benchmark de modelos](docs/benchmarks/BENCHMARK_MODELOS.md): comparação histórica e experimentos DINOv2, MobileNetV4, TinyViT e MobileCLIP2.
 - [Supabase](docs/SUPABASE.md): autenticação, migrations, RLS e Storage.
 - [Testes e QA](docs/TESTING.md): validações automatizadas e evidências históricas.

@@ -9,9 +9,8 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-// Supabase publishable key comes from android-app/local.properties (never committed),
-// with environment fallback for CI. project.findProperty does NOT read local.properties,
-// so the file is loaded explicitly here.
+// The public client key is versioned in gradle.properties; local.properties and
+// the environment can override it for local development and CI.
 val localProperties = Properties().apply {
     val localPropertiesFile = rootProject.file("local.properties")
     if (localPropertiesFile.exists()) {
@@ -20,6 +19,7 @@ val localProperties = Properties().apply {
 }
 val supabasePublishableKey =
     localProperties.getProperty("SUPABASE_PUBLISHABLE_KEY")
+        ?: providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY").orNull
         ?: System.getenv("SUPABASE_PUBLISHABLE_KEY")
         ?: "YOUR_PUBLISHABLE_KEY_HERE"
 
@@ -30,8 +30,8 @@ android {
         applicationId = "br.com.leafcare"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.1.0"
+        versionCode = 6
+        versionName = "1.1.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // BuildConfig fields for Supabase configuration (from local.properties)
         buildConfigField("String", "SUPABASE_URL", "\"https://nhkqfanjfcivcbndivav.supabase.co\"")
@@ -56,6 +56,25 @@ android {
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
+
+val debugApkCommit = providers.exec {
+    workingDir(rootProject.projectDir)
+    commandLine("git", "rev-parse", "--short=7", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.trim().ifBlank { "sem-git" } }
+val debugVersionName = android.defaultConfig.versionName
+val debugApkFileName = debugApkCommit.map { "leafcare-$debugVersionName-$it.apk" }
+
+val distributeDebugApk by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Disponibiliza o APK debug com versão e commit no nome."
+    dependsOn("packageDebug")
+    from(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+    into(layout.buildDirectory.dir("outputs/apk/distribution/debug"))
+    inputs.property("apkFileName", debugApkFileName)
+    rename { debugApkFileName.get() }
+}
+tasks.matching { it.name == "assembleDebug" }.configureEach { dependsOn(distributeDebugApk) }
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
@@ -112,7 +131,7 @@ val verifySupabaseConfig by tasks.registering {
     description = "Impede gerar APK com placeholder de chave Supabase."
     doLast {
         check(supabasePublishableKey.isNotBlank() && supabasePublishableKey != "YOUR_PUBLISHABLE_KEY_HERE") {
-            "SUPABASE_PUBLISHABLE_KEY não configurada em local.properties"
+            "SUPABASE_PUBLISHABLE_KEY não configurada"
         }
     }
 }

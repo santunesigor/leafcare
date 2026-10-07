@@ -90,6 +90,8 @@ private fun AuthScaffold(
     onBack: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    // Keep the Android back button/gesture consistent with the visible arrow.
+    BackHandler(enabled = onBack != null) { onBack?.invoke() }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -373,7 +375,7 @@ fun VerifyEmailScreen(viewModel: AuthViewModel) {
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
-    AuthScaffold(onBack = { viewModel.setScreen(AuthScreen.Login) }) {
+    AuthScaffold(onBack = { viewModel.setScreen(AuthScreen.SignUp) }) {
         AuthHeader(
             logoSize = 56,
             title = "Verifique seu e-mail",
@@ -472,12 +474,6 @@ fun NewPasswordScreen(
     val error by viewModel.error.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
     val showCancelDialog by viewModel.showCancelDialog.collectAsStateWithLifecycle()
-
-    // Recovery links are single-use: system back asks first instead of
-    // abandoning the flow silently. Profile change keeps default back.
-    if (confirmCancelRecovery) {
-        BackHandler { viewModel.requestCancelRecovery() }
-    }
 
     AuthScaffold(onBack = { if (confirmCancelRecovery) viewModel.requestCancelRecovery() else onBack() }) {
         AuthHeader(

@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -173,9 +174,9 @@ class AuthRepositoryTest {
     @Test fun restoreMarksSessionChecked() = runTest(testDispatcher) {
         val repository = AuthRepository(backend)
 
-        // The bootstrap flag flips once the storage attempt finishes; the
-        // gate shows only Loading before that (see AppGateTest).
-        testScheduler.advanceUntilIdle()
+        // Restoration runs on Dispatchers.IO, outside the test scheduler.
+        // Await the state change instead of advancing only the Main scheduler.
+        repository.sessionChecked.first { it }
         assertTrue(repository.sessionChecked.value)
     }
 
