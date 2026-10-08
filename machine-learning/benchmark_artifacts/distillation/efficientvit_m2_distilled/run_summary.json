@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "efficientvit_m2_distilled",
+  "selected_epoch": 11,
+  "selected_stage": "finetune",
+  "experimental_only": true,
+  "validation": {
+    "top1_accuracy": 0.7884615384615384,
+    "macro_f1": 0.7170751767526232,
+    "top3_accuracy": 0.9711538461538461
+  },
+  "test": {
+    "top1_accuracy": 0.7961165048543689,
+    "macro_f1": 0.6754231346942345,
+    "top3_accuracy": 0.9514563106796117,
+    "coverage": 0.6796116504854369,
+    "accepted_accuracy": 0.9142857142857143
+  },
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

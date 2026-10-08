@@ -1,0 +1,17 @@
+{
+  "attempted": [
+    "mobilenetv3_small_supervised",
+    "mobilenetv3_small_distilled",
+    "mobilenetv4_small_supervised",
+    "mobilenetv4_small_distilled",
+    "fastvit_t8_supervised",
+    "fastvit_t8_distilled",
+    "efficientvit_m2_supervised",
+    "efficientvit_m2_distilled",
+    "efficientvit_m3_supervised",
+    "efficientvit_m3_distilled"
+  ],
+  "failed": [],
+  "android_assets_replaced": false,
+  "all_runs_attempted": true
+}

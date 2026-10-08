@@ -1,0 +1,13 @@
+{
+  "top1_agreement": 1.0,
+  "max_abs_error": 4.470348358154297e-06,
+  "recorded_training_top1_agreement": 1.0,
+  "recorded_training_max_abs_error": 3.427267074584961e-06,
+  "max_abs_error_limit": 0.0001,
+  "passed": true,
+  "n_images": 104,
+  "split": "validation",
+  "reparameterized": true,
+  "fusion_max_abs_logit_error": 4.57763671875e-05,
+  "fusion_top1_agreement": 1.0
+}

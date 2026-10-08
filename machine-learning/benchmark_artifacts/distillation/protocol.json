@@ -1,0 +1,79 @@
+{
+  "models": {
+    "mobilenetv3_small": {
+      "architecture": "mobilenetv3_small_100.lamb_in1k",
+      "revision": "1824797e7887cbec1990e4adbd6675960a36c589"
+    },
+    "mobilenetv4_small": {
+      "architecture": "mobilenetv4_conv_small.e2400_r224_in1k",
+      "revision": "331fb803779522b685cf942e15f914fb6741c1eb"
+    },
+    "fastvit_t8": {
+      "architecture": "fastvit_t8.apple_dist_in1k",
+      "revision": "09215e34b4f178654bf6efc44131c50aa865779a"
+    },
+    "efficientvit_m2": {
+      "architecture": "efficientvit_m2.r224_in1k",
+      "revision": "f8b4f12220f55c2ea95fd81cde848ac5612ea4be"
+    },
+    "efficientvit_m3": {
+      "architecture": "efficientvit_m3.r224_in1k",
+      "revision": "9e6613643bedb7bd2432251bb71a00bdc47f9895"
+    }
+  },
+  "methods": [
+    "supervised",
+    "distilled"
+  ],
+  "recipe": {
+    "seed": 42,
+    "batch_size": 8,
+    "warmup_epochs": 3,
+    "finetune_epochs": 15,
+    "patience": 5,
+    "optimizer": "AdamW",
+    "head_warmup_lr": 0.001,
+    "head_finetune_lr": 0.0001,
+    "backbone_lr": 1e-05,
+    "weight_decay": 0.0001,
+    "class_weight": "balanced from training counts only",
+    "distillation_temperature": 4.0,
+    "distillation_weight": 0.5,
+    "loss": "(1-alpha) * weighted CE + alpha * T^2 * batchmean KL(teacher || student)",
+    "augmentation": "flip H/V p=.5; rotation +/-12 bilinear white fill; brightness/contrast .1 saturation .05; seed=42+epoch*100000+train_index",
+    "batch_norm": "running statistics frozen",
+    "initialization": "same pretrained encoder and validation-selected C=1 logistic probe for each pair",
+    "selection": "validation Macro-F1, Top-1, Top-3; earliest on ties",
+    "precision": "float32"
+  },
+  "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+  "class_order": [
+    "anthracnose",
+    "black_shank",
+    "brown_spot",
+    "cmv",
+    "frog_eye",
+    "genetic_abnormality",
+    "healthy",
+    "nematodes",
+    "potato_tuber_moth",
+    "pvy",
+    "sunscald",
+    "target_spot",
+    "tmv",
+    "tswv",
+    "weather_fleck",
+    "wildfire"
+  ],
+  "split_counts": {
+    "train": 489,
+    "validation": 104,
+    "test": 103
+  },
+  "teacher_selection": "DINOv2 with highest historical validation Macro-F1",
+  "test_used_for_selection": false,
+  "test_note": "Known internal historical test; not independent field validation",
+  "android_target_ms": 3000,
+  "android_device": "Samsung Galaxy A06",
+  "export_policy": "attempt all 10 runs; no integration into app"
+}

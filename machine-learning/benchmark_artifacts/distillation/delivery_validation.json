@@ -1,0 +1,22 @@
+{
+  "status": "completed",
+  "training_runs_completed": 10,
+  "tflite_exports_passed": 10,
+  "validation_images_per_export": 104,
+  "protected_files_unchanged": 215,
+  "experimental_models_integrated": false,
+  "python_tests_passed": 38,
+  "python_tests_skipped": 0,
+  "python_test_command": "experiments/vision/.venv/bin/python -m pytest -q experiments/distillation experiments/vision experiments/dinov2/test_benchmark.py",
+  "python_test_result": "38 passed in 2.30s",
+  "openspec_all_strict": {
+    "passed": 4,
+    "failed": 0
+  },
+  "openspec_archived_strict": {
+    "passed": 1,
+    "failed": 0
+  },
+  "android_evidence": "android_validation.json",
+  "android_device_measurement": "pending: no connected device"
+}
