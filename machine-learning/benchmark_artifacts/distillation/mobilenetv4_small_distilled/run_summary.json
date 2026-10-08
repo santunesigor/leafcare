@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "mobilenetv4_small_distilled",
+  "selected_epoch": 15,
+  "selected_stage": "finetune",
+  "experimental_only": true,
+  "validation": {
+    "top1_accuracy": 0.8653846153846154,
+    "macro_f1": 0.7895755069028726,
+    "top3_accuracy": 0.9615384615384616
+  },
+  "test": {
+    "top1_accuracy": 0.8543689320388349,
+    "macro_f1": 0.8082924836601307,
+    "top3_accuracy": 0.970873786407767,
+    "coverage": 0.8737864077669902,
+    "accepted_accuracy": 0.9
+  },
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

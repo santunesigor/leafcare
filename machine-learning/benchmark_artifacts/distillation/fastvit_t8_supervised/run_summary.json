@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "fastvit_t8_supervised",
+  "selected_epoch": 0,
+  "selected_stage": "initial_probe",
+  "experimental_only": true,
+  "validation": {
+    "top1_accuracy": 0.9134615384615384,
+    "macro_f1": 0.8133159184726522,
+    "top3_accuracy": 0.9807692307692307
+  },
+  "test": {
+    "top1_accuracy": 0.7669902912621359,
+    "macro_f1": 0.6605093369133683,
+    "top3_accuracy": 0.9514563106796117,
+    "coverage": 0.9902912621359223,
+    "accepted_accuracy": 0.7745098039215687
+  },
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

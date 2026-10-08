@@ -1,0 +1,99 @@
+{
+  "architecture": "mobilenetv3_small_100.lamb_in1k",
+  "revision": "1824797e7887cbec1990e4adbd6675960a36c589",
+  "model_id": "mobilenetv3_small_supervised",
+  "base_model_id": "mobilenetv3_small",
+  "method": "supervised",
+  "recipe": {
+    "seed": 42,
+    "batch_size": 8,
+    "warmup_epochs": 3,
+    "finetune_epochs": 15,
+    "patience": 5,
+    "optimizer": "AdamW",
+    "head_warmup_lr": 0.001,
+    "head_finetune_lr": 0.0001,
+    "backbone_lr": 1e-05,
+    "weight_decay": 0.0001,
+    "class_weight": "balanced from training counts only",
+    "distillation_temperature": 4.0,
+    "distillation_weight": 0.5,
+    "loss": "(1-alpha) * weighted CE + alpha * T^2 * batchmean KL(teacher || student)",
+    "augmentation": "flip H/V p=.5; rotation +/-12 bilinear white fill; brightness/contrast .1 saturation .05; seed=42+epoch*100000+train_index",
+    "batch_norm": "running statistics frozen",
+    "initialization": "same pretrained encoder and validation-selected C=1 logistic probe for each pair",
+    "selection": "validation Macro-F1, Top-1, Top-3; earliest on ties",
+    "precision": "float32"
+  },
+  "selected_epoch": 9,
+  "selected_stage": "finetune",
+  "epochs_executed": 14,
+  "training_seconds": 46.11686453400034,
+  "class_order": [
+    "anthracnose",
+    "black_shank",
+    "brown_spot",
+    "cmv",
+    "frog_eye",
+    "genetic_abnormality",
+    "healthy",
+    "nematodes",
+    "potato_tuber_moth",
+    "pvy",
+    "sunscald",
+    "target_spot",
+    "tmv",
+    "tswv",
+    "weather_fleck",
+    "wildfire"
+  ],
+  "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
+  "split_counts": {
+    "train": 489,
+    "validation": 104,
+    "test": 103
+  },
+  "pretrained_sha256": "46d2c063b18125884c48937afa4c49e18128869e52e8db96df48bf0a4d7ff697",
+  "initial_probe_sha256": "119054d0bcc5090c2ac477028a12b06176b29d92478a53bca6f791386b39131a",
+  "initial_state_sha256": "d0d4f53ebbd796d02cdbee7e891b6b57cd194af7d236bedb4478cdc95645c758",
+  "checkpoint_local": "experiments/distillation/.cache/checkpoints/mobilenetv3_small_supervised.safetensors",
+  "checkpoint_sha256": "968cb01386b762df9e36477ef394bc161606454d127b8f6209fc5fa1e6c1abea",
+  "checkpoint_bytes": 6209432,
+  "parameters": 1534256,
+  "preprocessing": {
+    "input_size": [
+      3,
+      224,
+      224
+    ],
+    "interpolation": "bicubic",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "crop_pct": 0.875,
+    "crop_mode": "center"
+  },
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "temperature": 1.483912673588269,
+  "threshold": 0.5974894762039185,
+  "test_used_for_selection": false,
+  "teacher_checkpoint_sha256": null,
+  "timing": {
+    "desktop_single_image_ms_median": 1.438087499991525,
+    "desktop_single_image_ms_p95": 1.4848869992420077,
+    "peak_cuda_allocated_bytes_batch1": 33812992,
+    "note": "GTX 1650 FP32 encoder+head; batch1, 5 warmups/30 synchronized samples; excludes preprocessing; not Android."
+  }
+}

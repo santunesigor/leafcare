@@ -1,0 +1,24 @@
+{
+  "commands": [
+    "bash ./gradlew assembleDebug",
+    "bash ./gradlew verifyModelAssets testDebugUnitTest"
+  ],
+  "build_successful": true,
+  "assemble_debug": {
+    "executed_tasks": 2,
+    "up_to_date_tasks": 38
+  },
+  "checks": {
+    "executed_tasks": 2,
+    "up_to_date_tasks": 31,
+    "unit_test_task": "UP-TO-DATE"
+  },
+  "apk": "android-app/app/build/outputs/apk/distribution/debug/leafcare-1.1.2-4106004.apk",
+  "apk_model": "unchanged integrated MobileNetV3 ensemble",
+  "experimental_models_integrated": false,
+  "adb_devices": [],
+  "android_latency_verified": false,
+  "apk_sha256": "31a8f062cfc213e9f47a70ed5c7b20ca37209a0ca9a054611b0be5e8a4ce620e",
+  "apk_model_sha256": "a039eebb22284e68d903f3e9f5c0f32c1a51073e5e3f91b569f31ac5a5b6fc40",
+  "apk_model_matches_protected_baseline": true
+}

@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "model_id": "efficientvit_m3_supervised",
+  "selected_epoch": 14,
+  "selected_stage": "finetune",
+  "experimental_only": true,
+  "validation": {
+    "top1_accuracy": 0.8365384615384616,
+    "macro_f1": 0.7632686247575953,
+    "top3_accuracy": 0.9807692307692307
+  },
+  "test": {
+    "top1_accuracy": 0.8058252427184466,
+    "macro_f1": 0.718332886616989,
+    "top3_accuracy": 0.9611650485436893,
+    "coverage": 0.5145631067961165,
+    "accepted_accuracy": 0.9245283018867925
+  },
+  "test_decoded_after_freezing_selection_temperature_threshold": true
+}

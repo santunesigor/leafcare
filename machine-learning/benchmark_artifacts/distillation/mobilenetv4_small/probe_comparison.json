@@ -1,0 +1,464 @@
+{
+  "models": [
+    {
+      "name": "unweighted",
+      "class_weight": null,
+      "C": 1.0,
+      "iterations": [
+        63
+      ],
+      "training_seconds": 10.447548070998891,
+      "validation": {
+        "top1_accuracy": 0.8365384615384616,
+        "macro_f1": 0.7236796802054155,
+        "top3_accuracy": 0.9519230769230769
+      }
+    },
+    {
+      "name": "balanced",
+      "class_weight": "balanced",
+      "C": 1.0,
+      "iterations": [
+        58
+      ],
+      "training_seconds": 9.377753610999207,
+      "validation": {
+        "top1_accuracy": 0.8461538461538461,
+        "macro_f1": 0.7474735398545383,
+        "top3_accuracy": 0.9423076923076923
+      }
+    }
+  ],
+  "selected": "balanced",
+  "pretrained_sha256": "7a7102ec18f62bbfb555b6fe829bbb5af749516b84174926c29ffdfdfc03aec4",
+  "preprocessing": {
+    "input_size": [
+      3,
+      224,
+      224
+    ],
+    "interpolation": "bicubic",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "crop_pct": 0.875,
+    "crop_mode": "center"
+  },
+  "test_used": false,
+  "validation": {
+    "n_images": 104,
+    "top1_correct": 88,
+    "top1_accuracy": 0.8461538461538461,
+    "macro_f1": 0.7474735398545383,
+    "top3_correct": 98,
+    "top3_accuracy": 0.9423076923076923,
+    "classification_report": {
+      "anthracnose": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 1.0
+      },
+      "black_shank": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 2.0
+      },
+      "brown_spot": {
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1-score": 0.8571428571428571,
+        "support": 8.0
+      },
+      "cmv": {
+        "precision": 0.6,
+        "recall": 0.75,
+        "f1-score": 0.6666666666666666,
+        "support": 8.0
+      },
+      "frog_eye": {
+        "precision": 0.875,
+        "recall": 1.0,
+        "f1-score": 0.9333333333333333,
+        "support": 7.0
+      },
+      "genetic_abnormality": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 1.0
+      },
+      "healthy": {
+        "precision": 0.8,
+        "recall": 1.0,
+        "f1-score": 0.8888888888888888,
+        "support": 8.0
+      },
+      "nematodes": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 6.0
+      },
+      "potato_tuber_moth": {
+        "precision": 0.8888888888888888,
+        "recall": 1.0,
+        "f1-score": 0.9411764705882353,
+        "support": 8.0
+      },
+      "pvy": {
+        "precision": 0.3333333333333333,
+        "recall": 0.2,
+        "f1-score": 0.25,
+        "support": 5.0
+      },
+      "sunscald": {
+        "precision": 1.0,
+        "recall": 0.9,
+        "f1-score": 0.9473684210526315,
+        "support": 10.0
+      },
+      "target_spot": {
+        "precision": 0.7777777777777778,
+        "recall": 1.0,
+        "f1-score": 0.875,
+        "support": 7.0
+      },
+      "tmv": {
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1-score": 0.8,
+        "support": 10.0
+      },
+      "tswv": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 1.0
+      },
+      "weather_fleck": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 9.0
+      },
+      "wildfire": {
+        "precision": 0.8333333333333334,
+        "recall": 0.7692307692307693,
+        "f1-score": 0.8,
+        "support": 13.0
+      },
+      "accuracy": 0.8461538461538461,
+      "macro avg": {
+        "precision": 0.7442708333333333,
+        "recall": 0.760576923076923,
+        "f1-score": 0.7474735398545383,
+        "support": 104.0
+      },
+      "weighted avg": {
+        "precision": 0.830582264957265,
+        "recall": 0.8461538461538461,
+        "f1-score": 0.8328174674053156,
+        "support": 104.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        6,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        0,
+        6,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        6,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        9,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        9,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        1,
+        0,
+        0,
+        10
+      ]
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+split,class,precision,recall,f1,support,statistical_note
+validation,anthracnose,0.0,0.0,0.0,1,instável: suporte 1 ou 2
+validation,black_shank,1.0,1.0,1.0,2,instável: suporte 1 ou 2
+validation,brown_spot,1.0,0.75,0.8571428571428571,8,
+validation,cmv,0.6363636363636364,0.875,0.7368421052631579,8,
+validation,frog_eye,0.8571428571428571,0.8571428571428571,0.8571428571428571,7,
+validation,genetic_abnormality,1.0,1.0,1.0,1,instável: suporte 1 ou 2
+validation,healthy,0.8888888888888888,1.0,0.9411764705882353,8,
+validation,nematodes,1.0,1.0,1.0,6,
+validation,potato_tuber_moth,0.8888888888888888,1.0,0.9411764705882353,8,
+validation,pvy,0.5,0.2,0.2857142857142857,5,
+validation,sunscald,1.0,0.9,0.9473684210526315,10,
+validation,target_spot,0.7,1.0,0.8235294117647058,7,
+validation,tmv,0.8181818181818182,0.9,0.8571428571428571,10,
+validation,tswv,0.0,0.0,0.0,1,instável: suporte 1 ou 2
+validation,weather_fleck,1.0,1.0,1.0,9,
+validation,wildfire,0.9090909090909091,0.7692307692307693,0.8333333333333334,13,
+test,anthracnose,0.0,0.0,0.0,1,instável: suporte 1 ou 2
+test,black_shank,1.0,1.0,1.0,2,instável: suporte 1 ou 2
+test,brown_spot,0.6666666666666666,0.8571428571428571,0.75,7,
+test,cmv,0.875,0.875,0.875,8,
+test,frog_eye,0.875,0.875,0.875,8,
+test,genetic_abnormality,0.0,0.0,0.0,1,instável: suporte 1 ou 2
+test,healthy,0.875,1.0,0.9333333333333333,7,
+test,nematodes,1.0,0.5,0.6666666666666666,6,
+test,potato_tuber_moth,0.875,1.0,0.9333333333333333,7,
+test,pvy,0.6666666666666666,0.4,0.5,5,
+test,sunscald,1.0,0.8,0.8888888888888888,10,
+test,target_spot,0.8571428571428571,0.75,0.8,8,
+test,tmv,0.8,0.8,0.8,10,
+test,tswv,0.5,1.0,0.6666666666666666,1,instável: suporte 1 ou 2
+test,weather_fleck,0.8181818181818182,1.0,0.9,9,
+test,wildfire,0.8,0.9230769230769231,0.8571428571428571,13,
