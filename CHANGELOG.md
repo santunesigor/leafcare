@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Experimentos isolados de MobileNetV3Small, MobileNetV4 Small, FastViT-T8 e EfficientViT-M2/M3, com cinco controles e cinco treinos com destilação de DINOv2-B. Dez exportações TFLite aprovadas; receitas, resultados e relatório em diretórios próprios, preservando o ensemble integrado.
+- [Relatório de destilação](docs/benchmarks/BENCHMARK_DESTILACAO.md): 38 testes Python passaram; classificação em aparelho dos candidatos continua pendente.
+
+## [1.1.2] - 2026-10-08
+
+- Release com APK debug e bundle do ensemble (TFLite, classes e metadados), acompanhados dos hashes SHA256.
 - APK 1.1.2 (versionCode 6): dias do histórico podem ser recolhidos/expandidos com contador, transição de cards e seta animada; removido o espaço excedente entre filtro e data.
 - Build debug e download da CI disponibilizam `leafcare-<versão>-<commit>.apk` automaticamente.
 - APK 1.1.1 (versionCode 5): botão/gesto de voltar do Android acompanha a seta nas telas de conta; confirmação de e-mail volta ao cadastro e recuperação mantém a confirmação antes de sair.
