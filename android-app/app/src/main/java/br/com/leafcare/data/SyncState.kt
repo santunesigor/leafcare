@@ -27,14 +27,14 @@ class SyncStateConverter {
 }
 
 /**
- * Photo upload state, tracked separately from the analysis row state so an
- * analysis is never marked fully SYNCED before its photo is uploaded.
+ * Photo state, tracked separately from the analysis row state.
  * Survives app restarts via the Room column.
  *
  * REMOTE_ONLY marks rows imported by restore whose photo lives remotely and
- * was never downloaded (photo download is a later Phase 6 unit).
+ * has not been downloaded yet. LOCAL_ONLY has no confirmed remote photo.
  */
 enum class PhotoSyncState {
+    LOCAL_ONLY,
     PENDING_UPLOAD,
     SYNCED,
     ERROR,

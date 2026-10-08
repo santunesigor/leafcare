@@ -168,3 +168,32 @@ Antes de usar outro projeto Supabase:
 - teste recuperação de senha;
 - teste restore após login;
 - teste exclusão offline seguida de reconexão.
+
+## Fotos com previsão aceita e consulta da classe
+
+A partir do APK 1.2.1, somente fotos de análises conclusivas são enviadas para `analysis-photos`: `inconclusive=false` e confiança maior ou igual ao limiar gravado naquela análise. O modelo atual usa limiar aproximado de 0,506676; a regra respeita o limiar de cada análise histórica. Igualdade no limiar permite envio. A classe é a primeira previsão em `analyses.class_id`, junto de `confidence`, `top3` e `model_sha256`; ela não é um rótulo confirmado por especialista.
+
+Resultados inconclusivos continuam no histórico local e sincronizam a linha da análise; a foto fica apenas no aparelho original. Sem cópia no bucket, essa foto não será recuperada após reinstalação ou em outro aparelho. O estado `LOCAL_ONLY` e `photo_path=null` representam ausência de foto remota; o caminho só é associado após upload confirmado. A fila de fotos também exclui retries inconclusivos antigos. APKs anteriores podem continuar enviando segundo a regra antiga.
+
+O caminho continua `{user_id}/{analysis_id}.jpg`, para preservar download/exclusão de objetos existentes. No SQL Editor do seu projeto Supabase, esta consulta **somente de leitura** mostra cada arquivo, classe prevista e confiança, inclusive fotos antigas:
+
+```sql
+SELECT
+    o.name AS arquivo_bucket,
+    a.id AS analysis_id,
+    a.user_id,
+    a.class_id AS classe_prevista,
+    a.display_name AS nome_classe,
+    a.confidence AS confianca,
+    a.threshold AS limiar,
+    a.inconclusive AS inconclusivo,
+    a.model_sha256,
+    a.created_at AS data_analise
+FROM storage.objects AS o
+LEFT JOIN public.analyses AS a
+    ON o.name = a.user_id::text || '/' || a.id::text || '.jpg'
+WHERE o.bucket_id = 'analysis-photos'
+ORDER BY o.created_at DESC;
+```
+
+O JOIN usa o UUID e usuário porque os registros antigos podem ter `photo_path` com nome local. Classe nula indica objeto sem análise correspondente. A consulta não abre o bucket nem altera políticas ou dados. Nenhum objeto previamente enviado é removido automaticamente nesta mudança.

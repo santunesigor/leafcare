@@ -61,3 +61,11 @@ Os relatórios XML antigos e o snapshot de ambiente sem consumidores foram remov
 Relatórios atuais: [pasta do aluno](model-reports/mobilenetv4-distilled/). Relatórios do ensemble e benchmarks anteriores permanecem históricos.
 
 Entrega: [pré-release v1.2.0](https://github.com/santunesigor/leafcare/releases/tag/v1.2.0), [APK leafcare-1.2.0-cca5514.apk](https://github.com/santunesigor/leafcare/releases/download/v1.2.0/leafcare-1.2.0-cca5514.apk) e [PR #6](https://github.com/santunesigor/leafcare/pull/6). APK/release correspondem ao commit de implementação `cca5514`; o commit posterior registra apenas a conclusão documental. SHA256 APK: `112a962b863fbcafc097cbeaf46c181d172e657b4438d98dba9817d3d00af37c`. A CI remota do PR é acompanhada no GitHub; os resultados acima são das execuções locais.
+
+## Envio somente de fotos conclusivas — 2026-10-08
+
+Branch `feat/conclusive-photo-sync`, APK 1.2.1/versionCode 8. Fotos novas ou retries antigos só enviam bytes quando inconclusive=false e confidence>=threshold da análise. Fotos abaixo do limiar permanecem no aparelho; a linha e classe continuam sincronizadas. Nenhum objeto antigo foi apagado e nenhuma mudança foi aplicada no schema/RLS Supabase.
+
+48 testes direcionados de sincronização e a suíte completa de 220 testes Android passaram, zero falhas/skips. Casos: inconclusiva com retry antigo, confiança abaixo/igual ao limiar, proteção no runner, fila Room real, payload sem caminho remoto, associação classe/UUID e restore sem foto com associação posterior. `verifyModelAssets`, `lintDebug`, `assembleDebug` e OpenSpec estrito (ativo/specs e arquivo) passaram. SHA256 do modelo dentro do APK conferido, mantendo o mesmo MobileNetV4 destilado. Não houve teste com sessão Supabase real/aparelho nesta execução.
+
+Consulta de classe por arquivo: [Supabase](SUPABASE.md#fotos-com-previsão-aceita-e-consulta-da-classe). Testar no aparelho: uma análise conclusiva envia foto; uma inconclusiva conserva histórico/foto local e não cria objeto; retry offline e restauração da análise sem foto não falham.

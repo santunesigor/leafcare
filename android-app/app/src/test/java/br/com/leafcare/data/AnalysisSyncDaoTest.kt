@@ -261,6 +261,24 @@ class AnalysisSyncDaoTest {
         }
     }
 
+    @Test fun photoUploadQueueExcludesInconclusiveAndRetriesBelowThreshold() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries().build()
+        try {
+            val dao = db.analysisDao()
+            val base = entity().copy(syncStatus = SyncState.SYNCED)
+            dao.insert(base.copy(id = "accepted", confidence = 0.7f))
+            dao.insert(base.copy(id = "low", confidence = 0.69f))
+            dao.insert(base.copy(id = "inconclusive", inconclusive = true))
+            dao.insert(base.copy(id = "retry", inconclusive = true, photoSyncStatus = PhotoSyncState.ERROR))
+            dao.insert(base.copy(id = "invalid", confidence = 1.1f))
+            dao.insert(base.copy(id = "local", photoSyncStatus = PhotoSyncState.LOCAL_ONLY))
+            assertEquals(listOf("accepted"), dao.getPendingPhotoUploads().map { it.id })
+            assertEquals(6, dao.count())
+            assertEquals(PhotoSyncState.LOCAL_ONLY, dao.get("local")?.photoSyncStatus)
+        } finally { db.close() }
+    }
+
     private fun legacyEntity() = LegacyAnalysisEntity(
         id = "a-1",
         photoName = "a-1.img",

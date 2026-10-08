@@ -11,7 +11,7 @@ O LeafCare é um aplicativo Android para triagem visual de doenças e alteraçõ
 1. O app prepara a imagem e a classifica localmente com um MobileNetV4 Small destilado em um único TFLite de 9,70 MiB.
 2. Mostra até três hipóteses. Se a maior pontuação ficar abaixo do limiar calibrado definido no bundle, o resultado é apresentado como inconclusivo.
 3. Salva a análise e o histórico no banco local Room.
-4. Depois do primeiro acesso autenticado, câmera, galeria, classificação e histórico ficam disponíveis offline. Quando há conexão, o app sincroniza o histórico e as fotos com o Supabase em segundo plano.
+4. Depois do primeiro acesso autenticado, câmera, galeria, classificação e histórico ficam disponíveis offline. Quando há conexão, o app sincroniza o histórico e as fotos de análises conclusivas com o Supabase em segundo plano. Fotos inconclusivas ficam somente no aparelho.
 
 O Supabase cuida da autenticação e da sincronização; ele não classifica as imagens.
 

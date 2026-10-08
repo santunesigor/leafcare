@@ -35,8 +35,17 @@ internal fun AnalysisEntity.toRemoteJson(userId: String, appVersion: String): Js
         put("inference_ms", inferenceMs)
         put("model_sha256", modelSha256)
         put("app_version", appVersion)
-        put("photo_path", photoName)
+        if (photoSyncStatus == PhotoSyncState.SYNCED || photoSyncStatus == PhotoSyncState.REMOTE_ONLY) {
+            put("photo_path", remotePhotoPath(userId, id))
+        } else {
+            put("photo_path", JsonNull)
+        }
     }
+
+/** Same acceptance rule as the saved result; never recalibrate historical rows. */
+internal fun AnalysisEntity.canUploadPhoto(): Boolean =
+    !inconclusive && confidence.isFinite() && threshold.isFinite() &&
+        confidence in 0f..1f && threshold in 0f..1f && confidence >= threshold
 
 /** Remote object path for an analysis photo. No new UUIDs: same analysis id. */
 internal fun remotePhotoPath(userId: String, analysisId: String): String =
@@ -72,7 +81,8 @@ internal fun JsonObject.toAnalysisEntity(): AnalysisEntity {
         modelSha256 = required("model_sha256"),
         syncStatus = SyncState.SYNCED,
         deletedAt = deletedIso?.let { Instant.parse(it).toEpochMilliseconds() },
-        photoSyncStatus = PhotoSyncState.REMOTE_ONLY
+        photoSyncStatus = if (get("photo_path")?.jsonPrimitive?.content ==
+            remotePhotoPath(required("user_id"), required("id"))) PhotoSyncState.REMOTE_ONLY else PhotoSyncState.LOCAL_ONLY
     )
 }
 

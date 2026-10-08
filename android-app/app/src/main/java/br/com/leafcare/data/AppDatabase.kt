@@ -23,9 +23,9 @@ data class AnalysisEntity(
     // but kept until the remote deletion is confirmed.
     val syncStatus: SyncState = SyncState.PENDING_UPLOAD,
     val deletedAt: Long? = null,
-    // Photo upload state (v3), tracked separately: an analysis row is never
-    // marked SYNCED before its photo upload, and vice versa.
-    val photoSyncStatus: PhotoSyncState = PhotoSyncState.PENDING_UPLOAD,
+    // Photo state (v3), independent of row sync. Inconclusive photos stay local.
+    val photoSyncStatus: PhotoSyncState = if (!inconclusive && confidence >= threshold)
+        PhotoSyncState.PENDING_UPLOAD else PhotoSyncState.LOCAL_ONLY,
 )
 
 @Dao
@@ -60,11 +60,14 @@ interface AnalysisDao {
 
     // Photo queue: only for analyses already confirmed remotely, never for
     // tombstones (their remote photo is removed through the delete path).
-    @Query("SELECT * FROM analyses WHERE photoSyncStatus IN ('PENDING_UPLOAD', 'ERROR') AND deletedAt IS NULL AND syncStatus = 'SYNCED'")
+    @Query("SELECT * FROM analyses WHERE photoSyncStatus IN ('PENDING_UPLOAD', 'ERROR') AND deletedAt IS NULL AND syncStatus = 'SYNCED' AND inconclusive = 0 AND confidence >= threshold AND confidence BETWEEN 0 AND 1 AND threshold BETWEEN 0 AND 1")
     suspend fun getPendingPhotoUploads(): List<AnalysisEntity>
 
     @Query("UPDATE analyses SET photoSyncStatus = 'SYNCED' WHERE id = :id")
     suspend fun markPhotoSynced(id: String)
+
+    @Query("UPDATE analyses SET photoSyncStatus = 'REMOTE_ONLY' WHERE id = :id AND photoSyncStatus = 'LOCAL_ONLY'")
+    suspend fun markPhotoRemoteOnly(id: String)
 
     @Query("UPDATE analyses SET photoSyncStatus = 'ERROR' WHERE id = :id")
     suspend fun markPhotoError(id: String)

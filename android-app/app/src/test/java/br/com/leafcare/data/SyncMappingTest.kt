@@ -45,10 +45,7 @@ class SyncMappingTest {
         assertEquals("550e8400-e29b-41d4-a716-446655440000", row.getValue("id").jsonPrimitive.content)
         assertEquals("user-1", row.getValue("user_id").jsonPrimitive.content)
         assertEquals("0.3.0", row.getValue("app_version").jsonPrimitive.content)
-        assertEquals(
-            "550e8400-e29b-41d4-a716-446655440000.img",
-            row.getValue("photo_path").jsonPrimitive.content
-        )
+        assertEquals(JsonNull, row.getValue("photo_path"))
     }
 
     @Test fun timestampsAndPayloadRoundTrip() {        val row = entity().toRemoteJson("user-1", "0.3.0")
@@ -138,4 +135,20 @@ class SyncMappingTest {
             entity.deletedAt
         )
     }
+    @Test fun confirmedPhotoPathKeepsClassAssociation() {
+        val row = entity().copy(photoSyncStatus = PhotoSyncState.SYNCED).toRemoteJson("user-1", "1.2.1")
+        assertEquals("user-1/${entity().id}.jpg", row.getValue("photo_path").jsonPrimitive.content)
+        assertEquals("frog_eye", row.getValue("class_id").jsonPrimitive.content)
+    }
+
+    @Test fun inconclusivePhotoDefaultsToLocalOnly() {
+        val original = entity()
+        val row = AnalysisEntity(original.id, original.photoName, original.createdAt, original.classId,
+            original.displayName, original.scientificName, 0.4f, original.top3Json, true, 0.7f,
+            original.inferenceMs, original.modelSha256)
+        assertEquals(PhotoSyncState.LOCAL_ONLY, row.photoSyncStatus)
+        assertEquals(JsonNull, row.toRemoteJson("user-1", "1.2.1").getValue("photo_path"))
+        assertFalse(row.canUploadPhoto())
+    }
+
 }
