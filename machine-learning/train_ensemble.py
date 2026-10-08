@@ -320,6 +320,10 @@ def export(config, manifest):
 
 
 def main():
+    current = ROOT / "artifacts/model_metadata.json"
+    if current.exists() and read_json(current).get("architecture") == "MobileNetV4SmallDistilled":
+        raise ValueError("Receita histórica: reproduza o ensemble no checkout v1.1.2; modelo atual usa deploy_distilled.py.")
+
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--train-only", action="store_true")

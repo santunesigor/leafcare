@@ -8,7 +8,7 @@ O LeafCare é um aplicativo Android para triagem visual de doenças e alteraçõ
 
 ### Como funciona
 
-1. O app prepara a imagem e a classifica localmente com um ensemble de dois MobileNetV3Small e um MobileNetV3Large, reunidos em um único TFLite.
+1. O app prepara a imagem e a classifica localmente com um MobileNetV4 Small destilado em um único TFLite de 9,70 MiB.
 2. Mostra até três hipóteses. Se a maior pontuação ficar abaixo do limiar calibrado definido no bundle, o resultado é apresentado como inconclusivo.
 3. Salva a análise e o histórico no banco local Room.
 4. Depois do primeiro acesso autenticado, câmera, galeria, classificação e histórico ficam disponíveis offline. Quando há conexão, o app sincroniza o histórico e as fotos com o Supabase em segundo plano.
@@ -21,7 +21,7 @@ O modelo foi treinado com 696 imagens em 16 classes, usando a seção TV3 bruta 
 
 As imagens completas do dataset não são distribuídas neste repositório. O mapa de classes está em [`machine-learning/tla_class_map.yaml`](machine-learning/tla_class_map.yaml), o registro da importação em [`machine-learning/data/import_report.json`](machine-learning/data/import_report.json) e as fontes/licenças das imagens de referência em [`docs/legal/referencias_manifest.csv`](docs/legal/referencias_manifest.csv).
 
-No teste registrado de 103 imagens, o ensemble integrado obteve 81,55% de acurácia Top-1, Macro-F1 de 0,7371 e acurácia Top-3 de 99,03%. O limiar calibrado de 0,631628 foi escolhido na validação; no teste, aceitou 82/103 previsões e acertou 76 delas (92,68%). É um teste interno pequeno, sem validação de campo; as pontuações não representam certeza agronômica. Mais detalhes estão em [Machine Learning](docs/MACHINE_LEARNING.md).
+No teste conhecido de 103 imagens, o aluno integrado obteve 85,44% de Top-1, Macro-F1 de 0,8083 e Top-3 de 97,09%. O limiar de 0,506676 foi escolhido na validação; no teste, aceitou 90/103 previsões e acertou 81 (90%). É um teste interno pequeno, sem validação de campo. O ensemble anterior está preservado na release `v1.1.2`. Mais detalhes estão em [Machine Learning](docs/MACHINE_LEARNING.md).
 
 ## Desenvolvimento
 
@@ -56,7 +56,7 @@ Dentro de `android-app`, gere o APK debug com:
 .\gradlew.bat assembleDebug
 ```
 
-O APK para instalar fica em `android-app/app/build/outputs/apk/distribution/debug/leafcare-<versão>-<commit>.apk`, por exemplo `leafcare-1.1.1-c0458b1.apk`. O nome é gerado automaticamente pelo `assembleDebug` e usado no download da CI. Antes de enviar mudanças, rode os testes e as verificações relevantes:
+O APK para instalar fica em `android-app/app/build/outputs/apk/distribution/debug/leafcare-<versão>-<commit>.apk`, por exemplo `leafcare-1.2.0-<commit>.apk`. O nome é gerado automaticamente pelo `assembleDebug` e usado no download da CI. Antes de enviar mudanças, rode os testes e as verificações relevantes:
 
 ```powershell
 .\gradlew.bat testDebugUnitTest verifyModelAssets lintDebug
@@ -64,7 +64,7 @@ O APK para instalar fica em `android-app/app/build/outputs/apk/distribution/debu
 
 O código Android fica em `android-app/app/src/main/java/br/com/leafcare/`: `ui/` contém as telas, `auth/` a autenticação, `data/` persistência e sincronização, e `ml/` o processamento e a inferência de imagens. A explicação dos fluxos e das relações entre esses módulos está em [Arquitetura](docs/ARCHITECTURE.md).
 
-### Treinar e integrar outro modelo
+### Validar e integrar o modelo
 
 O dataset completo não está no repositório. Para treinar, disponibilize os dados locais esperados em `machine-learning/data/raw/` e use Python 3.12. No PowerShell:
 
@@ -73,13 +73,13 @@ cd machine-learning
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python prepare_dataset.py --config config.yaml
-python train_ensemble.py --train-only
-python train_ensemble.py --export-only
+python predict.py ../samples/reference_frog_eye.jpg
+# Com dados e caches do experimento disponíveis:
+python deploy_distilled.py --install
 python validate_bundle.py --require-model
 ```
 
-A exportação atualiza o bundle usado pelo app em `android-app/app/src/main/assets/`. Depois de alterar o modelo, valide também o contrato Android:
+A promoção do checkpoint selecionado atualiza o bundle usado pelo app em `android-app/app/src/main/assets/`. Depois de alterar o modelo, valide também o contrato Android:
 
 ```powershell
 cd ../android-app

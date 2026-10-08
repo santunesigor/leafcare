@@ -64,7 +64,7 @@ def test_ensemble_keras_reload_and_tflite_match_calibrated_mean(tmp_path):
 
 
 @pytest.mark.tensorflow
-def test_default_app_bundle_executes_calibrated_ensemble():
+def test_default_app_bundle_executes_calibrated_distilled_model():
     pytest.importorskip("tensorflow")
     from leafcare.common import sha256
     from leafcare.inference import TFLitePredictor, rank
@@ -72,16 +72,14 @@ def test_default_app_bundle_executes_calibrated_ensemble():
     root = Path(__file__).resolve().parents[2]
     assets = root / "android-app/app/src/main/assets"
     metadata = json.loads((assets / "model_metadata.json").read_text())
-    if metadata["architecture"] != "MobileNetV3Ensemble":
-        pytest.skip("New ensemble has not been installed yet")
-    assert metadata["member_count"] == len(metadata["members"]) == 3
-    assert metadata["aggregation"] == "mean_probabilities"
+    assert metadata["architecture"] == "MobileNetV4SmallDistilled"
+    assert metadata["schema_version"] == 2
     assert metadata["probability_calibration"] == "embedded_temperature_scaling"
     assert metadata["threshold_calibrated"] is True
-    fixture = json.loads((root / "machine-learning/benchmark_artifacts/ensemble/reference_prediction.json").read_text())
+    fixture = json.loads((root / "docs/model-reports/mobilenetv4-distilled/reference_prediction.json").read_text())
     image = root / fixture["image"]
     assert sha256(image) == fixture["image_sha256"]
-    scores, _ = TFLitePredictor(assets / "leafcare.tflite", metadata["classes"]).scores(preprocess(image))
+    scores, _ = TFLitePredictor(assets / "leafcare.tflite", metadata["classes"]).scores(preprocess(image, resize=metadata["resize"]))
     np.testing.assert_allclose(scores, fixture["probabilities"], atol=1e-4, rtol=0)
     result = rank(scores, metadata["classes"], metadata["confidence_threshold"])
     assert result["threshold"] == metadata["confidence_threshold"]

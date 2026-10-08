@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "split": "validation",
+  "n_images": 104,
+  "max_abs_error_limit": 0.0001,
+  "max_abs_error": 5.066394805908203e-06,
+  "top1_agreement": 1.0
+}

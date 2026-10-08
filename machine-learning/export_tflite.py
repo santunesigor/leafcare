@@ -23,6 +23,8 @@ def export(config):
     manifest = load_manifest(config)
     output = location(config, "output_dir")
     meta = read_json(output / "training_metadata.json")
+    if meta["architecture"] == "MobileNetV4SmallDistilled":
+        raise ValueError("Modelo atual destilado: use deploy_distilled.py; receita Keras é histórica.")
     if meta["architecture"] == "MobileNetV3Ensemble":
         raise ValueError("Use train_ensemble.py --export-only para preservar a calibração e o contrato do ensemble.")
     if meta["classes"] != manifest["classes"] or meta["keras_sha256"] != sha256(output / "model.keras"):

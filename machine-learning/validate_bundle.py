@@ -31,6 +31,21 @@ def validate(root, require_model=False):
         raise ValueError("Modelo divergente dos metadados.")
     if classes_hash(classes) != meta["classes_sha256"]:
         raise ValueError("Hash das classes divergente.")
+    if meta.get("architecture") == "MobileNetV4SmallDistilled":
+        import math
+        from leafcare.preprocessing import DISTILLED_RESIZE
+        if (meta.get("schema_version") != 2 or meta.get("resize") != DISTILLED_RESIZE
+                or meta.get("normalization") != "embedded_imagenet_mean_std"
+                or meta.get("probability_calibration") != "embedded_temperature_scaling"
+                or meta.get("threshold_calibrated") is not True
+                or not math.isfinite(meta.get("temperature", 0)) or meta.get("temperature", 0) <= 0
+                or not 0 <= meta.get("confidence_threshold", -1) <= 1
+                or meta.get("input_shape") != [1,224,224,3] or meta.get("output_shape") != [1,len(classes)]
+                or meta.get("input_dtype") != "float32" or meta.get("output_dtype") != "float32"):
+            raise ValueError("Contrato do modelo destilado incompatível.")
+        artifact_dir = root / "machine-learning/artifacts"
+        if sha256(artifact_dir / "leafcare.tflite") != meta["model_sha256"] or read_json(artifact_dir / "model_metadata.json") != meta:
+            raise ValueError("Bundle Python e Android divergentes.")
     from leafcare.inference import TFLitePredictor
     TFLitePredictor(model, classes)
     artifact_classes = root / "machine-learning/artifacts/classes.json"

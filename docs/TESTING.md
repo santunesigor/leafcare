@@ -47,3 +47,15 @@ Ao validar mudanças que afetem o app, cubra os fluxos relevantes:
 - Segundo aparelho: quando disponível, validar restore e exclusões entre dispositivos.
 
 Os relatórios XML antigos e o snapshot de ambiente sem consumidores foram removidos. Relatórios de novas execuções ficam em `android-app/app/build/test-results/` e nos artefatos da CI; não substituem o roteiro manual. As capturas históricas usadas na jornada do app ficam em `docs/archive/ui/`.
+
+## Integração MobileNetV4 Small destilado — 2026-10-08
+
+- Branch `feat/mobilenetv4-distilled`, APK 1.2.0/versionCode 7, schema 2.
+- Replay da promoção: 104 imagens de validação, Top-1 idêntico e erro máximo de probabilidade 0,0000050664 contra logits do checkpoint selecionado. As 103 imagens de teste mantiveram Top-1 85,44%, Macro-F1 0,8083 e Top-3 97,09%. Não houve treino/recalibração ou nova seleção pelo teste.
+- Python padrão: 39 testes passaram; testes explícitos da destilação/exportação: 9 passaram. `validate_bundle.py --require-model` e CLI TFLite executados com sucesso em TensorFlow 2.16.1.
+- Android: 213 testes unitários passaram, zero falhas/skips, incluindo fixtures RGB sintéticas e replay pixel a pixel das 104 imagens decodificadas com `LEAFCARE_PARITY_DIR=/tmp/leafcare-distilled-parity`.
+- Uma execução conjunta de testes/lint foi interrompida (exit 143); a validação final foi executada novamente com duas workers. Houve aviso de limpeza de diretório temporário do Robolectric em uma execução direcionada; ela terminou com sucesso.
+- `verifyModelAssets`, `lintDebug` e `assembleDebug` concluídos com sucesso. O modelo dentro do APK foi extraído e conferido contra o SHA256 do aluno e metadata Python.
+- OpenSpec: specs, changes ativas e arquivo validaram em modo estrito. Nenhum aparelho conectado via ADB; captura/galeria, atualização sobre v1.1.2 e latência completa no Galaxy A06 ainda precisam de teste no aparelho. Os testes JVM não executam inferência no telefone.
+
+Relatórios atuais: [pasta do aluno](model-reports/mobilenetv4-distilled/). Relatórios do ensemble e benchmarks anteriores permanecem históricos.

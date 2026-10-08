@@ -35,7 +35,7 @@ br.com.leafcare
 ├── ml/
 │   ├── ImageDecoder.kt
 │   ├── LeafClassifier.kt
-│   ├── PixelPreprocessor.kt
+│   ├── DistilledPreprocessor.kt
 │   └── Prediction.kt
 ├── ui/
 │   ├── auth/
@@ -136,15 +136,15 @@ O contrato atual é:
 1. decodificar a imagem;
 2. aplicar orientação EXIF;
 3. converter para sRGB/RGB;
-4. fazer center crop quadrado;
-5. redimensionar para `224 × 224`;
+4. redimensionar o lado menor para 256 por bicúbica antialias;
+5. recortar `224 × 224` no centro com arredondamento ties-to-even;
 6. gerar tensor `float32` na faixa `0–255`;
-7. não aplicar normalização externa, pois o preprocessing da MobileNetV3 está incorporado ao modelo.
+7. não aplicar normalização externa, pois a normalização ImageNet está incorporada ao modelo.
 
 O identificador registrado para resize é:
 
 ```text
-center_crop_bilinear_integer_v1
+resize_shorter_256_bicubic_center_crop_224_v1
 ```
 
 O objetivo é evitar divergências de pixels entre o pipeline Python e o aplicativo Android.
@@ -153,7 +153,7 @@ O objetivo é evitar divergências de pixels entre o pipeline Python e o aplicat
 
 A saída do modelo contém 16 scores. A aplicação ordena os scores e exibe as três maiores hipóteses.
 
-O threshold padrão vem do `model_metadata.json` do ensemble, escolhido na validação. Média dos três membros e calibração por temperatura estão no grafo TFLite; o app recebe as probabilidades finais e aplica o limiar do bundle, sem recalibrar a saída.
+O threshold padrão vem do `model_metadata.json` do MobileNetV4 Small destilado, escolhido na validação. Normalização ImageNet, softmax e calibração por temperatura estão no grafo TFLite. O app aplica o limiar do aluno (0,506676); análises históricas mantêm o hash e limiar registrados.
 
 Quando a maior confiança fica abaixo do threshold, o resultado é tratado como **Inconclusivo**. Isso reduz a quantidade de previsões aceitas, mas não transforma a confiança softmax em probabilidade clínica/agronômica calibrada.
 

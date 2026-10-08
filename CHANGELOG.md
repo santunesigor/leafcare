@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
-- Experimentos isolados de MobileNetV3Small, MobileNetV4 Small, FastViT-T8 e EfficientViT-M2/M3, com cinco controles e cinco treinos com destilação de DINOv2-B. Dez exportações TFLite aprovadas; receitas, resultados e relatório em diretórios próprios, preservando o ensemble integrado.
+## [1.2.0] - 2026-10-08
+
+- MobileNetV4 Small destilado como modelo integrado: TFLite float32 de 9,70 MiB, professor DINOv2-B somente no treino; cerca de 44% menor que o ensemble anterior.
+- Schema 2, preprocessing bicúbico/recorte central equivalente entre Python e Kotlin, temperatura e limiar próprios do aluno. Análises anteriores preservam hash e limiar registrados.
+- Teste conhecido: Top-1 85,44%, Macro-F1 0,8083 e Top-3 97,09%; acerto entre aceitas 90% com cobertura 87,38%. Sem nova seleção pelo teste e sem validação de campo.
+- APK debug 1.2.0 (versionCode 7); receita, bundle atual e relatórios de integração em pastas próprias. Ensemble anterior preservado na release v1.1.2.
+
+- Experimentos isolados de MobileNetV3Small, MobileNetV4 Small, FastViT-T8 e EfficientViT-M2/M3, com cinco controles e cinco treinos com destilação de DINOv2-B. Dez exportações TFLite aprovadas; receitas, resultados e relatório em diretórios próprios, preservando o ensemble durante os experimentos.
 - [Relatório de destilação](docs/benchmarks/BENCHMARK_DESTILACAO.md): 38 testes Python passaram; classificação em aparelho dos candidatos continua pendente.
 
 ## [1.1.2] - 2026-10-08

@@ -21,11 +21,13 @@ def main():
         threshold = args.threshold if args.threshold is not None else meta["confidence_threshold"]
         if not 0 <= threshold <= 1:
             raise ValueError("Limiar deve estar entre 0 e 1.")
+        if args.backend == "keras" and "keras_sha256" not in meta:
+            raise ValueError("O modelo destilado usa TFLite; não há bundle Keras correspondente.")
         model_path = args.artifacts / ("leafcare.tflite" if args.backend == "tflite" else "model.keras")
         if sha256(model_path) != meta["model_sha256" if args.backend == "tflite" else "keras_sha256"]:
             raise ValueError("Hash do modelo não corresponde ao contrato.")
         if args.backend == "tflite":
-            result = TFLitePredictor(model_path, classes).predict(args.image, classes, threshold)
+            result = TFLitePredictor(model_path, classes).predict(args.image, classes, threshold, resize=meta["resize"])
         else:
             import tensorflow as tf
             import time

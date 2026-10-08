@@ -1,12 +1,15 @@
 import argparse
 from datetime import datetime, timezone
-from leafcare.common import load_config, location, write_json, sha256, contract
+from leafcare.common import load_config, location, write_json, sha256, contract, read_json
 from leafcare.dataset import load_manifest
 
 
 def train(config):
     manifest = load_manifest(config)
     output = location(config, "output_dir")
+    current = output / "model_metadata.json"
+    if current.exists() and read_json(current).get("architecture") == "MobileNetV4SmallDistilled":
+        raise ValueError("Bundle destilado existente. Use output_dir separado para o treino histórico.")
     if (output / "model.keras").exists():
         raise ValueError("Modelo já existente. Altere output_dir para preservar este experimento.")
     output.mkdir(parents=True, exist_ok=True)

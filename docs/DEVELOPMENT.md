@@ -55,3 +55,7 @@ openspec validate --archived --strict --no-interactive
 ```
 
 O contexto/regras ficam em `openspec/config.yaml`; os workflows do Codex já estão versionados em `.agents/skills/`. Não é necessário executar `openspec init` após clonar. O [guia OpenSpec](../openspec/README.md) explica o fluxo, o uso das skills e as specs de referência.
+
+### Modelo atual
+
+O APK 1.2.0 usa MobileNetV4 Small destilado. Para validar o bundle: `python validate_bundle.py --require-model`; para promoção do checkpoint previamente selecionado: `python deploy_distilled.py --install`, com dados e caches locais. Receitas do ensemble são históricas, reproduzíveis no tag `v1.1.2`. Veja [Machine Learning](MACHINE_LEARNING.md).
