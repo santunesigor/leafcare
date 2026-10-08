@@ -166,7 +166,7 @@ python train_ensemble.py --train-only
 
 ### Avaliação
 
-A avaliação do novo ensemble ocorre em `train_ensemble.py --export-only`, depois de congelar a seleção e verificar a conversão. `evaluate.py` permanece disponível para o pipeline legado de um único MobileNetV3Small.
+A avaliação do novo ensemble ocorre em `train_ensemble.py --export-only`, depois de congelar a seleção e verificar a conversão. O pipeline antigo fica em `legacy/`; a avaliação de um único MobileNetV3Small pode ser chamada com `python -m legacy.evaluate`, dentro de `machine-learning/`.
 
 ### Exportação
 
@@ -207,14 +207,21 @@ machine-learning/artifacts/
 ├── classes.json
 ├── diseases.json
 ├── metrics.json
-├── confusion_matrix.json
-├── confusion_matrix.png
-├── model.keras               # local, ignorado pelo Git
+├── training_metadata.json
+└── model.keras               # local, ignorado pelo Git
+
+docs/model-reports/ensemble/
+├── config_used.json
 ├── history.json
 ├── accuracy.png
 ├── loss.png
+├── confusion_matrix.json
+├── confusion_matrix.png
+├── test_predictions.json
 └── conversion_parity.json
 ```
+
+O [guia da pasta ML](../machine-learning/README.md) separa o pipeline atual, o legado e os experimentos. `benchmark_artifacts/` conserva todos os registros dos benchmarks nos caminhos existentes. A exportação do ensemble passa a escrever seus relatórios em `docs/model-reports/ensemble/`; a receita, os dados e o bundle não mudaram.
 
 ## Reprodutibilidade
 

@@ -61,7 +61,7 @@ def train(config):
     write_json(output / "training_metadata.json", metadata)
     write_json(output / "classes.json", manifest["classes"])
     write_json(output / "config_used.json", {k: v for k, v in config.items() if not k.startswith("_")})
-    print("Treinamento concluído. Execute evaluate.py e export_tflite.py.")
+    print("Treinamento concluído. Execute python -m legacy.evaluate e python export_tflite.py.")
 
 
 def main():

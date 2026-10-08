@@ -46,4 +46,4 @@ Ao validar mudanças que afetem o app, cubra os fluxos relevantes:
 - Contas: alternar usuários no aparelho e confirmar isolamento remoto com duas sessões.
 - Segundo aparelho: quando disponível, validar restore e exclusões entre dispositivos.
 
-Resultados exportados ficam em `docs/testing/`. Eles são evidência histórica e não substituem a execução após mudanças.
+Os relatórios XML antigos e o snapshot de ambiente sem consumidores foram removidos. Relatórios de novas execuções ficam em `android-app/app/build/test-results/` e nos artefatos da CI; não substituem o roteiro manual. As capturas históricas usadas na jornada do app ficam em `docs/archive/ui/`.
