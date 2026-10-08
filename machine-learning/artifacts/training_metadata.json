@@ -1,24 +1,35 @@
 {
-  "schema_version": 1,
-  "status": "trained",
-  "architecture": "MobileNetV3Ensemble",
-  "input_shape": [
-    1,
-    224,
-    224,
-    3
-  ],
-  "input_dtype": "float32",
-  "output_dtype": "float32",
-  "color_space": "RGB",
-  "pixel_range": [
-    0,
-    255
-  ],
-  "normalization": "embedded_mobilenetv3_rescaling",
-  "resize": "center_crop_bilinear_integer_v1",
-  "max_image_pixels": 16000000,
-  "classes": [
+  "architecture": "MobileNetV4SmallDistilled",
+  "revision": "331fb803779522b685cf942e15f914fb6741c1eb",
+  "model_id": "mobilenetv4_small_distilled",
+  "base_model_id": "mobilenetv4_small",
+  "method": "distilled",
+  "recipe": {
+    "seed": 42,
+    "batch_size": 8,
+    "warmup_epochs": 3,
+    "finetune_epochs": 15,
+    "patience": 5,
+    "optimizer": "AdamW",
+    "head_warmup_lr": 0.001,
+    "head_finetune_lr": 0.0001,
+    "backbone_lr": 1e-05,
+    "weight_decay": 0.0001,
+    "class_weight": "balanced from training counts only",
+    "distillation_temperature": 4.0,
+    "distillation_weight": 0.5,
+    "loss": "(1-alpha) * weighted CE + alpha * T^2 * batchmean KL(teacher || student)",
+    "augmentation": "flip H/V p=.5; rotation +/-12 bilinear white fill; brightness/contrast .1 saturation .05; seed=42+epoch*100000+train_index",
+    "batch_norm": "running statistics frozen",
+    "initialization": "same pretrained encoder and validation-selected C=1 logistic probe for each pair",
+    "selection": "validation Macro-F1, Top-1, Top-3; earliest on ties",
+    "precision": "float32"
+  },
+  "selected_epoch": 15,
+  "selected_stage": "finetune",
+  "epochs_executed": 18,
+  "training_seconds": 78.88701400100035,
+  "class_order": [
     "anthracnose",
     "black_shank",
     "brown_spot",
@@ -36,46 +47,54 @@
     "weather_fleck",
     "wildfire"
   ],
-  "classes_sha256": "d565d9a564eebe6e3e46c2566ca94d728b03f8d8f73b7fbef4df9a6a0295abec",
-  "confidence_threshold": 0.6316283345222473,
-  "threshold_calibrated": true,
-  "aggregation": "mean_probabilities",
-  "temperature": 0.8351045566863412,
-  "probability_calibration": "embedded_temperature_scaling",
-  "member_count": 3,
-  "members": [
-    {
-      "id": "small_adam",
-      "architecture": "MobileNetV3Small",
-      "keras_sha256": "03219df0752c639316f06ebbe1b0262b0ea9b0f535326cb01a3f3114b4d85e23"
-    },
-    {
-      "id": "small_rmsprop",
-      "architecture": "MobileNetV3Small",
-      "keras_sha256": "11c119238fb22fabdad90d9b4d633822cc7ba9097f4b193a2a8acbcb13cf8881"
-    },
-    {
-      "id": "large_adamw",
-      "architecture": "MobileNetV3Large",
-      "keras_sha256": "db2439d4022dbdc84dc8ab6c858302239fe91dddbf37481b71aec527a8524ca1"
-    }
-  ],
-  "seed": 42,
-  "tensorflow": "2.16.1",
-  "keras": "3.3.3",
-  "trained_at": "2026-10-05T20:48:22.302355+00:00",
-  "parameters": 4908432,
-  "keras_sha256": "515a00f1e4f4b70d3ddd81d824cb2ae06a8402e60c4c02889bb52e2782377c7a",
   "manifest_sha256": "81f537479187595ab9491d3f76dc023c80ecb457018b662624326e72b5e7f01e",
-  "model_sha256": "a039eebb22284e68d903f3e9f5c0f32c1a51073e5e3f91b569f31ac5a5b6fc40",
-  "conversion_parity": {
-    "split": "validation",
-    "n_images": 104,
-    "top1_agreement": 1.0,
-    "max_abs_error": 6.794929504394531e-06,
-    "numpy_formula_max_abs_error": 2.205371856689453e-06,
-    "max_abs_error_limit": 0.0001,
-    "passed": true
+  "split_counts": {
+    "train": 489,
+    "validation": 104,
+    "test": 103
   },
-  "test_used_for_selection": false
+  "pretrained_sha256": "7a7102ec18f62bbfb555b6fe829bbb5af749516b84174926c29ffdfdfc03aec4",
+  "initial_probe_sha256": "03d59341cafa8925d189b9c3786a7213d51831bce53fc98764ede849057e635c",
+  "initial_state_sha256": "6ca71866571e6faf9d8880b4b81e5325ff483fc3f0d4a543935ddc87e7cf0905",
+  "checkpoint_local": "experiments/distillation/.cache/checkpoints/mobilenetv4_small_distilled.safetensors",
+  "checkpoint_sha256": "e3fc9f53084458eee05f85b74b480f7686370872c70f9f9a1b7caa391ad1a130",
+  "checkpoint_bytes": 10183192,
+  "parameters": 2513520,
+  "preprocessing": {
+    "input_size": [
+      3,
+      224,
+      224
+    ],
+    "interpolation": "bicubic",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "crop_pct": 0.875,
+    "crop_mode": "center"
+  },
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "temperature": 1.8882043703807203,
+  "threshold": 0.5066758394241333,
+  "test_used_for_selection": false,
+  "teacher_checkpoint_sha256": "0423c9fe8cb99a8f741a4ffe1280e7f118b9e2744fd79a7bc329bf97ca86fae6",
+  "timing": {
+    "desktop_single_image_ms_median": 1.3753474995610304,
+    "desktop_single_image_ms_p95": 1.4757940498384414,
+    "peak_cuda_allocated_bytes_batch1": 41129472,
+    "note": "GTX 1650 FP32 encoder+head; batch1, 5 warmups/30 synchronized samples; excludes preprocessing; not Android."
+  },
+  "model_sha256": "422ab461585a83bfabe6896d7ac7b32c726a8b285ff4ade76cb0cec54ba6da99"
 }

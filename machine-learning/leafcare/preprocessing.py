@@ -1,4 +1,4 @@
-"""Contrato idêntico a ml/PixelPreprocessor.kt (RGB uint8 -> float32)."""
+"""Contratos RGB uint8 -> float32: aluno atual e bilinear histórico."""
 from pathlib import Path
 from io import BytesIO
 import numpy as np
@@ -60,5 +60,27 @@ def resize_rgb(rgb, size=224):
     return result.astype(np.float32)
 
 
-def preprocess(path, size=224):
-    return resize_rgb(decode_rgb(path), size)[None, ...]
+DISTILLED_RESIZE = "resize_shorter_256_bicubic_center_crop_224_v1"
+
+
+def resize_distilled_rgb(rgb):
+    """Preprocessing do checkpoint: Pillow bicubic antialias + CenterCrop torchvision."""
+    if rgb.ndim != 3 or rgb.shape[2] != 3 or rgb.dtype != np.uint8:
+        raise ValueError("Esperado RGB uint8 H×W×3.")
+    height, width, _ = rgb.shape
+    short = min(width, height)
+    if short < 1:
+        raise ValueError("Imagem vazia.")
+    resized_width, resized_height = 256 * width // short, 256 * height // short
+    image = Image.fromarray(rgb).resize((resized_width, resized_height), Image.Resampling.BICUBIC)
+    left, top = round((resized_width - 224) / 2), round((resized_height - 224) / 2)
+    return np.asarray(image.crop((left, top, left + 224, top + 224)), dtype=np.float32).copy()
+
+
+def preprocess(path, size=224, resize="center_crop_bilinear_integer_v1"):
+    rgb = decode_rgb(path)
+    if resize == DISTILLED_RESIZE and size == 224:
+        return resize_distilled_rgb(rgb)[None, ...]
+    if resize != "center_crop_bilinear_integer_v1":
+        raise ValueError("Contrato de preprocessing não suportado.")
+    return resize_rgb(rgb, size)[None, ...]

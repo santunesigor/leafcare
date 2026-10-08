@@ -13,22 +13,17 @@ import java.security.MessageDigest
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
-class EnsembleBundleTest {
-    @Test fun defaultBundleContainsThreeCalibratedMembersInOneModel() {
+class ModelBundleTest {
+    @Test fun defaultBundleContainsCalibratedDistilledModel() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val metadata = JSONObject(context.assets.open("model_metadata.json").bufferedReader().use { it.readText() })
-        assertEquals("MobileNetV3Ensemble", metadata.getString("architecture"))
-        assertEquals("mean_probabilities", metadata.getString("aggregation"))
+        assertEquals("MobileNetV4SmallDistilled", metadata.getString("architecture"))
+        br.com.leafcare.ml.validateModelMetadata(metadata)
         assertEquals("embedded_temperature_scaling", metadata.getString("probability_calibration"))
         assertTrue(metadata.getBoolean("threshold_calibrated"))
-        val members = metadata.getJSONArray("members")
-        assertEquals(3, members.length())
-        val architectures = (0 until members.length()).map { members.getJSONObject(it).getString("architecture") }
-        assertEquals(2, architectures.count { it == "MobileNetV3Small" })
-        assertEquals(1, architectures.count { it == "MobileNetV3Large" })
         assertTrue(metadata.getDouble("temperature").let { it.isFinite() && it > 0.0 })
         assertTrue(metadata.getDouble("confidence_threshold") in 0.0..1.0)
-        assertEquals("center_crop_bilinear_integer_v1", metadata.getString("resize"))
+        assertEquals("resize_shorter_256_bicubic_center_crop_224_v1", metadata.getString("resize"))
         val classes = JSONArray(context.assets.open("classes.json").bufferedReader().use { it.readText() })
         assertEquals(16, classes.length())
         assertEquals(classes.toString(), metadata.getJSONArray("classes").toString())
@@ -37,4 +32,15 @@ class EnsembleBundleTest {
         assertEquals(metadata.getString("model_sha256"), hash)
         assertTrue(metadata.getJSONObject("conversion_parity").getBoolean("passed"))
     }
+    @Test fun incompatibleMetadataIsRejected() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val original = context.assets.open("model_metadata.json").bufferedReader().use { it.readText() }
+        for ((key, invalid) in listOf("schema_version" to 1, "architecture" to "MobileNetV3Ensemble",
+            "resize" to "center_crop_bilinear_integer_v1", "temperature" to 0.0,
+            "confidence_threshold" to 2.0, "normalization" to "wrong", "threshold_calibrated" to false)) {
+            val metadata = JSONObject(original).put(key, invalid)
+            assertThrows(IllegalArgumentException::class.java) { br.com.leafcare.ml.validateModelMetadata(metadata) }
+        }
+    }
+
 }

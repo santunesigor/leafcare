@@ -1,262 +1,74 @@
 # Machine Learning — LeafCare
 
-Este documento reúne o dataset, o contrato do modelo atual, suas métricas e os comandos do pipeline.
-
-Resultados comparativos e experimentais estão centralizados em [Benchmark de Modelos](benchmarks/BENCHMARK_MODELOS.md).
-
-Para a explicação da preparação dos dados, da sequência de experimentos, da escolha do ensemble e dos próximos passos, veja a [Jornada do Machine Learning](explain/JORNADA_MACHINE_LEARNING.md).
-
 ## Modelo integrado
 
-Arquitetura atual: **ensemble de dois MobileNetV3Small e um MobileNetV3Large**,
-retreinados a partir dos pesos ImageNet. Cada membro produz 16 probabilidades;
-o grafo calcula a média e aplica `softmax(log(clip(média, 1e-7, 1)) / temperatura)`.
-As três redes e a calibração estão no mesmo `leafcare.tflite`. O Android executa
-um único Interpreter e mantém classificação offline, Top-3 e histórico local.
+O bundle atual é **MobileNetV4 Small destilado** (`mobilenetv4_conv_small.e2400_r224_in1k`), uma rede com 2.513.520 parâmetros e TFLite float32 de 10.167.768 bytes (9,70 MiB). O professor DINOv2-B não vai no APK. A classificação permanece local e offline após autenticação.
 
-A receita está em `machine-learning/train_ensemble.py`, fixada antes da avaliação:
+O checkpoint da época 15 foi escolhido pela validação no experimento já concluído; esta integração não retreina, muda o split ou recalibra pelo teste. Receita completa, histórico, logits e hashes: [`experiment_config.json`](../machine-learning/benchmark_artifacts/distillation/mobilenetv4_small_distilled/experiment_config.json). Comparação dos dez alunos: [Benchmark de destilação](benchmarks/BENCHMARK_DESTILACAO.md).
 
-| Membro | Seed | Otimizador | LR inicial | Dropout | Camadas finais liberadas | Épocas máximas: cabeça / ajuste |
-|---|---:|---|---:|---:|---:|---:|
-| Small Adam | 42 | Adam | 0,001 | 0,25 | 30 | 25 / 20 |
-| Small RMSprop | 54 | RMSprop, momentum 0,9 | 0,0007 | 0,25 | 30 | 12 / 12 |
-| Large AdamW | 44 | AdamW, weight decay 0,00001 | 0,0007 | 0,30 | 40 | 12 / 12 |
+O ensemble anterior continua reproduzível no tag `v1.1.2`, com relatórios em [`model-reports/ensemble/`](model-reports/ensemble/) e resultados em `machine-learning/benchmark_artifacts/ensemble/`. Seus resultados são históricos; a integração atual tem relatórios próprios em [`model-reports/mobilenetv4-distilled/`](model-reports/mobilenetv4-distilled/).
 
-Batch 16; LR de ajuste 0,00001; BatchNorm congelada; pesos de classe calculados
-somente no treino. Augmentation padrão do pipeline existente: flips, rotação,
-zoom e contraste. Cada membro escolhe o checkpoint de menor perda de validação,
-com preferência pela fase congelada em empate. Temperatura minimiza NLL na
-validação; limiar maximiza cobertura com pelo menos 90% de acerto nessa partição,
-ou prioriza acerto/cobertura se a meta não for alcançada. O limiar é definido a
-partir das saídas TFLite, no intervalo entre a última previsão rejeitada e a
-primeira aceita. Tudo é congelado antes da inferência de teste.
+## Contrato de inferência
 
-A composição veio do ensemble vencedor da validação histórica. Esta é uma
-**nova execução**, com augmentation padrão atual; suas métricas não devem ser
-substituídas pelos números do benchmark antigo. Configuração, hashes, históricos,
-versões e previsões estão em `benchmark_artifacts/ensemble/`.
+- Schema 2, arquitetura `MobileNetV4SmallDistilled`.
+- Entrada float32 NHWC `[1,224,224,3]`, RGB sRGB na faixa 0–255.
+- Decodificação mantém orientação EXIF, conversão sRGB, composição de alpha sobre branco e limite de 16 megapixels.
+- Resize do lado menor para 256, lado maior calculado por divisão inteira; bicúbica antialias equivalente ao Pillow 10.4, com acumuladores de coeficientes de 22 bits e clipping uint8 entre os eixos.
+- Recorte central 224×224, com arredondamento ties-to-even; contrato `resize_shorter_256_bicubic_center_crop_224_v1`.
+- Normalização ImageNet (mean 0,485/0,456/0,406; std 0,229/0,224/0,225), softmax e temperatura **1,8882043704** embarcados no grafo.
+- Saída float32 `[1,16]`; Top-3 ordenado por pontuação, desempate pelo índice da classe.
+- Limiar **0,5066758394**, definido na validação. Confiança abaixo dele produz resultado inconclusivo. Confiança não é acurácia nem certeza agronômica.
 
-## Classes
+Classes e sua ordem continuam em `artifacts/classes.json`; catálogo em `artifacts/diseases.json`. Android e CLI conferem hashes. Hash TFLite: `422ab461585a83bfabe6896d7ac7b32c726a8b285ff4ade76cb0cec54ba6da99`.
 
-A ordem de classes é parte do contrato e não pode ser alterada sem reexportar todo o bundle:
+`DistilledPreprocessor.kt` e `leafcare/preprocessing.py` implementam a entrada atual. `PixelPreprocessor.kt` e o resize bilinear Python permanecem para fixtures e receitas históricas. Não normalizar duas vezes e não aplicar o preprocessing antigo ao aluno.
 
-```text
-anthracnose
-black_shank
-brown_spot
-cmv
-frog_eye
-genetic_abnormality
-healthy
-nematodes
-potato_tuber_moth
-pvy
-sunscald
-target_spot
-tmv
-tswv
-weather_fleck
-wildfire
-```
+## Dataset, treino e destilação
 
-## Dataset e split
+696 imagens TV3 do [TLA](https://doi.org/10.3389/fpls.2024.1333236), 16 classes, seed 42 e separação por grupos: treino 489, validação 104, teste 103. Os dados brutos completos não são redistribuídos. Manifesto, mapa de classes, auditoria e proveniência permanecem nos caminhos de `machine-learning/data/`, `tla_class_map.yaml` e `docs/legal/`.
 
-O experimento registrado utiliza 696 imagens distribuídas em 16 classes.
+O aluno parte de pesos ImageNet e probe logística, usa AdamW, batch 8, três épocas de aquecimento e quinze de ajuste; BatchNorm congelada. A perda combina 50% entropia cruzada ponderada e 50% KL com o professor DINOv2-B, temperatura de destilação 4 (distinta da temperatura de calibração). Os logits do professor são usados somente no treino. A época é selecionada por Macro-F1/Top-1/Top-3 na validação; o teste não escolhe checkpoint nem limiar.
 
-Split configurado:
+## Métricas registradas
 
-- treino: 70%;
-- validação: 15%;
-- teste: 15%;
-- seed: 42;
-- separação orientada por grupos para reduzir vazamento entre imagens relacionadas.
+| Partição | Imagens | Top-1 | Macro-F1 | Top-3 |
+| --- | ---: | ---: | ---: | ---: |
+| Validação | 104 | 86,54% | 0,7896 | 96,15% |
+| Teste | 103 | 85,44% | 0,8083 | 97,09% |
 
-Os datasets completos não são redistribuídos neste repositório.
+No teste, 90/103 previsões foram aceitas (87,38% de cobertura), com 81 acertos (90%). O ensemble anterior tinha Top-1 81,55%, Macro-F1 0,7371, Top-3 99,03% e 92,68% de acerto nas 82 previsões aceitas. O aluno melhora Top-1 e Macro-F1, mas tem Top-3 e acerto entre aceitas menores. São resultados internos no teste já conhecido; não constituem validação de campo ou teste independente de novas escolhas.
 
-As imagens para o treinamento estão nesta [pasta do Google Drive](https://drive.google.com/drive/folders/1jMaqmAc-BQj3aDC6c50RuNQIAPneVd2A). Baixe a pasta `raw` e coloque-a em `machine-learning/data/raw/`.
+O replay da integração nas 104 imagens de validação manteve todas as classes previstas e erro máximo de probabilidade de 0,0000051 contra os logits gravados, abaixo de 0,0001. O replay das 103 imagens de teste manteve as métricas publicadas. [Paridade](model-reports/mobilenetv4-distilled/integration_parity.json) e relatórios por classe estão na pasta do modelo atual.
 
-As origens e licenças das imagens estão em `docs/legal/referencias_manifest.csv`.
+Tempo do benchmark em desktop i5-13400, duas threads: inferência TFLite mediana 2,11 ms/P95 2,20 ms; pipeline Python mediana 3,63 ms/P95 3,91 ms. Isso não mede Android. A meta de análise completa até três segundos no Galaxy A06 segue pendente de aparelho conectado.
 
-## Contrato de entrada
+## Executar e validar
 
-| Campo | Valor |
-|---|---|
-| Shape | `[1,224,224,3]` |
-| Dtype | `float32` |
-| Cor | RGB |
-| Faixa | `0–255` |
-| Resize | center crop + bilinear |
-| Normalização | rescaling embutido em cada MobileNetV3 |
-| Saída | 16 probabilidades float32, média e temperatura embutidas |
-
-## Métricas do modelo integrado
-
-Dados desta nova execução, medidos no TFLite final e registrados em `machine-learning/artifacts/metrics.json`. O ensemble acertou 84/103 imagens, contra 80/103 do MobileNetV3Small anterior. Validação: Top-1 87,50%, Macro-F1 0,8179 e Top-3 99,04%.
-
-| Métrica | Valor |
-|---|---:|
-| Imagens de teste | 103 |
-| Accuracy Top-1 | 0,8155 |
-| Macro-F1 | 0,7371 |
-| Accuracy Top-3 | 0,9903 |
-| Threshold | 0,631628 |
-| Temperatura | 0,835105 |
-| Cobertura | 0,7961 |
-| Accuracy nos resultados aceitos | 0,9268 |
-
-### Atenção às classes raras
-
-Algumas classes possuem apenas 1 ou 2 exemplos no conjunto de teste. Métricas individuais dessas classes têm alta variância e não devem ser interpretadas como estimativas estáveis de desempenho real.
-
-## Conversão e seleção
-
-A exportação usa somente operadores TFLite built-in, float32. Confere todas as
-104 imagens de validação: Top-1 idêntico entre Keras/TFLite e erro absoluto máximo
-≤0,0001. Também compara o grafo com a fórmula NumPy de média/calibração.
-Os assets só são substituídos após passar nessa verificação.
-
-Paridade mede implementação, não generalização de campo. A composição foi fixada
-pela validação histórica; nesta rodada não há busca de membros nem seleção pelo
-teste. O teste de 103 imagens já era conhecido e continua sendo uma comparação
-interna. A referência MobileNetV3Small anterior foi preservada em
-`benchmark_artifacts/ensemble/baseline_reference.json`.
-
-## Pipeline
-
-### Instalação
+Com Python 3.12, dentro de `machine-learning/`:
 
 ```bash
-cd machine-learning
-python3.12 -m venv .venv
-source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-No Windows, ative com:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-### Testes
-
-```bash
+python predict.py ../samples/reference_frog_eye.jpg
+python validate_bundle.py --require-model
 python -m pytest -q
 ```
 
-### Preparação
+A CLI usa TFLite e seleciona o preprocessing pelo metadata. Não existe `model.keras` correspondente ao aluno; o backend Keras é rejeitado para evitar usar um arquivo antigo local.
+
+Para reproduzir o treino e a conversão, siga [`experiments/distillation/README.md`](../machine-learning/experiments/distillation/README.md), usando seus ambientes separados. Para promover novamente o resultado já selecionado, com dataset e caches originais disponíveis:
 
 ```bash
-python prepare_dataset.py --config config.yaml
+python deploy_distilled.py --install --pixel-parity-dir /tmp/leafcare-distilled-parity
 ```
 
-Somente auditoria:
+A promoção verifica hashes do checkpoint, TFLite, manifesto e imagens; executa replay de validação/teste antes de atualizar `artifacts/` e `assets/`. Ela não seleciona outro modelo nem altera os experimentos históricos. O checkpoint também é distribuído na release do aluno para permitir futuras reexportações.
+
+No Android, com JDK 17 e SDK configurados:
 
 ```bash
-python prepare_dataset.py --config config.yaml --audit-only
+bash gradlew testDebugUnitTest verifyModelAssets lintDebug assembleDebug
 ```
 
-A preparação gera manifestos e dados de auditoria em `data/prepared/`.
+Fixtures sintéticas compartilhadas verificam retrato, paisagem, upscale, downsample, alpha e arredondamento de crop. O replay Kotlin das 104 imagens decodificadas pode ser habilitado com `LEAFCARE_PARITY_DIR=/tmp/leafcare-distilled-parity` após gerar as fixtures locais. Não distribua dados brutos no Git ou APK.
 
-### Treinamento
-
-```bash
-python train_ensemble.py --train-only
-```
-
-### Avaliação
-
-A avaliação do novo ensemble ocorre em `train_ensemble.py --export-only`, depois de congelar a seleção e verificar a conversão. O pipeline antigo fica em `legacy/`; a avaliação de um único MobileNetV3Small pode ser chamada com `python -m legacy.evaluate`, dentro de `machine-learning/`.
-
-### Exportação
-
-```bash
-python train_ensemble.py --export-only
-```
-
-A exportação instala o ensemble em `artifacts/` e copia o TFLite/metadados para:
-
-```text
-android-app/app/src/main/assets/
-```
-
-### Validação do bundle
-
-```bash
-python validate_bundle.py --require-model
-```
-
-### Predição isolada
-
-```bash
-python predict.py imagem.jpg
-```
-
-Com backend Keras:
-
-```bash
-python predict.py imagem.jpg --backend keras
-```
-
-## Artefatos principais
-
-```text
-machine-learning/artifacts/
-├── leafcare.tflite
-├── model_metadata.json
-├── classes.json
-├── diseases.json
-├── metrics.json
-├── training_metadata.json
-└── model.keras               # local, ignorado pelo Git
-
-docs/model-reports/ensemble/
-├── config_used.json
-├── history.json
-├── accuracy.png
-├── loss.png
-├── confusion_matrix.json
-├── confusion_matrix.png
-├── test_predictions.json
-└── conversion_parity.json
-```
-
-O [guia da pasta ML](../machine-learning/README.md) separa o pipeline atual, o legado e os experimentos. `benchmark_artifacts/` conserva todos os registros dos benchmarks nos caminhos existentes. A exportação do ensemble passa a escrever seus relatórios em `docs/model-reports/ensemble/`; a receita, os dados e o bundle não mudaram.
-
-## Reprodutibilidade
-
-Ao alterar o modelo:
-
-1. mantenha o seed registrado;
-2. preserve o conjunto de teste para avaliação final;
-3. não escolha arquitetura usando o conjunto de teste;
-4. atualize `model_metadata.json`;
-5. reexporte o TFLite;
-6. rode `validate_bundle.py`;
-7. rode `verifyModelAssets` no Android;
-8. confira a equivalência de preprocessing Python ↔ Kotlin.
-
-## Limitações científicas
-
-- poucas imagens para algumas classes;
-- possível diferença entre imagens acadêmicas e condições reais de campo;
-- ausência de validação externa suficiente no Brasil;
-- temperatura e threshold ajustados somente na validação pequena, sem garantia de calibração em campo;
-- confiança softmax não representa certeza agronômica;
-- conjunto fechado de 16 classes;
-- necessidade de revisão de rótulos, sintomas e recomendações por especialista.
-
-## Teste no Android
-
-O APK 1.1.0 usa o ensemble como padrão. A animação de carregamento existente
-acompanha a análise; a sincronização continua em segundo plano. Cada registro
-salva o hash do novo TFLite e o limiar do bundle; análises antigas preservam seu
-hash/limiar original. Nenhum schema Room/Supabase foi alterado.
-
-A referência é Samsung Galaxy A06, com meta de até três segundos do início da
-análise até o resultado disponível, incluindo decode, preprocessing, inferência,
-Room e UI. A medição no aparelho continua pendente de conexão física; os tempos
-de CPU desktop não comprovam essa meta. A integração foi solicitada pelo usuário
-para teste no app, sem validação externa de campo.
-
-O TFLite integrado tem 17,22 MiB e 4,908,432 parâmetros. A maior diferença Keras/TFLite foi 6.795e-06, com Top-1 idêntico nas 104 imagens. Em CPU desktop Intel Core i5-13400, duas threads, cinco aquecimentos e 30 amostras: inferência mediana/P95 4,42/4,79 ms; pipeline Python 9,68/10,46 ms, sem Room/UI. Esses tempos não são do A06.
+As receitas Keras/ensemble são históricas. `train_ensemble.py`, `export_tflite.py` e `legacy/train.py` e `legacy/evaluate.py` rejeitam o bundle destilado atual; reproduza o ensemble em checkout `v1.1.2`. Mantenha ambientes/checkpoints em `.cache` ignorados. Novos experimentos devem continuar isolados do bundle distribuído até promoção explícita.

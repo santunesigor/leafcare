@@ -1,10 +1,6 @@
-# model-bundle Specification
+# Spec Delta
 
-## Purpose
-
-Registrar o contrato do bundle de inferência integrado no Android e a consistência exigida entre modelo, classes, metadados e pré-processamento.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Bundle local consistente
 
@@ -47,11 +43,3 @@ O pipeline SHALL verificar pixels RGB compartilhados entre Python e Kotlin contr
 - **WHEN** os resultados históricos do ensemble são recalculados a partir das probabilidades registradas
 - **THEN** as métricas coincidem com os relatórios históricos
 - **AND** esses registros permanecem separados das fixtures do aluno atual
-
-## References
-
-- [LeafClassifier](../../../android-app/app/src/main/java/br/com/leafcare/ml/LeafClassifier.kt)
-- [ModelBundleTest](../../../android-app/app/src/test/java/br/com/leafcare/ModelBundleTest.kt)
-- [Testes do bundle e do ensemble histórico](../../../machine-learning/tests/test_ensemble.py)
-- [Validador do bundle](../../../machine-learning/validate_bundle.py)
-- [Contrato e métricas](../../../docs/MACHINE_LEARNING.md)

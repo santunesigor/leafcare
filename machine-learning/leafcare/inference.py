@@ -41,6 +41,6 @@ class TFLitePredictor:
         elapsed = (time.perf_counter() - start) * 1000
         return self.interpreter.get_tensor(self.output["index"])[0], elapsed
 
-    def predict(self, path, classes, threshold):
-        scores, elapsed = self.scores(preprocess(path))
+    def predict(self, path, classes, threshold, resize="center_crop_bilinear_integer_v1"):
+        scores, elapsed = self.scores(preprocess(path, resize=resize))
         return {**rank(scores, classes, threshold), "inference_ms": elapsed}

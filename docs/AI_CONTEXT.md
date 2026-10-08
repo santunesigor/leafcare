@@ -19,7 +19,7 @@ O app já inclui captura/importação de imagens, classificação local, resulta
 
 ## Machine Learning
 
-O bundle integrado é um ensemble de dois MobileNetV3Small e um MobileNetV3Large em um único TFLite float32, 16 classes e entrada `[1,224,224,3]` RGB 0–255. Média e calibração por temperatura (0,835105) estão no grafo; threshold 0,631628 definido na validação. Métricas do teste interno: Top-1 81,55%, Macro-F1 0,7371 e Top-3 99,03%. Treino/exportação padrão: `train_ensemble.py`. Medição de até três segundos no Galaxy A06 pendente de aparelho conectado.
+O bundle integrado é MobileNetV4 Small destilado, schema 2, TFLite float32 de 9,70 MiB, 16 classes e entrada `[1,224,224,3]` RGB 0–255. Resize bicúbico do lado menor para 256 e crop central 224; normalização ImageNet e temperatura 1,888204 embarcadas; limiar 0,506676. Teste conhecido: Top-1 85,44%, Macro-F1 0,8083, Top-3 97,09%. Promoção: `deploy_distilled.py --install`; receita em `experiments/distillation/`. Relatórios atuais: `docs/model-reports/mobilenetv4-distilled/`. Ensemble anterior: tag `v1.1.2` e relatórios históricos separados. Meta de três segundos no Galaxy A06 pendente de aparelho conectado.
 
 Não altere modelo, treinamento, dataset, ordem das classes ou threshold sem solicitação explícita. Confiança softmax não é certeza agronômica. Detalhes e comandos estão em [MACHINE_LEARNING.md](MACHINE_LEARNING.md).
 
@@ -32,7 +32,7 @@ Não altere modelo, treinamento, dataset, ordem das classes ou threshold sem sol
 
 ## Débitos conhecidos
 
-- Verifique o resíduo de threshold persistido em SharedPreferences antes de mexer nesse fluxo; o threshold deve seguir o bundle do modelo.
+- O threshold usado por AnalysisRepository vem de LeafClassifier e do bundle. Análises anteriores preservam o limiar e hash registrados.
 - Os fluxos Auth foram reportados aprovados manualmente em dispositivo em 2026-09-29. Validação em segundo aparelho não foi executada por indisponibilidade.
 - Atualize limitações e estado de QA sem transformar resultados antigos em evidência de uma execução nova.
 

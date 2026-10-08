@@ -1,4 +1,7 @@
 ---
+
+> Atualização de 2026-10-08: o modelo integrado passou a MobileNetV4 Small destilado. O relato abaixo mantém o contexto histórico do ensemble. O estado atual e a nova organização estão em [Machine Learning](../MACHINE_LEARNING.md) e [guia das pastas ML](../../machine-learning/README.md).
+
 title: "LeafCare — jornada do Machine Learning"
 aliases:
   - "Como o LeafCare chegou ao ensemble"

@@ -1,68 +1,29 @@
 # Machine Learning do LeafCare
 
-O app usa **MobileNetV3Ensemble**: dois MobileNetV3Small (`small_adam` e `small_rmsprop`) e um MobileNetV3Large (`large_adamw`), unidos em um TFLite float32. São 16 classes, entrada RGB `[1,224,224,3]`, temperatura 0,835105 e limiar calibrado 0,631628. O bundle instalado fica em `../android-app/app/src/main/assets/`.
+O modelo atual é **MobileNetV4 Small destilado**, TFLite float32 de 9,70 MiB com 16 classes. Professor DINOv2-B somente no treino. Contrato, métricas, comandos e limitações: [Machine Learning](../docs/MACHINE_LEARNING.md).
 
-## Estrutura
+## Organização
 
-```text
-machine-learning/
-├── README.md                  # guia da organização
-├── train_ensemble.py          # treino/exportação do modelo atual
-├── export_tflite.py           # conversão compartilhada + exportador antigo
-├── validate_bundle.py         # confere o bundle instalado
-├── predict.py                 # inferência local para inspeção
-├── import_tla.py              # importação das fontes locais
-├── prepare_dataset.py        # auditoria e split por grupos
-├── config.yaml               # configuração base
-├── requirements.txt          # dependências principais
-├── pytest.ini                # suíte padrão: tests/
-├── disease_catalog.json      # fonte do catálogo explicativo
-├── classes.reference.json    # contrato de referência sem modelo
-├── tla_class_map.yaml        # proveniência/taxonomia
-├── leafcare/                 # utilitários compartilhados de dados, treino e inferência
-├── data/                     # grupos, manifesto, auditoria e dados brutos locais
-├── artifacts/                # bundle atual e metadados/métricas consumidos pelo código
-├── tests/                    # testes do contrato e do ensemble
-├── legacy/                   # pipeline anterior de modelo único
-│   ├── train.py
-│   └── evaluate.py
-├── experiments/              # comparação de modelos; ambientes/checkpoints locais
-│   ├── dinov2/
-│   ├── vision/
-│   └── ensemble/             # ambiente e checkpoints ignorados pelo Git
-└── benchmark_artifacts/      # registros de benchmarks, preservados nos caminhos atuais
-
-docs/
-├── model-reports/ensemble/   # gráficos e relatórios do ensemble atual
-└── archive/ui/               # capturas históricas usadas na documentação
-```
-
-`docs/` é irmã de `machine-learning/`, na raiz do repositório. Nomes como `legacy`, `model-reports` e `archive` distinguem código antigo, relatórios técnicos e evidências históricas.
-
-## O que é necessário para o modelo atual
-
-- `artifacts/` mantém `leafcare.tflite`, `classes.json`, `diseases.json`, `model_metadata.json`, `training_metadata.json` e `metrics.json`. O `model.keras` local continua ignorado pelo Git. A cópia TFLite é usada pela CLI e pelos testes; os assets Android são a cópia distribuída no APK.
-- `train_ensemble.py`, `leafcare/`, `config.yaml`, dados locais e os checkpoints de `experiments/ensemble/.cache/` permitem reproduzir/reexportar o ensemble. As classes e o catálogo já exportados são reaproveitados pelo ensemble.
-- `export_tflite.py` permanece na raiz porque `convert_model` é usado pelo ensemble e pelos testes. Sua entrada de exportação de modelo único rejeita o ensemble.
-- `experiments/dinov2/benchmark.py` é uma dependência real: fornece métricas e calibração ao ensemble. Não remover essa pasta inteira.
-- `tests/`, `pytest.ini`, `samples/` na raiz e artefatos de benchmark verificam o contrato e recalculam resultados registrados.
-
-Gráficos, histórico por época, snapshot de configuração, matriz de confusão, previsões detalhadas e relatório de paridade ficam em [`docs/model-reports/ensemble/`](../docs/model-reports/ensemble/). Futuras exportações do ensemble escrevem nessa pasta.
-
-## O que não é necessário para executar o APK
-
-| Grupo | Recomendação |
+| Caminho | Uso |
 | --- | --- |
-| `legacy/train.py` | Não participa do pipeline atual; conservar isolado para reproduzir o modelo único anterior. Candidato a remoção se esse suporte for abandonado. |
-| `legacy/evaluate.py` | Não avalia o ensemble; conservar isolado porque há teste que verifica sua rejeição do bundle atual. Remoção exigiria ajustar o teste e a documentação. |
-| Experimentos `vision/` | Não fazem parte da inferência no app; conservar para comparação e para seus testes explícitos. Podem ser separados futuramente junto com os consumidores. |
-| Gráficos e relatórios em `docs/model-reports/ensemble/` | Não são carregados pelo app; conservar como evidência identificada do modelo atual. |
-| `.venv/`, caches e outputs de build | Não são versionados nem distribuídos. Ambientes podem ser reinstalados; checkpoints treinados devem ser guardados para reexportar sem novo treino. |
-| `benchmark_artifacts/` | Não vai no APK, mas tem leitores em testes e relatórios. Preservada integralmente conforme solicitado. |
+| `deploy_distilled.py` | Promoção hash-verificada do aluno selecionado; replay antes de atualizar bundle. |
+| `artifacts/` | TFLite, classes, catálogo, metadata, treinamento e métricas atuais. |
+| `leafcare/`, `predict.py`, `validate_bundle.py` | Preprocessing, CLI e validação do bundle instalado. |
+| `tests/` | Suíte padrão do contrato atual e replay dos resultados históricos. |
+| `experiments/distillation/` | Receita de treino/exportação; ambientes e checkpoints locais em `.cache`, ignorados. |
+| `benchmark_artifacts/distillation/` | Registros dos dez experimentos originais, preservados. |
+| `../docs/model-reports/mobilenetv4-distilled/` | Relatórios exclusivos da integração atual. |
+| `train_ensemble.py`, `experiments/ensemble/`, `benchmark_artifacts/ensemble/` | Receita e evidências históricas do ensemble; reproduzir no checkout `v1.1.2`. |
+| `../docs/model-reports/ensemble/` | Relatórios históricos do ensemble, preservados. |
+| `export_tflite.py`, `legacy/` | Pipeline Keras histórico; rejeita o modelo destilado atual. |
+| `experiments/dinov2/`, `experiments/vision/` | Benchmarks históricos e utilitários de métricas usados pelos experimentos. |
+| `data/`, `import_tla.py`, `prepare_dataset.py`, `tla_class_map.yaml` | Dataset, split e proveniência; nenhuma alteração nesta promoção. |
+
+`docs/` é irmã de `machine-learning/`. Nenhum experimento ou relatório entra no APK; somente o bundle e catálogo dos assets Android.
 
 ## Comandos
 
-Execute dentro de `machine-learning/`, usando o ambiente Python apropriado:
+Execute aqui, com Python 3.12 e `requirements.txt` instalados:
 
 ```bash
 python -m pytest -q
@@ -70,8 +31,10 @@ python validate_bundle.py --require-model
 python predict.py ../samples/reference_frog_eye.jpg
 ```
 
-O treino e a exportação atuais continuam com `python train_ensemble.py --train-only` e `python train_ensemble.py --export-only`. Esses comandos alteram artefatos/assets e não foram executados na organização.
+Com dados brutos e caches do experimento disponíveis:
 
-Para o legado, use `python -m legacy.train --config config.yaml` e `python -m legacy.evaluate --config config.yaml`, a partir desta pasta. O modelo único precisa de um `output_dir` separado do ensemble.
+```bash
+python deploy_distilled.py --install --pixel-parity-dir /tmp/leafcare-distilled-parity
+```
 
-Contrato completo, métricas e instruções de reprodução: [Machine Learning](../docs/MACHINE_LEARNING.md). Inventário e decisões da limpeza: [Mapa do repositório](../docs/explain/MAPA_REPOSITORIO.md).
+O backend Keras não possui modelo correspondente ao aluno. Arquivos `model.keras` locais antigos não participam da inferência atual. Novos testes permanecem isolados em `experiments/`; sua promoção ao app exige solicitação explícita.

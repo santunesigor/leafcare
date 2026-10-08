@@ -12,14 +12,16 @@ context: |
   Supabase provides Auth, Postgrest and private photo Storage, not inference.
   Room is observed by the UI; save locally before syncing. UUIDs, retry,
   tombstones and account isolation preserve data through network failures.
-  Current model: 2 MobileNetV3Small + 1 MobileNetV3Large in one float32 TFLite,
+  Current model: MobileNetV4 Small distilled, one float32 TFLite, schema 2.
+  Input RGB 0-255 NHWC; bicubic shorter-side 256 then center crop 224.
+  Embedded ImageNet normalization, softmax and temperature scaling.
   16 classes, RGB [1,224,224,3], calibrated threshold in model_metadata.json.
   Keep model weights, training recipe, dataset, class order, threshold and
   Supabase schema unchanged unless the user explicitly requests those changes.
   Read AGENTS.md, README.md, docs/AI_CONTEXT.md and docs/DEVELOPMENT.md first.
   Code, tests, migrations and model artifacts are the source of truth; specs
   describe supported contracts and do not certify pending device validation.
-  ML guide: machine-learning/README.md. Current reports: docs/model-reports/ensemble/.
+  ML guide: machine-learning/README.md. Current reports: docs/model-reports/mobilenetv4-distilled/. Ensemble reports are historical.
   Keep benchmark_artifacts intact unless a later request changes that scope.
   Follow the user's existing authorization for Git actions and changes.
   Never include credentials, local.properties, .env or signing keys in artifacts.

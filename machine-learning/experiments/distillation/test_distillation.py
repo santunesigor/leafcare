@@ -88,4 +88,8 @@ def test_final_delivery_has_ten_runs_and_preserves_baseline():
     for model_id in b.MODELS:
         for method in b.METHODS:
             assert b.read_json(b.OUTPUT / f'{model_id}_{method}/run_summary.json')['status'] == 'completed'
-    assert b.verify_protected(b.read_json(b.OUTPUT / 'isolation_before.json'))['passed']
+    before = b.read_json(b.OUTPUT / 'isolation_before.json')
+    after = b.read_json(b.OUTPUT / 'isolation_after_export.json')
+    assert after['passed']
+    # Evidência histórica: a integração posterior autoriza trocar o bundle atual.
+    assert after['sha256'] == before

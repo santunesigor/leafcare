@@ -42,7 +42,6 @@ class LeafClassifier(private val context: Context) {
         var inBuf: ByteBuffer? = null
         var outArr: Array<FloatArray>? = null
         var defThresh: Float = 0.70f
-        var availErr: String? = null
 
         runCatching {
             // 1. Carregar e validar metadata
@@ -62,15 +61,7 @@ class LeafClassifier(private val context: Context) {
             require(cls == List(listed.length()) { listed.getString(it) }) { "Contrato de classes incompatível." }
 
             // 3. Validar contrato de pré-processamento e schema
-            require(meta.getInt("schema_version") == 1 && meta.getString("resize") == "center_crop_bilinear_integer_v1")
-            require(meta.getString("normalization") == "embedded_mobilenetv3_rescaling")
-            if (meta.getString("architecture") == "MobileNetV3Ensemble") {
-                require(meta.getString("aggregation") == "mean_probabilities" && meta.getInt("member_count") == 3)
-                require(meta.getJSONArray("members").length() == 3)
-                val temperature = meta.getDouble("temperature")
-                require(temperature.isFinite() && temperature > 0.0)
-                require(meta.getString("probability_calibration") == "embedded_temperature_scaling")
-            }
+            validateModelMetadata(meta)
 
             // 4. Carregar modelo e validar hash
             val bytes = context.assets.open("leafcare.tflite").use { it.readBytes() }
@@ -93,7 +84,10 @@ class LeafClassifier(private val context: Context) {
 
             defThresh = meta.getDouble("confidence_threshold").toFloat()
             require(defThresh.isFinite() && defThresh in 0f..1f) { "Limiar do modelo inválido." }
-        }.onFailure { availErr = it.message }
+        }.onFailure {
+            interp?.close()
+            availabilityError = it.message ?: "Modelo indisponível."
+        }
             .onSuccess {
                 metadata = meta!!
                 classes = cls!!
@@ -102,7 +96,7 @@ class LeafClassifier(private val context: Context) {
                 inputBuffer = inBuf!!
                 outputArray = outArr!!
                 defaultThreshold = defThresh
-                availabilityError = availErr
+                availabilityError = null
             }
     }
 
@@ -111,7 +105,7 @@ class LeafClassifier(private val context: Context) {
 
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        val rgb = PixelPreprocessor.toRgb(pixels, bitmap.width, bitmap.height)
+        val rgb = DistilledPreprocessor.toRgb(pixels, bitmap.width, bitmap.height)
 
         inputBuffer.rewind()
         inputBuffer.asFloatBuffer().put(rgb)
@@ -125,6 +119,21 @@ class LeafClassifier(private val context: Context) {
 
     /** Fecha o Interpreter (chamado no shutdown do processo, se necessário). */
     fun close() {
-        interpreter.close()
+        if (::interpreter.isInitialized) interpreter.close()
     }
+}
+
+/** Contrato único do modelo embarcado; falha antes de criar o Interpreter. */
+internal fun validateModelMetadata(meta: JSONObject) {
+    require(meta.getInt("schema_version") == 2)
+    require(meta.getString("architecture") == "MobileNetV4SmallDistilled")
+    require(meta.getString("resize") == "resize_shorter_256_bicubic_center_crop_224_v1")
+    require(meta.getString("normalization") == "embedded_imagenet_mean_std")
+    require(meta.getString("probability_calibration") == "embedded_temperature_scaling")
+    require(meta.getBoolean("threshold_calibrated"))
+    require(meta.getDouble("temperature").let { it.isFinite() && it > 0.0 })
+    require(meta.getDouble("confidence_threshold").let { it.isFinite() && it in 0.0..1.0 })
+    require(meta.getString("input_dtype") == "float32" && meta.getString("output_dtype") == "float32")
+    require(meta.getJSONArray("input_shape").toString() == "[1,224,224,3]")
+    require(meta.getJSONArray("output_shape").toString() == "[1,${meta.getJSONArray("classes").length()}]")
 }
