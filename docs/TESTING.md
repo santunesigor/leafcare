@@ -59,3 +59,5 @@ Os relatórios XML antigos e o snapshot de ambiente sem consumidores foram remov
 - OpenSpec: specs, changes ativas e arquivo validaram em modo estrito. Nenhum aparelho conectado via ADB; captura/galeria, atualização sobre v1.1.2 e latência completa no Galaxy A06 ainda precisam de teste no aparelho. Os testes JVM não executam inferência no telefone.
 
 Relatórios atuais: [pasta do aluno](model-reports/mobilenetv4-distilled/). Relatórios do ensemble e benchmarks anteriores permanecem históricos.
+
+Entrega: [pré-release v1.2.0](https://github.com/santunesigor/leafcare/releases/tag/v1.2.0), [APK leafcare-1.2.0-cca5514.apk](https://github.com/santunesigor/leafcare/releases/download/v1.2.0/leafcare-1.2.0-cca5514.apk) e [PR #6](https://github.com/santunesigor/leafcare/pull/6). APK/release correspondem ao commit de implementação `cca5514`; o commit posterior registra apenas a conclusão documental. SHA256 APK: `112a962b863fbcafc097cbeaf46c181d172e657b4438d98dba9817d3d00af37c`. A CI remota do PR é acompanhada no GitHub; os resultados acima são das execuções locais.

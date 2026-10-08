@@ -4,6 +4,8 @@
 
 ## [1.2.0] - 2026-10-08
 
+- [Pré-release com APK/bundle](https://github.com/santunesigor/leafcare/releases/tag/v1.2.0) publicada a partir de `cca5514`; [PR #6](https://github.com/santunesigor/leafcare/pull/6) aberto para merge.
+
 - MobileNetV4 Small destilado como modelo integrado: TFLite float32 de 9,70 MiB, professor DINOv2-B somente no treino; cerca de 44% menor que o ensemble anterior.
 - Schema 2, preprocessing bicúbico/recorte central equivalente entre Python e Kotlin, temperatura e limiar próprios do aluno. Análises anteriores preservam hash e limiar registrados.
 - Teste conhecido: Top-1 85,44%, Macro-F1 0,8083 e Top-3 97,09%; acerto entre aceitas 90% com cobertura 87,38%. Sem nova seleção pelo teste e sem validação de campo.

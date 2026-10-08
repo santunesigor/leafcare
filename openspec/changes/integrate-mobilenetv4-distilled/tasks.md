@@ -13,5 +13,5 @@
 ## 3. Entrega
 
 - [x] 3.1 Executar testes Python/Android, lint e OpenSpec estrito; registrar resultados reais e limitações de aparelho.
-- [ ] 3.2 Gerar APK 1.2.0/code 7, conferir modelo embarcado e publicar release de teste na branch.
-- [ ] 3.3 Criar commits/push na branch e PR para main com resumo e evidências, sem fazer merge.
+- [x] 3.2 Gerar APK 1.2.0/code 7, conferir modelo embarcado e publicar release de teste na branch.
+- [x] 3.3 Criar commits/push na branch e PR para main com resumo e evidências, sem fazer merge.
