@@ -348,7 +348,7 @@ O exportador atualiza `machine-learning/artifacts/` e `android-app/app/src/main/
 
 O app mantém inferência local, Top-3, histórico Room e sincronização posterior. Novas análises registram o hash e o limiar do novo bundle; registros antigos preservam seus valores. Não houve alteração de schema Room/Supabase para integrar o ensemble.
 
-Os comandos legados `evaluate.py` e `export_tflite.py` têm proteção para não sobrescrever o ensemble com o fluxo do Small. Para o modelo atual, a entrada é `train_ensemble.py`.
+Os comandos legados `python -m legacy.evaluate` e `python export_tflite.py`, executados em `machine-learning/`, têm proteção para não sobrescrever o ensemble com o fluxo do Small. Para o modelo atual, a entrada é `train_ensemble.py`.
 
 ### 8.3 O que foi validado
 
@@ -507,7 +507,7 @@ O APK sai em `app/build/outputs/apk/debug/app-debug.apk`. Dataset bruto, caches,
 | Probes e ajuste | [`experiments/dinov2/`](../../machine-learning/experiments/dinov2/), [`experiments/vision/`](../../machine-learning/experiments/vision/) |
 | Comparação completa | [Benchmark de modelos](../benchmarks/BENCHMARK_MODELOS.md), [`comparison.csv`](../../machine-learning/benchmark_artifacts/vision/comparison.csv) |
 | Treinamento atual | [`train_ensemble.py`](../../machine-learning/train_ensemble.py), [`protocol.json`](../../machine-learning/benchmark_artifacts/ensemble/protocol.json), [`benchmark_artifacts/ensemble/`](../../machine-learning/benchmark_artifacts/ensemble/) |
-| Modelo distribuído | [`model_metadata.json`](../../machine-learning/artifacts/model_metadata.json), [`metrics.json`](../../machine-learning/artifacts/metrics.json), [`conversion_parity.json`](../../machine-learning/artifacts/conversion_parity.json) |
+| Modelo distribuído | [`model_metadata.json`](../../machine-learning/artifacts/model_metadata.json), [`metrics.json`](../../machine-learning/artifacts/metrics.json), [`conversion_parity.json`](../model-reports/ensemble/conversion_parity.json) |
 | Contrato Android | [`LeafClassifier.kt`](../../android-app/app/src/main/java/br/com/leafcare/ml/LeafClassifier.kt), [`EnsembleBundleTest.kt`](../../android-app/app/src/test/java/br/com/leafcare/EnsembleBundleTest.kt) |
 | Operação e próximos dados | [Machine Learning](../MACHINE_LEARNING.md), [Supabase](../SUPABASE.md), [Testes e QA](../TESTING.md) |
 

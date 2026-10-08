@@ -7,6 +7,23 @@ on:
     branches: [main]
 
 jobs:
+  openspec-validation:
+    name: OpenSpec Validation
+    runs-on: ubuntu-latest
+    env:
+      OPENSPEC_TELEMETRY: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install OpenSpec
+        run: npm install --global @fission-ai/openspec@1.14.1
+      - name: Validate specs and active changes
+        run: openspec validate --all --strict --no-interactive
+      - name: Validate archived tasks
+        run: openspec validate --archived --strict --no-interactive
+
   python-tests:
     name: Python Tests & Validation
     runs-on: ubuntu-latest

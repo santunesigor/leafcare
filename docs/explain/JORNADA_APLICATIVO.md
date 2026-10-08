@@ -178,11 +178,11 @@ O tema usa verde, fundos claros, fonte Inter, bordas e botões arredondados. Cor
 
 As capturas abaixo são **registros históricos do visual V3**, não screenshots produzidos ou validados na versão 1.1.2. O histórico atual já recebeu mudanças posteriores, como filtros compactos e agrupamentos recolhíveis.
 
-![Histórico — captura histórica V3](../ui/screenshots/historico-v3.png)
+![Histórico — captura histórica V3](../archive/ui/history-v3.png)
 
-![Câmera — captura histórica V3](../ui/screenshots/camera-v3.png)
+![Câmera — captura histórica V3](../archive/ui/camera-v3.png)
 
-![Resultado — captura histórica V3](../ui/screenshots/resultado-v3-topo.png)
+![Resultado — captura histórica V3](../archive/ui/result-top-v3.png)
 
 ## 5. O caminho completo de uma foto
 

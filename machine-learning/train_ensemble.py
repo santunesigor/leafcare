@@ -24,6 +24,7 @@ from experiments.dinov2.benchmark import (
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT = ROOT / "benchmark_artifacts/ensemble"
+REPORTS = ROOT.parent / "docs/model-reports/ensemble"
 CACHE = ROOT / "experiments/ensemble/.cache"
 # Composition fixed from the historical validation winner, before new training.
 MEMBERS = [
@@ -302,12 +303,12 @@ def export(config, manifest):
             write_json(folder / "model_metadata.json", metadata)
         write_json(output / "training_metadata.json", metadata)
         write_json(output / "metrics.json", test)
-        write_json(output / "history.json", {s["id"]: read_json(OUTPUT / s["id"] / "history.json") for s in MEMBERS})
-        write_json(output / "config_used.json", {"pipeline": "train_ensemble.py", "base_config": {k: v for k, v in config.items() if not k.startswith("_")}, "ensemble": configuration})
-        write_json(output / "conversion_parity.json", parity)
-        write_json(output / "test_predictions.json", read_json(OUTPUT / "predictions_test.json"))
-        write_json(output / "confusion_matrix.json", {"classes": classes, "matrix": test["confusion_matrix"]})
-        save_diagnostics(output, classes, np.asarray(test["confusion_matrix"]))
+        write_json(REPORTS / "history.json", {s["id"]: read_json(OUTPUT / s["id"] / "history.json") for s in MEMBERS})
+        write_json(REPORTS / "config_used.json", {"pipeline": "train_ensemble.py", "base_config": {k: v for k, v in config.items() if not k.startswith("_")}, "ensemble": configuration})
+        write_json(REPORTS / "conversion_parity.json", parity)
+        write_json(REPORTS / "test_predictions.json", read_json(OUTPUT / "predictions_test.json"))
+        write_json(REPORTS / "confusion_matrix.json", {"classes": classes, "matrix": test["confusion_matrix"]})
+        save_diagnostics(REPORTS, classes, np.asarray(test["confusion_matrix"]))
         write_json(OUTPUT / "run_summary.json", {"status": "integrated", "architecture": "MobileNetV3Ensemble",
             "validation": validation, "test": test, "temperature": temperature, "threshold": threshold,
             "parameters": ensemble.count_params(), "artifact_bytes": candidate.stat().st_size,

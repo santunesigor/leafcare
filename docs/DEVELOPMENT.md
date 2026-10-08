@@ -43,3 +43,15 @@ python validate_bundle.py --require-model
 No Linux/macOS, use `python3.12 -m venv .venv` e ative com `source .venv/bin/activate`.
 
 Mais comandos e detalhes do pipeline: [MACHINE_LEARNING.md](MACHINE_LEARNING.md). Testes e QA: [TESTING.md](TESTING.md).
+
+## OpenSpec
+
+O projeto usa OpenSpec **1.14.1** com Node.js **22** na CI. Para instalar a mesma versão localmente:
+
+```bash
+npm install -g @fission-ai/openspec@1.14.1
+openspec validate --all --strict --no-interactive
+openspec validate --archived --strict --no-interactive
+```
+
+O contexto/regras ficam em `openspec/config.yaml`; os workflows do Codex já estão versionados em `.agents/skills/`. Não é necessário executar `openspec init` após clonar. O [guia OpenSpec](../openspec/README.md) explica o fluxo, o uso das skills e as specs de referência.

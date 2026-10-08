@@ -28,7 +28,7 @@ def test_incomplete_ensemble_and_invalid_probabilities_are_rejected():
         calibrated_mean(np.full((3, 1, 3), .1), 1)
 
 
-@pytest.mark.parametrize("module_name,entry", [("evaluate", "evaluate"), ("export_tflite", "export")])
+@pytest.mark.parametrize("module_name,entry", [("legacy.evaluate", "evaluate"), ("export_tflite", "export")])
 def test_legacy_pipeline_cannot_replace_ensemble_calibration(tmp_path, monkeypatch, module_name, entry):
     import importlib
     module = importlib.import_module(module_name)
