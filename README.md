@@ -99,6 +99,8 @@ Formato de entrada, ordem das classes, pré-processamento, threshold e exportaç
 - [Supabase](docs/SUPABASE.md): autenticação, migrations, RLS e Storage.
 - [Testes e QA](docs/TESTING.md): validações automatizadas e evidências históricas.
 - [Contexto e regras do projeto](docs/AI_CONTEXT.md): limites importantes para mudanças.
+- [OpenSpec](openspec/README.md): fluxo de mudanças, specs do comportamento atual e integração Codex.
+- [Organização do ML](machine-learning/README.md) e [mapa do repositório](docs/explain/MAPA_REPOSITORIO.md): modelo atual, relatórios, legado e decisões de limpeza.
 - [Licença da fonte Inter](docs/legal/Inter-OFL.txt) e [fontes das imagens](docs/legal/referencias_manifest.csv).
 - [Histórico de versões](CHANGELOG.md).
 
@@ -110,4 +112,6 @@ machine-learning/  dados de referência, pipeline e artefatos do modelo
 supabase/          migrations do backend
 docs/              arquitetura, setup e evidências de QA
 samples/           imagens e fixtures de validação
+openspec/          especificações e histórico de mudanças
+.agents/skills/    workflows OpenSpec para Codex
 ```
