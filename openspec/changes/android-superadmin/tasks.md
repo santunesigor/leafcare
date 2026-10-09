@@ -14,4 +14,4 @@
 
 - [x] 3.1 Documentar bootstrap, publicação, operação e evidências; sincronizar specs.
 - [x] 3.2 Validar backend/Android/lint/OpenSpec e gerar APK debug.
-- [ ] 3.3 Commit/push e PR dependente do #7, sem merge/publicação automática na produção.
+- [x] 3.3 Commit/push e PR dependente do #7, sem merge/publicação automática na produção.

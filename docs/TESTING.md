@@ -82,3 +82,5 @@ Branch `feat/superadmin`, APK 1.3.0/versionCode 9, dependente do PR #7. Implemen
 - Nenhum aparelho conectado via ADB. Teste físico e integração com Supabase publicado continuam pendentes; os testes locais não certificam entrega real de e-mail ou navegação no telefone.
 
 Após publicar em ambiente autorizado: validar conta comum sem Administração; conta superadmin com as cinco telas; filtros/paginação/zoom; dois revisores concorrentes; convite e definição de senha; pausa com análise offline, retomada sem enviar acumulado e exclusões pendentes; exclusão retomável em conta descartável; revogação de papel, logout/troca de conta e perda de conexão. Conferir que rejeitar mantém a foto e que corrigir não altera a previsão exibida no histórico do proprietário.
+
+Entrega da administração: [PR #8](https://github.com/santunesigor/leafcare/pull/8), base `feat/conclusive-photo-sync`, implementação `a17c106`. APK debug em `android-app/app/build/outputs/apk/distribution/debug/`, nomeado com a versão e o HEAD final da branch. Publicação em produção e ativação da primeira conta permanecem pendentes.
