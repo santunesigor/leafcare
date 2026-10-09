@@ -45,18 +45,6 @@ class AuthBackButtonTest {
         )
     }
 
-    @Test fun profileWithoutOnlineSuperadminConfirmationHidesAdministration() {
-        compose.setContent { LeafCareTheme { ProfileScreen(viewModel(), {}) } }
-        compose.onNodeWithText("Administração").assertDoesNotExist()
-    }
-
-    @Test fun profileWithSuperadminAccessOpensAdministration() {
-        var opened = false
-        compose.setContent { LeafCareTheme { ProfileScreen(viewModel(), {}, onAdmin = { opened = true }) } }
-        compose.onNodeWithText("Administração").performClick()
-        assertEquals(true, opened)
-    }
-
     private fun assertBackAboveContent(title: String) {
         val back = compose.onNodeWithContentDescription("Voltar")
         back.assertExists()

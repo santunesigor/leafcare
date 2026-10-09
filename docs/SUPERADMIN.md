@@ -16,11 +16,13 @@ A implementação não ativa permissões nem modifica o Supabase de produção a
 2. Publicar `supabase/functions/leafcare-admin` com `supabase functions deploy leafcare-admin --project-ref <projeto> --no-verify-jwt`. A função valida o Bearer token com `auth.getUser` e consulta o papel atual antes de usar o cliente privilegiado. `verify_jwt=false` evita a verificação legada do gateway, sem liberar acesso anônimo.
 3. Conferir `leafcare://auth/reset-password` na lista de redirects permitidos do Auth e o envio de e-mails de convite/recuperação. URL e `SUPABASE_SERVICE_ROLE_KEY` são variáveis do ambiente servidor Supabase; nunca configurá-las no Android.
 4. Executar [bootstrap-superadmin.sql](../supabase/scripts/bootstrap-superadmin.sql) como proprietário do banco, com `superadmin_email` de uma conta cadastrada e confirmada. O script é transacional/idempotente e recusa criar outro administrador quando já existe um diferente. Para SQL Editor, substituir somente a primeira chamada `set_config` pelo e-mail escolhido; não salvar essa cópia no Git.
-5. Instalar o APK, entrar com a conta escolhida e abrir **Perfil → Administração** online. Depois do bootstrap, conceder/revogar outras permissões pela tela de usuários.
+5. Instalar o APK, entrar com a conta escolhida e abrir **ícone circular de administração ao lado da câmera**, no rodapé do histórico online. Depois do bootstrap, conceder/revogar outras permissões pela tela de usuários.
 
 A nova versão consulta `my_account_policy` antes de enviar dados. **Instalar sem publicar a migration deixa os envios em retry**, preservando o histórico local; restauração e classificação continuam independentes da administração. Aplicar o backend antes de distribuir o APK para uso normal.
 
 ## Operação
+
+O acesso fica no botão circular com escudo ao lado da câmera no histórico, somente para a conta autorizada. As abas Resumo, Usuários, Triagem e Atividades usam cartões e indicadores de situação. O resumo abre diretamente a fila pendente; a triagem mantém os filtros adicionais recolhidos e abre a revisão em tela inteira. As ações de conta são agrupadas no painel de detalhes, com confirmação na própria tela antes do envio.
 
 - **Visão geral:** usuários, envios pausados, fotos, revisadas/pendentes e distribuição da previsão original por classe/modelo.
 - **Usuários:** busca por nome/e-mail, dados de cadastro/acesso, contagens, convite/reenvio, recuperação, papel, pausa/liberação e exclusão. Ações exigem confirmação; excluir exige digitar o e-mail. Autoexclusão e remoção do último superadmin são recusadas pelo servidor.

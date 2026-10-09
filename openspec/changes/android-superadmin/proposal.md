@@ -6,7 +6,7 @@ O usuário precisa administrar contas e revisar fotos dentro do Android, mantend
 
 ## What Changes
 
-Área online no Perfil para superadmins: visão geral, usuários, triagem/revisão e auditoria. Gestão de convite, recuperação, permissões, exclusão retomável e pausa de envios. Pausa preserva login/dados locais; liberação permite apenas resultados novos. Fotos rejeitadas permanecem privadas.
+Área online com acesso circular no rodapé do histórico para superadmins: visão geral, usuários, triagem/revisão e auditoria. Gestão de convite, recuperação, permissões, exclusão retomável e pausa de envios. Pausa preserva login/dados locais; liberação permite apenas resultados novos. Fotos rejeitadas permanecem privadas.
 
 ## Capabilities
 

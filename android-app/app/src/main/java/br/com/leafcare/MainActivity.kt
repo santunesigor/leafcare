@@ -143,7 +143,8 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                 popExitTransition = { leafExitTransition }
             ) {
                 composable("history") {
-                    HistoryScreen(vm, { nav.navigate("camera") }, { nav.navigate("result/$it") }, { nav.navigate("profile") }, displayNameOf(user))
+                    HistoryScreen(vm, { nav.navigate("camera") }, { nav.navigate("result/$it") }, { nav.navigate("profile") }, displayNameOf(user),
+                        onAdmin = if (adminState.allowed) ({ nav.navigate("admin") }) else null)
                 }
                 composable("profile") {
                     // Same AuthViewModel instance: logout clears the session and the
@@ -152,8 +153,7 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                     ProfileScreen(
                         authViewModel,
                         onBack = { nav.popBackStack() },
-                        onChangePassword = { nav.navigate("change-password") },
-                        onAdmin = if (adminState.allowed) ({ nav.navigate("admin") }) else null
+                        onChangePassword = { nav.navigate("change-password") }
                     )
                 }
                 composable("admin") { AdminScreen(admin, onBack = { nav.popBackStack() }) }

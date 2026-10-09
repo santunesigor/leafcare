@@ -21,3 +21,7 @@ Convites retornam à rota de definir senha existente, aceitando type=invite ness
 ## Risks / Trade-offs
 
 Excluir conta não apaga remotamente arquivos já baixados em aparelhos offline. APIs antigas são restringidas por políticas novas; novos estados locais permanecem na coluna TEXT existente. Erros parciais de Auth/Storage devem ser retomáveis e auditados. Nenhuma migration ou operação administrativa destrutiva será aplicada na produção durante testes locais.
+
+## Visual follow-up
+
+Após teste, o proprietário pediu acesso circular ao lado da câmera no histórico e melhoria visual de toda a administração. O botão só aparece após confirmar superadmin online e substitui o acesso no Perfil. Cards de resumo, destaque para pendências, navegação por ícones, filtros recolhíveis, listas legíveis e detalhes organizados usam as cores e tipografia existentes. Reutilizar os mesmos callbacks e API, sem alterar modelo, schema ou produção. Validar telas com fixtures locais e capturas antes de entregar APK; manter o PR fechado conforme pedido.
