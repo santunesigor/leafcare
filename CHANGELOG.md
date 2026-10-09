@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- APK 1.2.1 (versionCode 8): envia ao bucket apenas fotos conclusivas com confiança >= limiar da análise, incluindo proteção para retries antigos. Histórico inconclusivo continua sincronizado; sua foto permanece local. Restore sem foto remota não tenta download inexistente.
+- Consulta de arquivo/classe/confiança documentada em `docs/SUPABASE.md`, usando o UUID já associado a cada foto.
+
 ## [1.2.0] - 2026-10-08
 
 - [Pré-release com APK/bundle](https://github.com/santunesigor/leafcare/releases/tag/v1.2.0) publicada a partir de `cca5514`; [PR #6](https://github.com/santunesigor/leafcare/pull/6) aberto para merge.

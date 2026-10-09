@@ -14,7 +14,7 @@ O app já inclui captura/importação de imagens, classificação local, resulta
 - Room é a fonte observada pela UI. Salve a análise local antes de tentar sincronizar.
 - Sincronização usa UUID estável, WorkManager e retry; falhas remotas não podem invalidar a análise local.
 - Tombstones de exclusão não podem ressuscitar durante restore.
-- Fotos ficam no armazenamento local e em bucket privado; estado de sync da foto é independente da análise.
+- Fotos conclusivas (confiança >= limiar registrado) são enviadas ao bucket privado; inconclusivas ficam apenas locais. Estado de sync da foto é independente da análise. Classe de cada foto em analyses.class_id pelo UUID.
 - Dados devem permanecer isolados por conta; RLS restringe acesso remoto pelo usuário autenticado.
 
 ## Machine Learning

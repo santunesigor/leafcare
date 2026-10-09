@@ -51,6 +51,7 @@ internal class AnalysisSyncRunner(
         }
 
         dao.getPendingPhotoUploads().forEach { entity ->
+            if (!entity.canUploadPhoto()) return@forEach
             try {
                 val path = remotePhotoPath(userId, entity.id)
                 api.uploadPhoto(path, photoFile(entity.photoName).readBytes())
@@ -130,6 +131,12 @@ internal class AnalysisSyncRunner(
                     }
                 } else if (local == null) {
                     dao.insert(entity)
+                } else if (local.deletedAt == null && local.syncStatus == SyncState.SYNCED &&
+                    local.photoSyncStatus == PhotoSyncState.LOCAL_ONLY &&
+                    entity.photoSyncStatus == PhotoSyncState.REMOTE_ONLY
+                ) {
+                    // A previously absent photo appeared remotely; preserve local analysis.
+                    dao.markPhotoRemoteOnly(local.id)
                 }
             } catch (e: CancellationException) {
                 throw e

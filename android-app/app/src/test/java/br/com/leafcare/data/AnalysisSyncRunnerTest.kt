@@ -84,11 +84,15 @@ internal class FakeAnalysisDao(initial: List<AnalysisEntity> = emptyList()) : An
         rows.values.filter {
             (it.photoSyncStatus == PhotoSyncState.PENDING_UPLOAD || it.photoSyncStatus == PhotoSyncState.ERROR) &&
                 it.deletedAt == null &&
-                it.syncStatus == SyncState.SYNCED
+                it.syncStatus == SyncState.SYNCED && it.canUploadPhoto()
         }
 
     override suspend fun markPhotoSynced(id: String) {
         update(id) { it.copy(photoSyncStatus = PhotoSyncState.SYNCED) }
+    }
+
+    override suspend fun markPhotoRemoteOnly(id: String) {
+        update(id) { it.copy(photoSyncStatus = PhotoSyncState.REMOTE_ONLY) }
     }
 
     override suspend fun markPhotoError(id: String) {
@@ -432,11 +436,70 @@ class AnalysisSyncRunnerTest {
         assertTrue(api.deleteCalls.isEmpty())
     }
 
+    @Test fun inconclusiveAndLowConfidencePhotosStayLocalEvenOnLegacyRetry() = runTest(dispatcher) {
+        val rows = listOf(
+            entity(id = "low", syncStatus = SyncState.PENDING_UPLOAD).copy(confidence = 0.4f, inconclusive = true),
+            entity(id = "retry", syncStatus = SyncState.SYNCED, photoSyncStatus = PhotoSyncState.ERROR)
+                .copy(inconclusive = true),
+            entity(id = "inconsistent", syncStatus = SyncState.SYNCED).copy(confidence = 0.4f)
+        )
+        val dao = FakeAnalysisDao(rows)
+        val api = FakeAnalysisSyncApi()
+        val result = runner(dao, api).syncOnce("user-1")
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertTrue(api.uploadCalls.isEmpty())
+        assertTrue(api.photoPathUpdates.isEmpty())
+        assertEquals(SyncState.SYNCED, dao.get("low")?.syncStatus)
+        assertEquals(JsonNull, api.remote.getValue("low").getValue("photo_path"))
+        assertEquals(3, dao.count())
+    }
+
+    @Test fun runnerRejectsInconclusiveEvenIfQueueReturnsIt() = runTest(dispatcher) {
+        val row = entity(syncStatus = SyncState.SYNCED).copy(inconclusive = true)
+        val backing = FakeAnalysisDao(listOf(row))
+        val dao = object : AnalysisDao by backing {
+            override suspend fun getPendingPhotoUploads() = listOf(row)
+        }
+        val api = FakeAnalysisSyncApi()
+        val engine = AnalysisSyncRunner(dao, api, "test", photoFile = { error("Photo must not be read") })
+        assertEquals(SyncRunResult.Completed(0), engine.syncOnce("user-1"))
+        assertTrue(api.uploadCalls.isEmpty())
+    }
+
+    @Test fun photoAtSavedThresholdUploadsWithItsClassAndUuid() = runTest(dispatcher) {
+        val row = entity().copy(confidence = 0.7f, threshold = 0.7f)
+        localPhoto(row.photoName)
+        val dao = FakeAnalysisDao(listOf(row))
+        val api = FakeAnalysisSyncApi()
+        assertEquals(SyncRunResult.Completed(0), runner(dao, api).syncOnce("user-1"))
+        assertEquals(listOf("user-1/a-1.jpg"), api.uploadCalls)
+        assertEquals(listOf("a-1" to "user-1/a-1.jpg"), api.photoPathUpdates)
+        assertEquals("\"frog_eye\"", api.remote.getValue("a-1").getValue("class_id").toString())
+        assertEquals(PhotoSyncState.SYNCED, dao.get("a-1")?.photoSyncStatus)
+    }
+
+    @Test fun restoreWithoutPhotoDoesNotDownloadUntilPhotoAppears() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao()
+        val api = FakeAnalysisSyncApi(fetchRows = listOf(remoteRow(photoPath = null)))
+        val engine = runner(dao, api)
+        engine.restoreOnce("user-1")
+        assertEquals(PhotoSyncState.LOCAL_ONLY, dao.get("r-1")?.photoSyncStatus)
+        assertEquals(SyncRunResult.Completed(0), engine.downloadOnce("user-1"))
+        assertTrue(api.downloadCalls.isEmpty())
+        api.fetchRows = listOf(remoteRow(displayName = "remote change"))
+        api.remoteObjects["user-1/r-1.jpg"] = "jpeg".toByteArray()
+        engine.restoreOnce("user-1")
+        assertEquals("Olho-de-rã", dao.get("r-1")?.displayName)
+        assertEquals(PhotoSyncState.REMOTE_ONLY, dao.get("r-1")?.photoSyncStatus)
+        engine.downloadOnce("user-1")
+        assertEquals(listOf("user-1/r-1.jpg"), api.downloadCalls)
+    }
+
     private fun remoteRow(
         id: String = "r-1",
         displayName: String = "Olho-de-rã",
         deletedAt: String? = null,
-        photoPath: String? = "user-1/r-1.jpg",
+        photoPath: String? = "user-1/$id.jpg",
     ) = buildJsonObject {
         put("id", id)
         put("user_id", "user-1")

@@ -30,8 +30,8 @@ android {
         applicationId = "br.com.leafcare"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.2.0"
+        versionCode = 8
+        versionName = "1.2.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // BuildConfig fields for Supabase configuration (from local.properties)
         buildConfigField("String", "SUPABASE_URL", "\"https://nhkqfanjfcivcbndivav.supabase.co\"")
