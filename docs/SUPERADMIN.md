@@ -2,11 +2,17 @@
 
 APK 1.3.0 (versionCode 9), change `android-superadmin`, branch `feat/superadmin`. Depende do PR #7 (`feat/conclusive-photo-sync`). O modelo continua o MobileNetV4 Small destilado da versão 1.2.0.
 
+## Estado da publicação
+
+Backend publicado no projeto LeafCare em 2026-10-09, com autorização do proprietário: migration remota `20261009181010_superadmin`, função `leafcare-admin` ativa na versão 1 e primeira conta selecionada promovida pelo bootstrap. O nome do arquivo local foi alinhado à versão registrada pelo Supabase; o SQL é o mesmo validado anteriormente. Não reaplicar essa migration nesse projeto.
+
+A verificação remota confirmou RLS nas três tabelas administrativas, RPC disponível apenas a `service_role`, política da conta superadmin e consultas do painel/listas. O endpoint real recusou sessão ausente/inválida com 401 e método incorreto com 405. Login e navegação autenticada no aparelho ainda precisam ser testados pelo proprietário; não foram enviados e-mails nem executadas revisões/exclusões de teste na produção.
+
 ## Publicação e primeira conta
 
-A implementação não ativa permissões nem modifica o Supabase de produção automaticamente. Publicar o backend exige autorização e conferência do projeto de destino. A primeira conta escolhida pelo proprietário é fornecida ao bootstrap por parâmetro; nenhum e-mail de administrador fica no APK.
+A implementação não ativa permissões nem modifica o Supabase de produção automaticamente; a publicação acima foi executada após autorização explícita. Publicar o backend exige autorização e conferência do projeto de destino. A primeira conta escolhida pelo proprietário é fornecida ao bootstrap por parâmetro; nenhum e-mail de administrador fica no APK.
 
-1. Aplicar as migrations versionadas no projeto correto, incluindo `20261009090000_superadmin.sql`, pelo fluxo de migrations do Supabase. Conferir primeiro o histórico remoto; não reaplicar migrations antigas já instaladas.
+1. Aplicar as migrations versionadas no projeto correto, incluindo `20261009181010_superadmin.sql`, pelo fluxo de migrations do Supabase. Conferir primeiro o histórico remoto; não reaplicar migrations antigas já instaladas.
 2. Publicar `supabase/functions/leafcare-admin` com `supabase functions deploy leafcare-admin --project-ref <projeto> --no-verify-jwt`. A função valida o Bearer token com `auth.getUser` e consulta o papel atual antes de usar o cliente privilegiado. `verify_jwt=false` evita a verificação legada do gateway, sem liberar acesso anônimo.
 3. Conferir `leafcare://auth/reset-password` na lista de redirects permitidos do Auth e o envio de e-mails de convite/recuperação. URL e `SUPABASE_SERVICE_ROLE_KEY` são variáveis do ambiente servidor Supabase; nunca configurá-las no Android.
 4. Executar [bootstrap-superadmin.sql](../supabase/scripts/bootstrap-superadmin.sql) como proprietário do banco, com `superadmin_email` de uma conta cadastrada e confirmada. O script é transacional/idempotente e recusa criar outro administrador quando já existe um diferente. Para SQL Editor, substituir somente a primeira chamada `set_config` pelo e-mail escolhido; não salvar essa cópia no Git.

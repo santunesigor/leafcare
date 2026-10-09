@@ -83,8 +83,14 @@ Branch `feat/superadmin`, APK 1.3.0/versionCode 9, dependente do PR #7. Implemen
 
 Após publicar em ambiente autorizado: validar conta comum sem Administração; conta superadmin com as cinco telas; filtros/paginação/zoom; dois revisores concorrentes; convite e definição de senha; pausa com análise offline, retomada sem enviar acumulado e exclusões pendentes; exclusão retomável em conta descartável; revogação de papel, logout/troca de conta e perda de conexão. Conferir que rejeitar mantém a foto e que corrigir não altera a previsão exibida no histórico do proprietário.
 
-Entrega da administração: [PR #8](https://github.com/santunesigor/leafcare/pull/8), base `feat/conclusive-photo-sync`, implementação `a17c106`. APK debug em `android-app/app/build/outputs/apk/distribution/debug/`, nomeado com a versão e o HEAD final da branch. Publicação em produção e ativação da primeira conta permanecem pendentes.
+Entrega da administração: [PR #8](https://github.com/santunesigor/leafcare/pull/8), base `feat/conclusive-photo-sync`, implementação `a17c106`. APK debug em `android-app/app/build/outputs/apk/distribution/debug/`, nomeado com a versão e o HEAD final da branch. Na entrega inicial, publicação em produção e ativação da primeira conta estavam pendentes; foram autorizadas e executadas na rodada abaixo.
 
 ### Ocultar limiar nas telas — 2026-10-09
 
 Removidos os textos de confiança mínima/explicação do histórico, o limite no resultado e as referências ao limiar na administração, incluindo o filtro de confiança mínima. Confiança da previsão e política interna permanecem. Os 7 testes de `VisualV3Test`, `verifyModelAssets`, `lintDebug`, `assembleDebug` e OpenSpec estrito (ativo e arquivado) passaram. Nenhuma mudança no modelo, limiar ou backend; sem teste físico nesta rodada.
+
+## Publicação do backend administrativo — 2026-10-09
+
+Após autorização explícita, schema e conta confirmada foram conferidos no projeto LeafCare. Aplicada migration `20261009181010_superadmin` e publicada Edge Function `leafcare-admin` versão 1/ACTIVE, com autenticação própria via Auth e papel atual no banco. Bootstrap executado uma vez para a conta escolhida; nenhum e-mail de administrador foi adicionado ao repositório. O arquivo local foi renomeado para coincidir com o histórico remoto, sem mudar SQL.
+
+Verificação real: todas as contas inicializadas; primeiro superadmin com envios ativos; RLS habilitada; RPC administrativa negada a anon/authenticated e concedida a service_role; auditoria do bootstrap registrada; painel e listas retornaram 2 usuários e 11 fotos pendentes. Consulta com papel authenticated e identidade da conta confirmou a política e isolamento dos controles. HTTP publicado retornou 401 sem sessão, 401 com token inválido e 405 para GET. Nenhuma análise/foto foi criada, revisada ou removida como teste. Fluxos com sessão real no APK, convites/e-mails e ações administrativas continuam para teste do proprietário.
