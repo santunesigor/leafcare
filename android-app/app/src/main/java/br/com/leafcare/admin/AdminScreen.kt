@@ -43,7 +43,6 @@ internal fun AdminScreen(vm: AdminViewModel, onBack: () -> Unit) {
     var userId by remember { mutableStateOf("") }
     var from by remember { mutableStateOf("") }
     var until by remember { mutableStateOf("") }
-    var minimum by remember { mutableStateOf("") }
     var invite by remember { mutableStateOf(false) }
     var inviteEmail by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { vm.load() }
@@ -99,9 +98,8 @@ internal fun AdminScreen(vm: AdminViewModel, onBack: () -> Unit) {
                             OutlinedTextField(from, { from = it }, label = { Text("De: AAAA-MM-DD") }, modifier = Modifier.weight(1f))
                             OutlinedTextField(until, { until = it }, label = { Text("Até: AAAA-MM-DD") }, modifier = Modifier.weight(1f))
                         }
-                        OutlinedTextField(minimum, { minimum = it }, label = { Text("Confiança mínima: 0 a 1") }, modifier = Modifier.fillMaxWidth())
                         Button(onClick = { vm.load("photos", query = JSONObject().put("status", status).put("class_id", classFilter)
-                            .put("model", model.trim()).put("user_id", userId.trim()).put("from", from.trim()).put("until", until.trim()).put("min_confidence", minimum.trim().replace(',', '.'))) }, enabled = !state.busy) { Text("Aplicar filtros") }
+                            .put("model", model.trim()).put("user_id", userId.trim()).put("from", from.trim()).put("until", until.trim())) }, enabled = !state.busy) { Text("Aplicar filtros") }
                     }
                 }
                 items(state.rows, key = { it.get("id").toString() }) { row ->
@@ -232,7 +230,7 @@ internal fun AdminScreen(vm: AdminViewModel, onBack: () -> Unit) {
                 }
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = vm::reload) { Text("Recarregar lista") } }
                 Text("Previsão original: ${catalog.get(row.getString("class_id")).name}")
-                Text("Confiança: ${"%.2f".format(row.optDouble("confidence") * 100)}% • Limiar: ${"%.2f".format(row.optDouble("threshold") * 100)}%")
+                Text("Confiança: ${"%.2f".format(row.optDouble("confidence") * 100)}%")
                 Text("Data: ${row.label("created_at")}")
                 Text("Usuário: ${row.label("email")}")
                 Text("Modelo: ${row.label("model_sha256")}")

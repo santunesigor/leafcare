@@ -34,7 +34,7 @@ class VisualV3Test {
         val previous = recent.copy(id = "previous", createdAt = 1791212400000, displayName = "Folha saudável")
         compose.setContent {
             LeafCareTheme {
-                HistoryContent(listOf(recent, second, previous), .631628f, {}, {},
+                HistoryContent(listOf(recent, second, previous), {}, {},
                     { R.drawable.v3_example_correct }, null)
             }
         }
@@ -61,7 +61,7 @@ class VisualV3Test {
         val inconclusive = identified.copy(id = "inconclusive", inconclusive = true, confidence = .4f)
         compose.setContent {
             LeafCareTheme {
-                HistoryContent(listOf(identified, inconclusive), .631628f, {}, {},
+                HistoryContent(listOf(identified, inconclusive), {}, {},
                     { R.drawable.v3_example_correct }, null)
             }
         }
@@ -85,7 +85,7 @@ class VisualV3Test {
         val inconclusive = identified.copy(id = "inconclusive", inconclusive = true, confidence = .4f)
         compose.setContent {
             LeafCareTheme {
-                HistoryContent(listOf(identified, inconclusive), .631628f, {}, {},
+                HistoryContent(listOf(identified, inconclusive), {}, {},
                     { R.drawable.v3_example_correct }, null)
             }
         }
@@ -105,7 +105,7 @@ class VisualV3Test {
         var selected = false; var opened = false
         compose.activity.imageLoader.memoryCache?.clear()
         val row = AnalysisEntity("fixture", "fixture.jpg", 1788134400000, "frog_eye", "Olho-de-rã", "Cercospora nicotianae", .82f, "[]", false, .7f, 30.0, "fixture")
-        compose.setContent { LeafCareTheme { HistoryContent(listOf(row), .7f, { opened = true }, { selected = true }, { R.drawable.v3_example_correct }, null) } }
+        compose.setContent { LeafCareTheme { HistoryContent(listOf(row), { opened = true }, { selected = true }, { R.drawable.v3_example_correct }, null) } }
         compose.onNodeWithText("Olá").assertExists()
         awaitPhoto()
         capture("historico-v3")

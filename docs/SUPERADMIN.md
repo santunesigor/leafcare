@@ -18,7 +18,7 @@ A nova versão consulta `my_account_policy` antes de enviar dados. **Instalar se
 
 - **Visão geral:** usuários, envios pausados, fotos, revisadas/pendentes e distribuição da previsão original por classe/modelo.
 - **Usuários:** busca por nome/e-mail, dados de cadastro/acesso, contagens, convite/reenvio, recuperação, papel, pausa/liberação e exclusão. Ações exigem confirmação; excluir exige digitar o e-mail. Autoexclusão e remoção do último superadmin são recusadas pelo servidor.
-- **Triagem:** listas de 20, miniaturas e filtros por situação, classe original, confiança (0–1), modelo, UUID de usuário e intervalo de datas. Datas do filtro são dias UTC. Detalhe tem zoom, Top-3, confiança/limiar, usuário/modelo e revisão atual. Confirmar ou corrigir usa as 16 classes; duvidosa e rejeitada exigem motivo. Após salvar, abre a próxima pendente que atende aos demais filtros.
+- **Triagem:** listas de 20, miniaturas e filtros por situação, classe original, modelo, UUID de usuário e intervalo de datas. Datas do filtro são dias UTC. Detalhe tem zoom, Top-3, confiança, usuário/modelo e revisão atual. Confirmar ou corrigir usa as 16 classes; duvidosa e rejeitada exigem motivo. Após salvar, abre a próxima pendente que atende aos demais filtros.
 - **Atividades:** auditoria geral ou por conta/foto, incluindo alterações anteriores da revisão. Conflito entre revisores retorna erro e exige recarregar.
 
 A avaliação humana fica em `photo_reviews`; a classe/confiança original em `analyses` não muda. Rejeitar não apaga fotos. Não há exportação, alteração do dataset, treinamento ou recalibração.

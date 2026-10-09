@@ -52,9 +52,8 @@ fun percent(value: Float) = String.format(Locale.forLanguageTag("pt-BR"), "%.0f%
 @Composable
 fun HistoryScreen(vm: LeafCareViewModel, onCamera: () -> Unit, onResult: (String) -> Unit, onProfile: () -> Unit = {}, displayName: String? = null) {
     val rows by vm.analyses.collectAsStateWithLifecycle()
-    val threshold by vm.threshold.collectAsStateWithLifecycle()
     val modelError = vm.getModelError()
-    HistoryContent(rows, threshold, onCamera, onResult, { vm.getPhoto(it) }, modelError, onProfile, displayName)
+    HistoryContent(rows, onCamera, onResult, { vm.getPhoto(it) }, modelError, onProfile, displayName)
 }
 
 /**
@@ -65,7 +64,7 @@ internal fun homeGreeting(displayName: String?): String =
     if (displayName.isNullOrBlank()) "Olá" else "Olá, $displayName"
 
 @Composable
-fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: Float, onCamera: () -> Unit, onResult: (String) -> Unit,
+fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: () -> Unit, onResult: (String) -> Unit,
     photo: (String) -> Any, modelError: String?, onProfile: () -> Unit = {}, displayName: String? = null) {
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("Todas") }
@@ -270,29 +269,7 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                     }
                 }
             }
-            if (rows.isNotEmpty()) item {
-                Column(
-                    Modifier.fillMaxWidth()
-                        .animateItem(placementSpec = tween(220, easing = FastOutSlowInEasing))
-                        .padding(top = 12.dp, bottom = 8.dp)
-                ) {
-                    Text(
-                        stringResource(R.string.confidence_threshold_label,
-                            String.format(Locale.forLanguageTag("pt-BR"), "%.2f%%", threshold * 100)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = LeafColors.Muted,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        stringResource(R.string.confidence_threshold_help),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = LeafColors.Muted,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
+
         }
     }
 }
