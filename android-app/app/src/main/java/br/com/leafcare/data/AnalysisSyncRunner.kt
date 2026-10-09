@@ -26,19 +26,32 @@ internal sealed interface SyncRunResult {
  *   so a deleted analysis can never be resurrected by a later upsert.
  * - Network/auth failures never touch local data beyond the ERROR state.
  */
+internal data class UploadPolicy(val enabled: Boolean = true, val cutoffMs: Long? = null) {
+    fun includes(createdAt: Long): Boolean = cutoffMs == null || createdAt > cutoffMs
+}
+
 internal class AnalysisSyncRunner(
     private val dao: AnalysisDao,
     private val api: AnalysisSyncApi,
     private val appVersion: String,
+    private val uploadPolicy: suspend () -> UploadPolicy = { UploadPolicy() },
     private val photoDeleter: (photoName: String) -> Unit = {},
     private val photoFile: (photoName: String) -> File = { throw IllegalStateException("no photo storage") },
 ) {
     suspend fun syncOnce(userId: String?): SyncRunResult {
         if (userId == null) return SyncRunResult.SkippedNoAuth
 
+        val policy = try { uploadPolicy() }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { return SyncRunResult.Completed(1) }
+        if (!policy.enabled) return SyncRunResult.Completed(0)
         var failures = 0
 
         dao.getPendingUploads().forEach { entity ->
+            if (!policy.includes(entity.createdAt)) {
+                dao.markLocalOnly(entity.id)
+                return@forEach
+            }
             try {
                 api.upsertAnalysis(entity.toRemoteJson(userId, appVersion))
                 dao.markSynced(entity.id)
@@ -51,6 +64,10 @@ internal class AnalysisSyncRunner(
         }
 
         dao.getPendingPhotoUploads().forEach { entity ->
+            if (!policy.includes(entity.createdAt)) {
+                dao.markPhotoLocalOnly(entity.id)
+                return@forEach
+            }
             if (!entity.canUploadPhoto()) return@forEach
             try {
                 val path = remotePhotoPath(userId, entity.id)

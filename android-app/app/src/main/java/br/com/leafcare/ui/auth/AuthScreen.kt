@@ -529,7 +529,8 @@ fun NewPasswordScreen(
 fun ProfileScreen(
     viewModel: AuthViewModel,
     onBack: () -> Unit,
-    onChangePassword: () -> Unit = {}
+    onChangePassword: () -> Unit = {},
+    onAdmin: (() -> Unit)? = null
 ) {
     val displayName = viewModel.getDisplayName()
     val email = viewModel.getEmail()
@@ -573,6 +574,10 @@ fun ProfileScreen(
         )
         Spacer(Modifier.height(32.dp))
 
+        onAdmin?.let { open ->
+            Button(onClick = open, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Administração") }
+            Spacer(Modifier.height(12.dp))
+        }
         Button(
             onClick = onChangePassword,
             modifier = Modifier

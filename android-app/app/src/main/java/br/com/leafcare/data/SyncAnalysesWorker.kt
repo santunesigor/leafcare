@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import br.com.leafcare.admin.AdminRepository
 import br.com.leafcare.BuildConfig
 import br.com.leafcare.LeafCareApplication
 import io.github.jan.supabase.gotrue.auth
@@ -62,6 +63,14 @@ class SyncAnalysesWorker(
             dao = dao,
             api = api,
             appVersion = BuildConfig.VERSION_NAME,
+            uploadPolicy = {
+                val policy = AdminRepository(app.supabaseClientHolder).policy()
+                check(auth.currentUserOrNull()?.id == userId) { "Account changed" }
+                UploadPolicy(
+                    enabled = policy.getBoolean("uploads_enabled"),
+                    cutoffMs = if (policy.isNull("cutoff_ms")) null else policy.getLong("cutoff_ms"),
+                )
+            },
             photoDeleter = { name ->
                 require(File(name).name == name)
                 File(photosDir, name).delete()

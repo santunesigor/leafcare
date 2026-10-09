@@ -4,9 +4,24 @@ on:
   push:
     branches: [main, refactor/**, experiment/**]
   pull_request:
-    branches: [main]
+    branches: [main, feat/**]
 
 jobs:
+  backend-tests:
+    name: Administrative Backend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - name: Check Edge Function
+        run: deno check supabase/functions/leafcare-admin/index.ts
+      - name: Test authenticated handler
+        run: deno test supabase/functions/leafcare-admin/handler_test.ts
+      - name: Test migrations and RLS in isolated PostgreSQL
+        run: bash supabase/tests/run-local.sh
+
   openspec-validation:
     name: OpenSpec Validation
     runs-on: ubuntu-latest

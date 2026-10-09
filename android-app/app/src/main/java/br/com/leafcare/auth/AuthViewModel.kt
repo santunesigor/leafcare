@@ -558,7 +558,7 @@ internal fun parseAuthDeeplink(url: String): AuthDeeplink? {
             "/reset-password" -> when {
                 code != null -> AuthDeeplink.RecoveryCode(code)
                 !accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank() &&
-                    (type == null || type == "recovery") ->
+                    (type == null || type == "recovery" || type == "invite") ->
                     AuthDeeplink.RecoveryTokens(accessToken, refreshToken)
                 else -> null
             }

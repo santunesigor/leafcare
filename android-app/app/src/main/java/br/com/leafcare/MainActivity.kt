@@ -23,6 +23,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
+import br.com.leafcare.admin.AdminViewModel
+import br.com.leafcare.admin.AdminScreen
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import br.com.leafcare.auth.AuthNavigationEvent
 import br.com.leafcare.auth.AuthBootstrapState
 import br.com.leafcare.auth.AuthViewModel
@@ -106,6 +111,15 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
     val state by vm.ui.collectAsStateWithLifecycle()
     // Drives recomposition when the user changes; the name is read fresh below.
     val user by authViewModel.user.collectAsStateWithLifecycle()
+    val admin: AdminViewModel = viewModel()
+    val adminState by admin.state.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(user?.id) { admin.bind(user?.id) }
+    DisposableEffect(lifecycleOwner, user?.id) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) admin.bind(user?.id) }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); admin.clear() }
+    }
     LaunchedEffect(vm) { vm.results.collect { id ->
         nav.navigate("result/$id") { popUpTo("history"); launchSingleTop = true } } }
     // After a password change inside "change-password", go back to profile.
@@ -138,9 +152,11 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                     ProfileScreen(
                         authViewModel,
                         onBack = { nav.popBackStack() },
-                        onChangePassword = { nav.navigate("change-password") }
+                        onChangePassword = { nav.navigate("change-password") },
+                        onAdmin = if (adminState.allowed) ({ nav.navigate("admin") }) else null
                     )
                 }
+                composable("admin") { AdminScreen(admin, onBack = { nav.popBackStack() }) }
                 composable("change-password") {
                     NewPasswordScreen(
                         authViewModel,

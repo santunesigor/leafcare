@@ -59,3 +59,7 @@ O contexto/regras ficam em `openspec/config.yaml`; os workflows do Codex já est
 ### Modelo atual
 
 O APK 1.2.0 usa MobileNetV4 Small destilado. Para validar o bundle: `python validate_bundle.py --require-model`; para promoção do checkpoint previamente selecionado: `python deploy_distilled.py --install`, com dados e caches locais. Receitas do ensemble são históricas, reproduzíveis no tag `v1.1.2`. Veja [Machine Learning](MACHINE_LEARNING.md).
+
+## Backend administrativo
+
+Para validar sem usar produção: `bash supabase/tests/run-local.sh` (Docker/PostgreSQL 18) e `npx --yes deno test supabase/functions/leafcare-admin/handler_test.ts` (Deno 2.9.6). Publicação e bootstrap separados em [SUPERADMIN.md](SUPERADMIN.md).

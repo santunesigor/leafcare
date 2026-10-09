@@ -197,3 +197,7 @@ ORDER BY o.created_at DESC;
 ```
 
 O JOIN usa o UUID e usuário porque os registros antigos podem ter `photo_path` com nome local. Classe nula indica objeto sem análise correspondente. A consulta não abre o bucket nem altera políticas ou dados. Nenhum objeto previamente enviado é removido automaticamente nesta mudança.
+
+## Administração e triagem
+
+Configuração, publicação, bootstrap da primeira conta, pausa de envios e revisão humana: [SUPERADMIN.md](SUPERADMIN.md). As novas migrations e a função devem ser publicadas antes de distribuir o APK 1.3.0; nenhum e-mail ou credencial administrativa vai no aplicativo.
