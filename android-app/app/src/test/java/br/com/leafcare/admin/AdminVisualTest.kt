@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.*
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -30,8 +31,8 @@ import java.io.File
 class AdminVisualTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val classes = listOf("frog_eye", "healthy", "brown_spot")
-    private fun actions(load: (String, JSONObject) -> Unit = { _, _ -> }, select: (JSONObject) -> Unit = {}, action: (String, JSONObject) -> Unit = { _, _ -> }) =
-        AdminActions(load, {}, {}, select, action, {}, {}, {}, {})
+    private fun actions(load: (String, JSONObject) -> Unit = { _, _ -> }, select: (JSONObject) -> Unit = {}, action: (String, JSONObject) -> Unit = { _, _ -> }, movePhoto: (Int) -> Unit = {}, nextPhoto: () -> Unit = {}) =
+        AdminActions(load, {}, {}, select, action, {}, {}, {}, {}, movePhoto = movePhoto, nextPhoto = nextPhoto)
     private fun show(state: AdminState, events: AdminActions = actions()) {
         compose.setContent { LeafCareTheme { AdminContent(state, DiseaseCatalog(compose.activity), classes, events) } }
     }
@@ -67,15 +68,40 @@ class AdminVisualTest {
         assertEquals("photos", section); assertEquals("pending", filters.getString("status"))
         compose.onNode(hasText("Usuários") and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).performClick(); assertEquals("users", section)
     }
-    @Test fun photoQueueShowsCardsAndKeepsAdvancedFiltersCollapsed() {
-        var selected = ""
-        show(AdminState(allowed = true, section = "photos", rows = listOf(photo())), actions(select = { selected = it.getString("id") }))
+    @Test fun photoQueueOpensDirectlyAndFiltersStayInPanel() {
+        var skipped = false
+        show(AdminState(allowed = true, section = "photos", rows = listOf(photo())), actions(nextPhoto = { skipped = true }))
         compose.onNodeWithText("Olho-de-rã").assertIsDisplayed()
+        compose.onNodeWithTag("review-feed").assertIsDisplayed()
         compose.onNodeWithText("Identificador do modelo").assertDoesNotExist()
-        capture("admin-triagem")
-        compose.onNodeWithText("Olho-de-rã").performClick(); assertEquals("photo-1", selected)
-        compose.onNodeWithContentDescription("Expandir filtros").performClick()
+        compose.onNodeWithText("Pular sem revisar").performClick()
+        assertTrue(skipped)
+        capture("admin-triagem-fila")
+        compose.onNodeWithContentDescription("Filtrar fotos").performClick()
         compose.onNodeWithText("Identificador do modelo").assertExists()
+        compose.onNodeWithText("Aplicar filtros").assertIsDisplayed()
+    }
+    @Test fun verticalSwipeMovesToNextPhotoWithoutSaving() {
+        var saved = false
+        val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
+        val rows = listOf(photo(), photo().put("id", "photo-2"))
+        val state = mutableStateOf(AdminState(allowed = true, section = "photos", rows = rows, photoId = "photo-1", bitmap = bitmap))
+        compose.setContent { LeafCareTheme { AdminContent(state.value, DiseaseCatalog(compose.activity), classes,
+            actions(action = { _, _ -> saved = true }, movePhoto = { index -> state.value = state.value.copy(photoIndex = index, photoId = rows[index].getString("id")) })) } }
+        compose.onNodeWithTag("review-feed").performTouchInput { swipeUp() }
+        compose.waitUntil { state.value.photoIndex == 1 }
+        compose.onNodeWithText("2 de 2 · Deslize para cima").assertIsDisplayed()
+        assertFalse(saved)
+    }
+    @Test fun confirmSubmitsOriginalClassAndVersionFromFeed() {
+        var payload: JSONObject? = null
+        val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
+        show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap),
+            actions(action = { op, data -> assertEquals("review", op); payload = data }))
+        compose.onNodeWithText("Confirmar e próxima").assertIsDisplayed().performClick()
+        assertEquals("confirmed", payload?.getString("status"))
+        assertEquals("frog_eye", payload?.getString("class_id"))
+        assertEquals(0, payload?.getInt("version"))
     }
     @Test fun usersShowReadableStatusAndOpenDetails() {
         var selected = ""
@@ -97,17 +123,92 @@ class AdminVisualTest {
     @Test fun uncertainReviewNeedsReasonAndSubmitsOriginalVersion() {
         var payload: JSONObject? = null
         val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
-        show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), selected = photo(), bitmap = bitmap),
+        show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap),
             actions(action = { op, data -> assertEquals("review", op); payload = data }))
         capture("admin-revisao-topo")
+        compose.onNodeWithText("Avaliar").performClick()
         compose.onNodeWithText("Duvidosa").performScrollTo().performClick()
-        compose.onNodeWithText("Salvar e continuar").assertIsNotEnabled()
+        compose.onNodeWithText("Salvar e próxima").assertIsNotEnabled()
         compose.onNode(hasSetTextAction()).performScrollTo().performTextInput("Foto sem nitidez suficiente")
         capture("admin-revisao-avaliacao")
-        compose.onNodeWithText("Salvar e continuar").assertIsEnabled().performClick()
+        compose.onNodeWithText("Salvar e próxima").assertIsEnabled().performClick()
         assertEquals("uncertain", payload?.getString("status"))
         assertEquals("Foto sem nitidez suficiente", payload?.getString("note"))
         assertEquals(0, payload?.getInt("version"))
+    }
+    @Test
+    @Config(qualifiers = "w320dp-h480dp-mdpi")
+    fun smallScreenKeepsReviewActionsVisibleWhileEditing() {
+        val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
+        show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap))
+        compose.onNodeWithText("Confirmar e próxima").assertIsDisplayed()
+        compose.onNodeWithText("Avaliar").performClick()
+        compose.onNodeWithText("Rejeitar").performScrollTo().performClick()
+        compose.onNodeWithText("Salvar e próxima").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNode(hasSetTextAction()).performScrollTo().performClick().performTextInput("Imagem inadequada")
+        compose.onNodeWithText("Cancelar").assertIsDisplayed()
+        compose.onNodeWithText("Salvar e próxima").assertIsDisplayed().assertIsEnabled()
+        capture("admin-revisao-tela-pequena")
+    }
+    @Test fun correctionNeedsClassAndPreservesOriginalPrediction() {
+        var payload: JSONObject? = null
+        val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
+        show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap),
+            actions(action = { _, data -> payload = data }))
+        compose.onNodeWithText("Avaliar").performClick()
+        compose.onNodeWithText("Corrigir classe").performClick()
+        compose.onNodeWithText("Classe revisada").performScrollTo().performClick()
+        compose.onNodeWithText("Folha sem alteração aparente").performClick()
+        compose.onNodeWithText("Salvar e próxima").performClick()
+        assertEquals("corrected", payload?.getString("status"))
+        assertEquals("healthy", payload?.getString("class_id"))
+    }
+    @Test fun savingReviewClosesPanelAndShowsNextPhotoInSameFeed() {
+        val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
+        val next = photo().put("id", "photo-2").put("class_id", "healthy")
+        val state = mutableStateOf(AdminState(allowed = true, section = "photos", rows = listOf(photo(), next), photoId = "photo-1", bitmap = bitmap))
+        compose.setContent { LeafCareTheme { AdminContent(state.value, DiseaseCatalog(compose.activity), classes, actions(action = { _, _ ->
+            state.value = state.value.copy(rows = listOf(next), photoId = "photo-2", reviewedCount = 1)
+        })) } }
+        compose.onNodeWithText("Avaliar").performClick()
+        compose.onNodeWithText("Salvar e próxima").performClick()
+        compose.onNodeWithText("Sua avaliação").assertDoesNotExist()
+        compose.onNodeWithText("Folha sem alteração aparente").assertIsDisplayed()
+        compose.onNodeWithText("Confirmar e próxima").assertIsDisplayed().assertIsEnabled()
+    }
+    @Test fun cancellingReviewDiscardsDraftBeforeQuickConfirmation() {
+        var payload: JSONObject? = null
+        val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
+        show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap),
+            actions(action = { _, data -> payload = data }))
+        compose.onNodeWithText("Avaliar").performClick()
+        compose.onNodeWithText("Rejeitar").performClick()
+        compose.onNode(hasSetTextAction()).performScrollTo().performTextInput("Rascunho descartado")
+        compose.onNodeWithText("Cancelar").performClick()
+        assertNull(payload)
+        compose.onNodeWithText("Confirmar e próxima").performClick()
+        assertEquals("confirmed", payload?.getString("status"))
+        assertEquals("", payload?.getString("note"))
+    }
+    @Test
+    @Config(qualifiers = "w320dp-h480dp-mdpi")
+    fun keyboardInsetsKeepReviewFooterInsideSmallWindow() {
+        val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
+        show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap))
+        compose.onNodeWithText("Avaliar").performClick()
+        compose.onNode(hasSetTextAction()).performScrollTo().performClick()
+        compose.runOnIdle {
+            val decor = ShadowDialog.getLatestDialog().window!!.decorView
+            val insets = android.view.WindowInsets.Builder()
+                .setInsets(android.view.WindowInsets.Type.ime(), android.graphics.Insets.of(0, 0, 0, 220))
+                .setVisible(android.view.WindowInsets.Type.ime(), true).build()
+            decor.dispatchApplyWindowInsets(insets)
+        }
+        compose.onNodeWithText("Cancelar").assertIsDisplayed()
+        compose.onNodeWithText("Salvar e próxima").assertIsDisplayed()
+        val saveBottom = compose.onNodeWithText("Salvar e próxima").fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue("O rodapé deve ficar acima do espaço reservado ao teclado", saveBottom < 260f)
+        capture("admin-revisao-teclado-simulado")
     }
     @Test fun auditShowsReadableActionWithoutRawJson() {
         show(AdminState(allowed = true, section = "audit", rows = listOf(JSONObject("""{"id":1,"action":"review","created_at":"2026-10-09T14:30:00Z","actor_id":"reviewer-1","target_id":"photo-1","details":{"after":{"status":"corrected","class_id":"healthy","note":"Folha sem lesão visível"}}}"""))))

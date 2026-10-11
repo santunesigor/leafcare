@@ -10,13 +10,20 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 internal class AdminAccessException(message: String) : Exception(message)
+internal class AdminReviewConflictException(message: String) : Exception(message)
+
+internal interface AdminApi {
+    suspend fun policy(): JSONObject
+    suspend fun command(operation: String, payload: JSONObject = JSONObject()): String
+    suspend fun photo(id: String): ByteArray
+}
 
 /** Authenticated requests; no service key or persistent administrative cache. */
-internal class AdminRepository(private val holder: SupabaseClientHolder) {
-    suspend fun policy(): JSONObject = JSONObject(String(request("/rest/v1/rpc/my_account_policy", JSONObject())))
-    suspend fun command(operation: String, payload: JSONObject = JSONObject()): String =
+internal class AdminRepository(private val holder: SupabaseClientHolder) : AdminApi {
+    override suspend fun policy(): JSONObject = JSONObject(String(request("/rest/v1/rpc/my_account_policy", JSONObject())))
+    override suspend fun command(operation: String, payload: JSONObject): String =
         String(request("/functions/v1/leafcare-admin", JSONObject().put("operation", operation).put("payload", payload)))
-    suspend fun photo(id: String): ByteArray = request("/functions/v1/leafcare-admin",
+    override suspend fun photo(id: String): ByteArray = request("/functions/v1/leafcare-admin",
         JSONObject().put("operation", "photo").put("payload", JSONObject().put("id", id)))
 
     private suspend fun request(path: String, body: JSONObject): ByteArray = withContext(Dispatchers.IO) {
@@ -37,6 +44,7 @@ internal class AdminRepository(private val holder: SupabaseClientHolder) {
             if (status !in 200..299) {
                 val error = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
                 val message = runCatching { JSONObject(error).optString("error") }.getOrDefault("")
+                if (status == 409) throw AdminReviewConflictException(message.ifBlank { "Revisão mudou; recarregue antes de salvar" })
                 throw IllegalStateException(message.ifBlank { "Serviço indisponível. Confira a conexão e tente novamente." })
             }
             val bytes = connection.inputStream.use { it.readBytes() }
