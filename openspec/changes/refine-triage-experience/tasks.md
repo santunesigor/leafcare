@@ -11,4 +11,4 @@
 ## 3. Integração e entrega
 
 - [x] 3.1 Executar testes Android, verifyModelAssets, lint e validações OpenSpec estritas; registrar evidências e limitações em validation.md.
-- [ ] 3.2 Gerar APK debug, revisar diff e publicar commits na branch feat/superadmin, incluindo commits locais pendentes; verificar remoto e disponibilizar arquivo.
+- [x] 3.2 Gerar APK debug, revisar diff e publicar commits na branch feat/superadmin, incluindo commits locais pendentes; verificar remoto e disponibilizar arquivo.

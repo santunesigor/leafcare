@@ -10,6 +10,7 @@ Execução local em 2026-10-12 na branch `feat/superadmin`, base `8c2e0c5`. JDK 
 - `testDebugUnitTest verifyModelAssets lintDebug assembleDebug`: BUILD SUCCESSFUL; suíte completa com 260 testes, zero falhas, erros ou ignorados. Verificação do bundle e análises lint executadas; geração do relatório lint reaproveitada (`UP-TO-DATE`), com zero erros e 24 avisos. APK debug de aproximadamente 64 MiB gerado e assinatura v2 validada com apksigner.
 - Capturas locais inspecionadas em `android-app/app/build/reports/screenshots/`: painel de triagens, avaliação com fonte 1,3× em 320×640dp, avaliação em 320×480dp e rodapé acima do teclado simulado. Capturas e resultados gerados ficam no build ignorado pelo Git.
 - OpenSpec: validações `--all --strict --no-interactive` e `--archived --strict --no-interactive` aprovadas. A change anterior `continuous-photo-triage`, já concluída, foi arquivada e sincronizada antes do delta atual.
+- Implementação commitada em `7e8209f` e enviada à `origin/feat/superadmin`; hash remoto conferido com `git ls-remote`. Não havia alterações ou commits locais pendentes antes desta tarefa. O APK é disponibilizado em `android-app/app/build/outputs/apk/distribution/debug/`, com versão e commit no nome; o registro final de entrega usa commit de documentação separado.
 
 ## Device QA
 
