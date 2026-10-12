@@ -22,6 +22,7 @@ internal data class AdminState(
     val photoIndex: Int = 0, val photoId: String? = null, val queueHasMore: Boolean = false,
     val reviewedCount: Int = 0, val reviewConflict: Boolean = false,
     val photoFilterStatus: String = "pending",
+    val photoQuery: String = "{}",
 )
 internal class AdminViewModel(application: Application, private val api: AdminApi) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, AdminRepository((application as LeafCareApplication).supabaseClientHolder))
@@ -67,17 +68,19 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
     }
     fun load(section: String = mutable.value.section, page: Int = 0, query: JSONObject = if (section == "photos") JSONObject().put("status", "pending") else JSONObject()) {
         if (mutable.value.busy) return
+        val overview = section == "dashboard" || section == "triage"
+        if (overview) mutable.value = mutable.value.copy(section = section, selected = null, bitmap = null, dashboard = JSONObject())
         run {
             val payload = JSONObject(query.toString()).put("page", page)
-            val result = api.command(section, payload)
+            val result = api.command(if (overview) "dashboard" else section, payload)
             filters = query
             reviewedIds.clear()
             mutable.value = mutable.value.copy(section = section, page = page, selected = null, bitmap = null,
                 photoIndex = 0, photoId = null, reviewedCount = 0, reviewConflict = false,
-                dashboard = if (section == "dashboard") JSONObject(result) else mutable.value.dashboard,
-                rows = if (section == "dashboard") emptyList() else JSONArray(result).let { array -> List(array.length()) { array.getJSONObject(it) } })
+                dashboard = if (overview) JSONObject(result) else mutable.value.dashboard,
+                rows = if (overview) emptyList() else JSONArray(result).let { array -> List(array.length()) { array.getJSONObject(it) } })
             if (section == "photos") {
-                mutable.value = mutable.value.copy(queueHasMore = mutable.value.rows.size == 20, photoFilterStatus = query.optString("status"))
+                mutable.value = mutable.value.copy(queueHasMore = mutable.value.rows.size == 20, photoFilterStatus = query.optString("status"), photoQuery = query.toString())
                 showPhoto(0)
             }
         }

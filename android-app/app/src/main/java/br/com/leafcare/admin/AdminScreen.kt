@@ -72,12 +72,12 @@ internal fun AdminContent(
     var search by remember { mutableStateOf("") }
     var invite by remember { mutableStateOf(false) }
     var inviteEmail by remember { mutableStateOf("") }
-    val openPending = { actions.load("photos", JSONObject().put("status", "pending")) }
+    val openTriage = { actions.load("triage", JSONObject()) }
     if (state.allowed && state.section == "photos") {
         ReviewQueue(state, actions, classes, catalog)
         return
     }
-    Column(Modifier.fillMaxSize().background(LeafColors.Pale)) {
+    Column(Modifier.fillMaxSize().background(LeafColors.Pale), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 24.dp, top = 16.dp, bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = actions.back, modifier = Modifier.size(44.dp).background(Color.White, CircleShape).border(1.dp, LeafColors.Border, CircleShape)) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar", tint = LeafColors.Text)
@@ -95,10 +95,10 @@ internal fun AdminContent(
             return@Column
         }
         Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("dashboard" to "Resumo", "users" to "Usuários", "photos" to "Triagem", "audit" to "Atividades").forEach { (id, title) ->
+            listOf("dashboard" to "Resumo", "users" to "Usuários", "triage" to "Triagem", "audit" to "Atividades").forEach { (id, title) ->
                 val selected = state.section == id
-                val icon = when (id) { "dashboard" -> Icons.Outlined.Dashboard; "users" -> Icons.Outlined.PeopleAlt; "photos" -> Icons.Outlined.PhotoLibrary; else -> Icons.Outlined.History }
-                Surface(onClick = { actions.load(id, if (id == "photos") JSONObject().put("status", "pending") else JSONObject()) }, enabled = !state.busy,
+                val icon = when (id) { "dashboard" -> Icons.Outlined.Dashboard; "users" -> Icons.Outlined.PeopleAlt; "triage" -> Icons.Outlined.Eco; else -> Icons.Outlined.History }
+                Surface(onClick = { actions.load(id, JSONObject()) }, enabled = !state.busy,
                     shape = RoundedCornerShape(16.dp), color = if (selected) LeafColors.Green else Color.White,
                     border = if (selected) null else BorderStroke(1.dp, LeafColors.Border), modifier = Modifier.weight(1f).semantics { role = Role.Tab; this.selected = selected }) {
                     Column(Modifier.padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -109,11 +109,16 @@ internal fun AdminContent(
             }
         }
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 12.dp), color = LeafColors.Green, trackColor = LeafColors.Border)
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp, 18.dp, 20.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        LazyColumn(Modifier.weight(1f).widthIn(max = 720.dp).fillMaxWidth(), contentPadding = PaddingValues(20.dp, 18.dp, 20.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             state.error?.let { item { AdminNotice(it, error = true) } }
             state.message?.let { item { AdminNotice(it) } }
-            if (state.section == "dashboard") {
-                item { AdminDashboard(state.dashboard, catalog, state.busy, openPending) }
+            if (state.section in listOf("dashboard", "triage")) {
+                if (!state.dashboard.has("photos")) item {
+                    AdminEmpty(if (state.busy) "Carregando painel…" else "Painel indisponível", if (state.busy) "Buscando os totais de fotos e revisões." else "Confira sua conexão e atualize para tentar novamente.", Icons.Outlined.CloudSync)
+                    if (!state.busy) OutlinedButton(onClick = actions.refresh, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Tentar novamente") }
+                } else if (state.section == "triage") {
+                    triageDashboard(state.dashboard, catalog, state.busy) { query -> actions.load("photos", query) }
+                } else item { AdminDashboard(state.dashboard, catalog, state.busy, openTriage) }
             } else {
                 item {
                     if (state.section == "users") {

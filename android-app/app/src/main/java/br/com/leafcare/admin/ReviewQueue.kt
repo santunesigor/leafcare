@@ -5,12 +5,11 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.pager.VerticalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +24,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,46 +36,42 @@ import br.com.leafcare.ui.LeafColors
 import org.json.JSONArray
 import org.json.JSONObject
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable internal fun ReviewQueue(state: AdminState, actions: AdminActions, classes: List<String>, catalog: DiseaseCatalog) {
     var filtersOpen by remember { mutableStateOf(false) }
-    var status by rememberSaveable { mutableStateOf(state.photoFilterStatus) }
-    var classFilter by rememberSaveable { mutableStateOf("") }
-    var model by rememberSaveable { mutableStateOf("") }
-    var user by rememberSaveable { mutableStateOf("") }
-    var from by rememberSaveable { mutableStateOf("") }
-    var until by rememberSaveable { mutableStateOf("") }
-    val back = { if (!state.busy) actions.load("dashboard", JSONObject()) }
+    val query = remember(state.photoQuery) { JSONObject(state.photoQuery) }
+    var status by rememberSaveable(state.photoQuery) { mutableStateOf(state.photoFilterStatus) }
+    var classFilter by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("class_id")) }
+    var model by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("model")) }
+    var user by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("user_id")) }
+    var from by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("from")) }
+    var until by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("until")) }
+    var advancedFilters by rememberSaveable(state.photoQuery) { mutableStateOf(model.isNotBlank() || user.isNotBlank()) }
+    val back = { if (!state.busy) actions.load("triage", JSONObject()) }
     BackHandler(onBack = back)
-    Column(Modifier.fillMaxSize().background(LeafColors.Pale).safeDrawingPadding()) {
+    Column(Modifier.fillMaxSize().background(LeafColors.Pale)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = back, enabled = !state.busy) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar à administração") }
+            IconButton(onClick = back, enabled = !state.busy) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar ao painel de triagens") }
             Column(Modifier.weight(1f)) {
-                Text("Triagem", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("${reviewStatuses[state.photoFilterStatus]} · ${state.reviewedCount} revisadas nesta sessão", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+                Text("Avaliação", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("${reviewStatuses[state.photoFilterStatus]} · ${state.reviewedCount} salvas", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
             }
             IconButton(onClick = { filtersOpen = true }, enabled = !state.busy) { Icon(Icons.Outlined.Tune, "Filtrar fotos", tint = LeafColors.Green) }
             IconButton(onClick = actions.refresh, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "Atualizar fila", tint = LeafColors.Green) }
         }
-        if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = LeafColors.Green)
+        Box(Modifier.fillMaxWidth().height(3.dp)) { if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = LeafColors.Green) }
         if (state.rows.isEmpty()) {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
                 state.error?.let { AdminNotice(it, error = true); TextButton(onClick = actions.retryPhoto, enabled = !state.busy) { Text("Tentar novamente") } }
                 AdminEmpty(if (state.busy) "Carregando fila…" else if (state.reviewedCount > 0) "Fila concluída!" else "Sem fotos nesta seleção",
                     if (state.busy) "Buscando fotos para revisar." else state.message ?: "Altere os filtros ou volte mais tarde.", Icons.Outlined.TaskAlt)
-                if (!state.busy) OutlinedButton(onClick = actions.refresh) { Text("Atualizar fila") }
+                if (!state.busy) {
+                    Button(onClick = back, modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp)) { Text("Voltar ao painel") }
+                    TextButton(onClick = actions.refresh) { Text("Atualizar fila") }
+                }
             }
         } else {
-            val pager = rememberPagerState(initialPage = state.photoIndex) { state.rows.size }
-            // Keep the visible UUID aligned when saving removes a page from the queue.
-            LaunchedEffect(state.photoIndex, state.rows) {
-                if (!pager.isScrollInProgress && pager.currentPage != state.photoIndex) pager.scrollToPage(state.photoIndex)
-            }
-            LaunchedEffect(pager.settledPage, pager.isScrollInProgress, state.busy) {
-                if (!state.busy && !pager.isScrollInProgress && pager.settledPage != state.photoIndex) actions.movePhoto(pager.settledPage)
-            }
-            VerticalPager(pager, Modifier.weight(1f).fillMaxWidth().testTag("review-feed"),
-                userScrollEnabled = !state.busy, key = { state.rows[it].getString("id") }) { index ->
+            Box(Modifier.weight(1f).fillMaxWidth().testTag("review-photo")) {
+                val index = state.photoIndex.coerceIn(state.rows.indices)
                 val row = state.rows[index]
                 key(row.getString("id"), row.optInt("review_version")) {
                     ReviewPage(row, state, actions, classes, catalog, index)
@@ -92,10 +91,13 @@ import org.json.JSONObject
     }) {
         item { Choice("Situação", status, reviewStatuses) { status = it } }
         item { Choice("Classe prevista", classFilter, linkedMapOf("" to "Todas") + classes.associateWith { catalog.get(it).name }) { classFilter = it } }
-        item { OutlinedTextField(user, { user = it }, label = { Text("Identificador do usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-        item { OutlinedTextField(model, { model = it }, label = { Text("Identificador do modelo") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
         item { OutlinedTextField(from, { from = it }, label = { Text("De (AAAA-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
         item { OutlinedTextField(until, { until = it }, label = { Text("Até (AAAA-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+        item { TextButton(onClick = { advancedFilters = !advancedFilters }) { Text(if (advancedFilters) "Menos filtros" else "Mais filtros"); Icon(if (advancedFilters) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null) } }
+        if (advancedFilters) {
+            item { OutlinedTextField(user, { user = it }, label = { Text("Identificador do usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(model, { model = it }, label = { Text("Identificador do modelo") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+        }
     }
 }
 
@@ -130,19 +132,19 @@ import org.json.JSONObject
             } else if (state.busy) CircularProgressIndicator(color = Color.White)
             else TextButton(onClick = actions.retryPhoto) { Text("Carregar foto", color = Color.White) }
             Surface(Modifier.align(Alignment.BottomStart).padding(12.dp), color = Color.Black.copy(alpha = .6f), shape = RoundedCornerShape(10.dp)) {
-                Text("${index + 1} de ${state.rows.size}${if (state.queueHasMore) "+" else ""} · Deslize para cima", Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = Color.White, fontSize = 11.sp)
+                Text("Foto ${index + 1} de ${state.rows.size}${if (state.queueHasMore) "+" else ""}", Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = Color.White, fontSize = 11.sp)
             }
         }
         // This area can scroll on short screens; the action bar always keeps its own space.
-        Column(Modifier.fillMaxWidth().heightIn(max = 190.dp).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 154.dp).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("PREVISÃO ORIGINAL", color = LeafColors.Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text(reviewLabel(row.optString("review_status")), color = LeafColors.Green, style = MaterialTheme.typography.labelSmall)
+                AdminBadge(reviewLabel(row.optString("review_status")))
             }
-            Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("${"%.1f".format(row.optDouble("confidence") * 100)}% de confiança", Modifier.weight(1f), color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = { details = true }, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Ver detalhes") }
+                TextButton(onClick = { details = true }, contentPadding = PaddingValues(horizontal = 8.dp)) { Icon(Icons.Outlined.Info, null, Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Detalhes", style = MaterialTheme.typography.labelMedium) }
             }
             if (index == state.photoIndex) {
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -150,13 +152,25 @@ import org.json.JSONObject
                 state.message?.let { Text(it, color = LeafColors.Green, style = MaterialTheme.typography.bodySmall) }
             }
         }
-        Surface(color = Color.White, shadowElevation = 6.dp) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { edit = true }, enabled = ready, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) { Text("Avaliar") }
-                    Button(onClick = { submit("confirmed") }, enabled = ready, modifier = Modifier.weight(1.5f), shape = RoundedCornerShape(14.dp)) { Text("Confirmar e próxima", fontSize = 12.sp) }
+        Surface(color = Color.White, shadowElevation = 4.dp) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Button(onClick = { submit("confirmed") }, enabled = ready, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(16.dp)) {
+                    Icon(Icons.Outlined.CheckCircle, null, Modifier.size(20.dp)); Spacer(Modifier.width(10.dp)); Text("Confirmar previsão", fontWeight = FontWeight.SemiBold)
                 }
-                TextButton(onClick = actions.nextPhoto, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Pular sem revisar") }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = { edit = true }, enabled = ready, modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp), border = BorderStroke(1.dp, LeafColors.Border)) {
+                        Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp)); Spacer(Modifier.width(7.dp)); Text("Outra avaliação", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    TextButton(onClick = actions.nextPhoto, enabled = !state.busy, modifier = Modifier.heightIn(min = 48.dp), contentPadding = PaddingValues(horizontal = 10.dp)) {
+                        Text("Pular"); Spacer(Modifier.width(4.dp)); Icon(Icons.Outlined.SkipNext, null, Modifier.size(20.dp))
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { actions.movePhoto(index - 1) }, enabled = index > 0 && !state.busy, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                        Icon(Icons.Outlined.ChevronLeft, null, Modifier.size(18.dp)); Text("Anterior", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text("Ao salvar, a próxima foto aparece.", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                }
             }
         }
     }
@@ -166,14 +180,21 @@ import org.json.JSONObject
             Button(onClick = { submit(reviewStatus) }, enabled = ready && valid, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) { Text("Salvar e próxima") }
         }
     }) {
-        item { Text("Sua avaliação preserva a previsão original.", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall) }
+        item { Text("Como você avalia esta folha?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("A previsão original será preservada.", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall) }
         state.error?.let { item { AdminNotice(it, error = true); TextButton(onClick = actions.retryPhoto, enabled = !state.busy) { Text(if (state.reviewConflict) "Recarregar revisão" else "Tentar novamente") } } }
         item {
-            listOf("confirmed" to "Confirmar", "corrected" to "Corrigir classe", "uncertain" to "Duvidosa", "rejected" to "Rejeitar").chunked(2).forEach { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { pair.forEach { (id, label) ->
-                    FilterChip(selected = reviewStatus == id, onClick = { reviewStatus = id }, enabled = !state.busy, modifier = Modifier.weight(1f), label = { Text(label) },
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = LeafColors.Green.copy(alpha = .12f), selectedLabelColor = LeafColors.Green))
-                } }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("confirmed" to "Confirmar", "corrected" to "Corrigir classe", "uncertain" to "Duvidosa", "rejected" to "Rejeitar").forEach { (id, label) ->
+                    val chosen = reviewStatus == id
+                    Surface(onClick = { reviewStatus = id }, enabled = !state.busy, color = if (chosen) Color(0xFFEAF3E9) else Color.White, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, if (chosen) LeafColors.Green else LeafColors.Border), modifier = Modifier.fillMaxWidth().semantics { role = Role.RadioButton; selected = chosen }) {
+                        Row(Modifier.padding(12.dp).heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Icon(when(id) { "confirmed" -> Icons.Outlined.CheckCircle; "corrected" -> Icons.Outlined.Edit; "uncertain" -> Icons.AutoMirrored.Outlined.HelpOutline; else -> Icons.Outlined.HideImage }, null, tint = LeafColors.Green, modifier = Modifier.size(22.dp))
+                            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = if (chosen) FontWeight.Bold else FontWeight.Normal)
+                            Icon(if (chosen) Icons.Outlined.RadioButtonChecked else Icons.Outlined.RadioButtonUnchecked, null, tint = if (chosen) LeafColors.Green else LeafColors.Muted, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
             }
         }
         if (reviewStatus == "corrected") item { Choice("Classe revisada", selectedClass, classes.associateWith { catalog.get(it).name }, !state.busy) { selectedClass = it } }

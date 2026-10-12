@@ -77,7 +77,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
                 Text(if (pending == 1) "foto aguardando sua avaliação" else "fotos aguardando sua avaliação", color = Color.White, style = MaterialTheme.typography.bodyMedium)
                 Button(onClick = onReview, enabled = !busy, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF194C2B))) {
-                    Text("Revisar fotos", fontWeight = FontWeight.SemiBold); Spacer(Modifier.width(10.dp)); Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp))
+                    Text("Abrir painel de triagem", fontWeight = FontWeight.SemiBold); Spacer(Modifier.width(10.dp)); Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp))
                 }
             }
         }

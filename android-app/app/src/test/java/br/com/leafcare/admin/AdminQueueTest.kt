@@ -37,6 +37,31 @@ class AdminQueueTest {
         vm.action("review", JSONObject().put("id", row.getString("id")).put("version", row.optInt("review_version"))
             .put("status", "confirmed").put("class_id", "frog_eye").put("note", ""))
     }
+    @Test fun triageUsesExistingDashboardAndRefreshesTotalsAfterReview() {
+        api.seed(2)
+        vm.load("triage")
+        assertEquals("triage", vm.state.value.section)
+        assertEquals(2, vm.state.value.dashboard.getInt("photos"))
+        assertEquals(0, vm.state.value.dashboard.getInt("reviewed"))
+        open()
+        save()
+        vm.load("triage")
+        assertEquals(1, vm.state.value.dashboard.getInt("reviewed"))
+        assertNull(vm.state.value.bitmap)
+    }
+    @Test fun failedDashboardClearsStaleTotalsAndCanRetry() {
+        api.seed(2)
+        vm.load("triage")
+        api.listFailure = true
+        vm.reload()
+        assertEquals("triage", vm.state.value.section)
+        assertFalse(vm.state.value.dashboard.has("photos"))
+        assertNotNull(vm.state.value.error)
+        api.listFailure = false
+        vm.reload()
+        assertEquals(2, vm.state.value.dashboard.getInt("photos"))
+        assertNull(vm.state.value.error)
+    }
     @Test fun savesFortyFivePendingPhotosWithoutSkippingShiftedPages() {
         api.seed(45)
         open()
@@ -166,6 +191,10 @@ class AdminQueueTest {
         override suspend fun policy() = JSONObject().put("role", "superadmin")
         override suspend fun photo(id: String): ByteArray { if (failedPhoto == id) error("Não foi possível carregar a foto"); return bytes }
         override suspend fun command(operation: String, payload: JSONObject): String = when (operation) {
+            "dashboard" -> {
+                if (listFailure) error("Falha ao buscar painel")
+                JSONObject().put("photos", rows.size).put("reviewed", rows.count { it.optString("review_status") != "pending" }).toString()
+            }
             "photos" -> {
                 if (listFailure) error("Falha ao buscar fotos")
                 queries += JSONObject(payload.toString())
