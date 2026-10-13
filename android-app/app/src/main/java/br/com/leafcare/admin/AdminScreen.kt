@@ -1,17 +1,21 @@
 package br.com.leafcare.admin
 
+import android.content.Intent
+import android.util.Patterns
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,9 +27,13 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import br.com.leafcare.data.DiseaseCatalog
 import br.com.leafcare.ui.LeafColors
 import org.json.JSONArray
@@ -54,9 +62,18 @@ internal data class AdminActions(
 internal fun AdminScreen(vm: AdminViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val catalog = remember { DiseaseCatalog(context) }
     val classes = remember { context.assets.open("classes.json").bufferedReader().use { JSONArray(it.readText()) }.let { a -> List(a.length()) { a.getString(it) } } }
     LaunchedEffect(Unit) { vm.load() }
+    LaunchedEffect(vm, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            vm.invitationLinks.collect { link ->
+                try { context.startActivity(invitationShareIntent(link)) }
+                catch (_: android.content.ActivityNotFoundException) { vm.shareFailed() }
+            }
+        }
+    }
     AdminContent(state, catalog, classes, AdminActions(
         load = { section, query -> vm.load(section, query = query) }, refresh = vm::reload,
         page = vm::page, select = vm::select, action = vm::action, history = vm::history,
@@ -70,8 +87,9 @@ internal fun AdminContent(
     state: AdminState, catalog: DiseaseCatalog, classes: List<String>, actions: AdminActions,
 ) {
     var search by remember { mutableStateOf("") }
-    var invite by remember { mutableStateOf(false) }
-    var inviteEmail by remember { mutableStateOf("") }
+    var invite by rememberSaveable { mutableStateOf(false) }
+    var inviteEmail by rememberSaveable { mutableStateOf("") }
+    val validInviteEmail = Patterns.EMAIL_ADDRESS.matcher(inviteEmail.trim()).matches()
     val openTriage = { actions.load("triage", JSONObject()) }
     if (state.allowed && state.section == "photos") {
         ReviewQueue(state, actions, classes, catalog)
@@ -153,15 +171,37 @@ internal fun AdminContent(
             }
         }
     }
-    if (state.allowed && invite) AlertDialog(onDismissRequest = { if (!state.busy) invite = false }, shape = RoundedCornerShape(24.dp), containerColor = Color.White,
-        icon = { Icon(Icons.Outlined.PersonAdd, null, tint = LeafColors.Green) }, title = { Text("Convidar usuário") },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("A pessoa receberá um e-mail para criar seu acesso.", color = LeafColors.Muted)
-            OutlinedTextField(inviteEmail, { inviteEmail = it }, label = { Text("E-mail") }, singleLine = true, shape = RoundedCornerShape(14.dp))
-        } },
-        confirmButton = { TextButton(onClick = { actions.action("invite", JSONObject().put("email", inviteEmail.trim())); invite = false }, enabled = inviteEmail.isNotBlank() && !state.busy) { Text("Enviar convite") } },
-        dismissButton = { TextButton(onClick = { invite = false }) { Text("Cancelar") } })
+    if (state.allowed && invite) AdminSheet("Convidar usuário", { invite = false }, dismissEnabled = !state.busy, heightFraction = .68f,
+        footer = { TextButton(onClick = { invite = false }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().padding(8.dp)) { Text("Cancelar") } }) {
+        item {
+            Text("Informe o e-mail da pessoa. Depois, escolha um aplicativo para compartilhar o link de acesso ou envie o convite por e-mail.", color = LeafColors.Muted)
+        }
+        item {
+            OutlinedTextField(inviteEmail, { inviteEmail = it }, label = { Text("E-mail da pessoa") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
+        }
+        item {
+            Button(onClick = { actions.action("invite_link", JSONObject().put("email", inviteEmail.trim())); invite = false },
+                enabled = validInviteEmail && !state.busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                Icon(Icons.Outlined.Share, null, Modifier.size(19.dp)); Spacer(Modifier.width(8.dp)); Text("Compartilhar convite")
+            }
+        }
+        item {
+            OutlinedButton(onClick = { actions.action("invite", JSONObject().put("email", inviteEmail.trim())); invite = false },
+                enabled = validInviteEmail && !state.busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                Icon(Icons.Outlined.MailOutline, null, Modifier.size(19.dp)); Spacer(Modifier.width(8.dp)); Text("Enviar por e-mail")
+            }
+        }
+    }
     if (state.allowed) state.selected?.let { row ->
         if (state.section == "users") UserDetails(actions, row, state.busy, state.error)
     }
 }
+
+internal fun invitationShareIntent(link: String): Intent = Intent.createChooser(
+    Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, "Convite para o LeafCare")
+        putExtra(Intent.EXTRA_TEXT, "Você recebeu um convite para o LeafCare! Com o aplicativo instalado, abra este link para definir sua senha e acessar:\n$link")
+    }, "Compartilhar convite",
+)

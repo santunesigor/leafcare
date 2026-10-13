@@ -11,6 +11,8 @@ function fixture() {
   let listingFails = false;
   let objects: { name: string }[] = [];
   let gone = false;
+  let linkFails = false;
+  let revokeAfterLink = false;
   const bucket = {
     download: (path: string) => { external.push(`download:${path}`); return { data: new Blob(['photo'], { type: 'image/jpeg' }), error: null }; },
     list: () => { external.push('list'); return { data: objects, error: listingFails ? { message: 'offline' } : null }; },
@@ -21,6 +23,11 @@ function fixture() {
       getUser: () => ({ data: { user: authenticated ? { id: 'verified-user' } : null }, error: null }),
       admin: {
         inviteUserByEmail: (email: string) => { external.push(`invite:${email}`); return { data: { user: { id: 'invited' } }, error: null }; },
+        generateLink: (args: { type: string; email: string; options: { redirectTo: string } }) => {
+          external.push(`link:${args.type}:${args.email}:${args.options.redirectTo}`);
+          if (revokeAfterLink) authorized = false;
+          return { data: { user: { id: 'invited' }, properties: { action_link: 'https://auth.example.test/invite' } }, error: linkFails ? { message: 'failed' } : null };
+        },
         deleteUser: (id: string) => { external.push(`delete:${id}`); return { error: null }; },
       },
       resetPasswordForEmail: (email: string) => { external.push(`recovery:${email}`); return { error: null }; },
@@ -46,6 +53,7 @@ function fixture() {
     failListing: () => { listingFails = true; },
     setObjects: (value: typeof objects) => { objects = value; },
     deleted: () => { gone = true; },
+    failLink: () => { linkFails = true; }, revokeAfterLink: () => { revokeAfterLink = true; },
   };
 }
 Deno.test('missing/invalid session cannot invoke privileged RPC', async () => {
@@ -57,7 +65,7 @@ Deno.test('missing/invalid session cannot invoke privileged RPC', async () => {
 });
 Deno.test('non-admin is denied before every service action', async () => {
   const f = fixture(); f.deny();
-  for (const op of ['dashboard', 'invite', 'recovery', 'delete', 'photo']) assert((await f.request(op)).status === 403);
+  for (const op of ['dashboard', 'invite', 'invite_link', 'recovery', 'delete', 'photo']) assert((await f.request(op)).status === 403);
   assert(f.external.length === 0);
 });
 Deno.test('verified JWT supplies actor; forbidden operations cannot reach RPC', async () => {
@@ -86,6 +94,27 @@ Deno.test('invite validates email; recovery/reinvite resolved server-side and au
   assert((await f.request('reinvite', { id: 'target' })).status === 200);
   assert(f.external.join('|') === 'invite:new@test.local|recovery:target@test.local|recovery:target@test.local');
   assert(f.calls.filter(c => c.operation === 'record_event').length === 3);
+});
+Deno.test('share invitation creates an access link without emailing or auditing credentials', async () => {
+  const f = fixture();
+  assert((await f.request('invite_link', { email: 'invalid' })).status === 400);
+  assert(f.external.length === 0);
+  const response = await f.request('invite_link', { email: ' new@test.local ' });
+  assert(response.status === 200 && response.headers.get('Cache-Control') === 'no-store');
+  const result = await response.json();
+  assert(result.link === 'https://auth.example.test/invite' && Object.keys(result).length === 1);
+  assert(f.external.join('|') === 'link:invite:new@test.local:leafcare://auth/reset-password');
+  const event = f.calls.find(c => c.operation === 'record_event');
+  assert(JSON.stringify(event?.payload) === JSON.stringify({ id: 'invited', action: 'invite' }));
+});
+Deno.test('failed invitation generation and revoked access never return an access link', async () => {
+  const f = fixture(); f.failLink();
+  const response = await f.request('invite_link', { email: 'new@test.local' });
+  assert(response.status === 400 && !(await response.json()).link);
+  assert(!f.calls.some(c => c.operation === 'record_event'));
+  const revoked = fixture(); revoked.revokeAfterLink();
+  const denied = await revoked.request('invite_link', { email: 'new@test.local' });
+  assert(denied.status === 403 && !(await denied.json()).link);
 });
 Deno.test('deletion batches objects before deleting auth; retries are idempotent', async () => {
   const f = fixture(); f.setObjects([{ name: 'a.jpg' }]);

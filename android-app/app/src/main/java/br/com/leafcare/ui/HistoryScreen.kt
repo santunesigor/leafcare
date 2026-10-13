@@ -80,18 +80,10 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: ()
     val formatter = remember { DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("pt-BR")) }
     Scaffold(floatingActionButtonPosition = FabPosition.Center,
         floatingActionButton = {
-            Box(Modifier.width(216.dp).height(80.dp)) {
+            Box(Modifier.size(80.dp)) {
                 Surface(onClick = onCamera, shape = CircleShape, shadowElevation = 12.dp, color = LeafColors.Green,
                     modifier = Modifier.align(Alignment.Center).size(68.dp), border = BorderStroke(6.dp, Color.White)) {
                     Box(contentAlignment = Alignment.Center) { FigmaIcon(R.drawable.v3_camera, stringResource(R.string.camera_button_desc), 28) }
-                }
-                onAdmin?.let { open ->
-                    Surface(onClick = open, shape = CircleShape, shadowElevation = 6.dp, color = Color.White,
-                        border = BorderStroke(1.dp, LeafColors.Border), modifier = Modifier.align(Alignment.CenterEnd).size(56.dp)) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Outlined.AdminPanelSettings, "Abrir administração", tint = LeafColors.Green, modifier = Modifier.size(26.dp))
-                        }
-                    }
                 }
             }
         }) { padding ->
@@ -110,6 +102,15 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: ()
                         Text(stringResource(R.string.history_subtitle), fontSize = 14.sp, color = LeafColors.Muted)
                     }
                     Spacer(Modifier.width(12.dp))
+                    onAdmin?.let { open ->
+                        Surface(onClick = open, shape = CircleShape, color = LeafColors.Pale,
+                            border = BorderStroke(1.dp, LeafColors.Border), modifier = Modifier.size(48.dp)) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(Icons.Outlined.AdminPanelSettings, "Abrir administração", tint = LeafColors.Green, modifier = Modifier.size(24.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                    }
                     Surface(onClick = onProfile, shape = CircleShape, color = LeafColors.Pale,
                         border = BorderStroke(1.dp, LeafColors.Border), modifier = Modifier.size(48.dp)) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {

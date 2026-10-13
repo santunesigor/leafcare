@@ -168,7 +168,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
 }
 @Composable internal fun AdminAuditCard(row: JSONObject, catalog: DiseaseCatalog) {
     var expanded by remember(row) { mutableStateOf(false) }
-    val title = when (row.optString("action")) { "bootstrap" -> "Primeiro superadmin ativado"; "role" -> "Permissão alterada"; "pause" -> "Envios atualizados"; "review" -> "Revisão registrada"; "invite" -> "Convite enviado"; "reinvite" -> "Convite reenviado"; "recovery" -> "Recuperação enviada"; "delete_begin" -> "Exclusão iniciada"; "delete_complete" -> "Exclusão concluída"; "delete_failed" -> "Exclusão pendente"; else -> "Ação administrativa" }
+    val title = when (row.optString("action")) { "bootstrap" -> "Primeiro superadmin ativado"; "role" -> "Permissão alterada"; "pause" -> "Envios atualizados"; "review" -> "Revisão registrada"; "invite" -> "Convite criado"; "reinvite" -> "Convite reenviado"; "recovery" -> "Recuperação enviada"; "delete_begin" -> "Exclusão iniciada"; "delete_complete" -> "Exclusão concluída"; "delete_failed" -> "Exclusão pendente"; else -> "Ação administrativa" }
     AdminPanel {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.size(36.dp).background(LeafColors.Pale, CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.History, null, Modifier.size(20.dp), tint = LeafColors.Green) }

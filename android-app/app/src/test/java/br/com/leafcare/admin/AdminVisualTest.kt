@@ -44,7 +44,7 @@ class AdminVisualTest {
         compose.onNodeWithContentDescription("Abrir câmera").assertIsDisplayed()
         compose.onNodeWithContentDescription("Abrir administração").assertDoesNotExist()
     }
-    @Test fun adminEntrySitsBesideCameraAndBothActionsWork() {
+    @Test fun adminEntrySitsBesideProfileAndBothActionsWork() {
         var admin = false; var camera = false
         compose.setContent { LeafCareTheme { HistoryContent(emptyList(), { camera = true }, {}, { R.drawable.v3_example_correct }, null, onAdmin = { admin = true }) } }
         val cameraButton = compose.onNodeWithContentDescription("Abrir câmera")
@@ -52,9 +52,11 @@ class AdminVisualTest {
         cameraButton.assertIsDisplayed(); adminButton.assertIsDisplayed()
         val cameraBounds = cameraButton.fetchSemanticsNode().boundsInRoot
         val adminBounds = adminButton.fetchSemanticsNode().boundsInRoot
-        assertTrue(adminBounds.left > cameraBounds.right)
-        assertEquals(cameraBounds.center.y, adminBounds.center.y, 1f)
-        capture("admin-acesso-inferior")
+        val profileBounds = compose.onNodeWithContentDescription("Abrir perfil").fetchSemanticsNode().boundsInRoot
+        assertTrue(adminBounds.right < profileBounds.left)
+        assertEquals(profileBounds.center.y, adminBounds.center.y, 1f)
+        assertTrue(adminBounds.bottom < cameraBounds.top)
+        capture("admin-acesso-superior")
         adminButton.performClick(); cameraButton.performClick()
         assertTrue(admin && camera)
     }
@@ -156,8 +158,13 @@ class AdminVisualTest {
                 LeafCareTheme { AdminContent(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap), DiseaseCatalog(compose.activity), classes, actions()) }
             }
         }
-        compose.onNodeWithText("Confirmar previsão").assertIsDisplayed()
-        compose.onNodeWithText("Outra avaliação").assertIsDisplayed()
+        listOf("Confirmar", "Corrigir", "Duvidosa", "Rejeitar").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+        val confirmBounds = compose.onNodeWithText("Confirmar").fetchSemanticsNode().boundsInRoot
+        listOf("Corrigir", "Duvidosa", "Rejeitar").forEach {
+            val bounds = compose.onNodeWithText(it).fetchSemanticsNode().boundsInRoot
+            assertEquals(confirmBounds.width, bounds.width, 1f)
+            assertEquals(confirmBounds.height, bounds.height, 1f)
+        }
         compose.onNodeWithText("Pular").assertIsDisplayed()
         capture("admin-revisao-fonte-ampliada")
     }
@@ -166,7 +173,7 @@ class AdminVisualTest {
         val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
         show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap),
             actions(action = { op, data -> assertEquals("review", op); payload = data }))
-        compose.onNodeWithText("Confirmar previsão").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Confirmar").assertIsDisplayed().performClick()
         assertEquals("confirmed", payload?.getString("status"))
         assertEquals("frog_eye", payload?.getString("class_id"))
         assertEquals(0, payload?.getInt("version"))
@@ -178,6 +185,46 @@ class AdminVisualTest {
         capture("admin-usuarios")
         compose.onNodeWithText("igor@exemplo.com").performClick(); assertEquals("user-1", selected)
     }
+    @Test fun invitationCanBeSharedThroughAppsAfterEnteringRecipientEmail() {
+        var operation = ""; var email = ""
+        show(AdminState(allowed = true, section = "users"), actions(action = { op, data -> operation = op; email = data.getString("email") }))
+        compose.onNodeWithText("Convidar usuário").performClick()
+        compose.onNodeWithText("Compartilhar convite").assertIsNotEnabled()
+        compose.onNodeWithText("Enviar por e-mail").assertIsNotEnabled()
+        compose.onNode(hasSetTextAction() and hasText("E-mail da pessoa")).performTextInput("pessoa@exemplo.com")
+        capture("admin-convite-compartilhar")
+        compose.onNodeWithText("Compartilhar convite").assertIsEnabled().performClick()
+        assertEquals("invite_link", operation); assertEquals("pessoa@exemplo.com", email)
+    }
+    @Test fun emailInvitationRemainsAvailable() {
+        var operation = ""
+        show(AdminState(allowed = true, section = "users"), actions(action = { op, _ -> operation = op }))
+        compose.onNodeWithText("Convidar usuário").performClick()
+        compose.onNode(hasSetTextAction() and hasText("E-mail da pessoa")).performTextInput("pessoa@exemplo.com")
+        compose.onNodeWithText("Enviar por e-mail").performClick()
+        assertEquals("invite", operation)
+    }
+    @Test fun invitationOpensNativeChooserWithTextLinkAndNoFixedApp() {
+        val chooser = invitationShareIntent("https://auth.example.test/invite")
+        assertEquals(android.content.Intent.ACTION_CHOOSER, chooser.action)
+        val intent = chooser.getParcelableExtra(android.content.Intent.EXTRA_INTENT, android.content.Intent::class.java)!!
+        assertEquals(android.content.Intent.ACTION_SEND, intent.action)
+        assertEquals("text/plain", intent.type)
+        assertTrue(intent.getStringExtra(android.content.Intent.EXTRA_TEXT)!!.contains("https://auth.example.test/invite"))
+        assertNull(intent.component); assertNull(intent.`package`)
+    }
+    @Test fun rejectionWithoutNoteKeepsOriginalVersionAndAdvancesOnlyThroughSave() {
+        var payload: JSONObject? = null
+        val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
+        show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap),
+            actions(action = { _, data -> payload = data }))
+        compose.onNodeWithText("Rejeitar").performClick()
+        assertNull(payload)
+        compose.onNodeWithText("Salvar e próxima").assertIsEnabled().performClick()
+        assertEquals("rejected", payload?.getString("status"))
+        assertEquals("", payload?.getString("note"))
+        assertEquals(0, payload?.getInt("version"))
+    }
     @Test fun permissionChangeRequiresConfirmation() {
         var action = ""
         show(AdminState(allowed = true, section = "users", selected = user()), actions(action = { op, _ -> action = op }))
@@ -188,20 +235,18 @@ class AdminVisualTest {
         compose.onNodeWithText("Confirmar").performClick()
         assertEquals("role", action)
     }
-    @Test fun uncertainReviewNeedsReasonAndSubmitsOriginalVersion() {
+    @Test fun uncertainReviewAcceptsEmptyNoteAndSubmitsOriginalVersion() {
         var payload: JSONObject? = null
         val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
         show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap),
             actions(action = { op, data -> assertEquals("review", op); payload = data }))
         capture("admin-revisao-topo")
-        compose.onNodeWithText("Outra avaliação").performClick()
-        compose.onNodeWithText("Duvidosa").performScrollTo().performClick()
-        compose.onNodeWithText("Salvar e próxima").assertIsNotEnabled()
-        compose.onNode(hasSetTextAction()).performScrollTo().performTextInput("Foto sem nitidez suficiente")
+        compose.onNodeWithText("Duvidosa").performClick()
+        compose.onNodeWithText("Observação (opcional)").assertExists()
         capture("admin-revisao-avaliacao")
         compose.onNodeWithText("Salvar e próxima").assertIsEnabled().performClick()
         assertEquals("uncertain", payload?.getString("status"))
-        assertEquals("Foto sem nitidez suficiente", payload?.getString("note"))
+        assertEquals("", payload?.getString("note"))
         assertEquals(0, payload?.getInt("version"))
     }
     @Test
@@ -209,10 +254,10 @@ class AdminVisualTest {
     fun smallScreenKeepsReviewActionsVisibleWhileEditing() {
         val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
         show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap))
-        compose.onNodeWithText("Confirmar previsão").assertIsDisplayed()
-        compose.onNodeWithText("Outra avaliação").performClick()
-        compose.onNodeWithText("Rejeitar").performScrollTo().performClick()
-        compose.onNodeWithText("Salvar e próxima").assertIsDisplayed().assertIsNotEnabled()
+        listOf("Confirmar", "Corrigir", "Duvidosa", "Rejeitar").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+        capture("admin-revisao-acoes-tela-pequena")
+        compose.onNodeWithText("Rejeitar").performClick()
+        compose.onNodeWithText("Salvar e próxima").assertIsDisplayed().assertIsEnabled()
         compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasSetTextAction())
         compose.onNode(hasSetTextAction()).performClick().performTextInput("Imagem inadequada")
         compose.onNodeWithText("Cancelar").assertIsDisplayed()
@@ -224,8 +269,7 @@ class AdminVisualTest {
         val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
         show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap),
             actions(action = { _, data -> payload = data }))
-        compose.onNodeWithText("Outra avaliação").performClick()
-        compose.onNodeWithText("Corrigir classe").performClick()
+        compose.onNodeWithText("Corrigir").performClick()
         compose.onNodeWithText("Classe revisada").performScrollTo().performClick()
         compose.onNodeWithText("Folha sem alteração aparente").performClick()
         compose.onNodeWithText("Salvar e próxima").performClick()
@@ -239,23 +283,22 @@ class AdminVisualTest {
         compose.setContent { LeafCareTheme { AdminContent(state.value, DiseaseCatalog(compose.activity), classes, actions(action = { _, _ ->
             state.value = state.value.copy(rows = listOf(next), photoId = "photo-2", reviewedCount = 1)
         })) } }
-        compose.onNodeWithText("Outra avaliação").performClick()
+        compose.onNodeWithText("Duvidosa").performClick()
         compose.onNodeWithText("Salvar e próxima").performClick()
         compose.onNodeWithText("Sua avaliação").assertDoesNotExist()
         compose.onNodeWithText("Folha sem alteração aparente").assertIsDisplayed()
-        compose.onNodeWithText("Confirmar previsão").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithText("Confirmar").assertIsDisplayed().assertIsEnabled()
     }
     @Test fun cancellingReviewDiscardsDraftBeforeQuickConfirmation() {
         var payload: JSONObject? = null
         val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
         show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap),
             actions(action = { _, data -> payload = data }))
-        compose.onNodeWithText("Outra avaliação").performClick()
         compose.onNodeWithText("Rejeitar").performClick()
         compose.onNode(hasSetTextAction()).performScrollTo().performTextInput("Rascunho descartado")
         compose.onNodeWithText("Cancelar").performClick()
         assertNull(payload)
-        compose.onNodeWithText("Confirmar previsão").performClick()
+        compose.onNodeWithText("Confirmar").performClick()
         assertEquals("confirmed", payload?.getString("status"))
         assertEquals("", payload?.getString("note"))
     }
@@ -264,7 +307,7 @@ class AdminVisualTest {
     fun keyboardInsetsKeepReviewFooterInsideSmallWindow() {
         val bitmap = BitmapFactory.decodeResource(compose.activity.resources, R.drawable.v3_example_correct)
         show(AdminState(allowed = true, section = "photos", rows = listOf(photo()), photoId = "photo-1", bitmap = bitmap))
-        compose.onNodeWithText("Outra avaliação").performClick()
+        compose.onNodeWithText("Duvidosa").performClick()
         compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasSetTextAction())
         compose.onNode(hasSetTextAction()).performClick()
         compose.runOnIdle {

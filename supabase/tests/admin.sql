@@ -70,8 +70,13 @@ SELECT public.admin_command('00000000-0000-0000-0000-000000000004','role','{"id"
 DO $$ BEGIN
  BEGIN PERFORM public.admin_command('00000000-0000-0000-0000-000000000001','dashboard'); RAISE EXCEPTION 'revoked role accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN PERFORM public.admin_command('00000000-0000-0000-0000-000000000004','review','{"id":"00000000-0000-0000-0000-000000000003","version":2,"status":"corrected","class_id":"invalid"}'); RAISE EXCEPTION 'invalid class accepted'; EXCEPTION WHEN raise_exception THEN IF SQLERRM='invalid class accepted' THEN RAISE; END IF; END;
- BEGIN PERFORM public.admin_command('00000000-0000-0000-0000-000000000004','review','{"id":"00000000-0000-0000-0000-000000000003","version":2,"status":"uncertain","note":"  "}'); RAISE EXCEPTION 'empty reason accepted'; EXCEPTION WHEN raise_exception THEN IF SQLERRM='empty reason accepted' THEN RAISE; END IF; END;
 END $$;
+SELECT public.admin_command('00000000-0000-0000-0000-000000000004','review','{"id":"00000000-0000-0000-0000-000000000003","version":2,"status":"uncertain","note":"  "}');
+SELECT pg_temp.assert_true((SELECT status='uncertain' AND class_id IS NULL AND version=3 AND trim(note)='' FROM public.photo_reviews LIMIT 1),'uncertain accepts blank note');
+SELECT public.admin_command('00000000-0000-0000-0000-000000000004','review','{"id":"00000000-0000-0000-0000-000000000003","version":3,"status":"rejected"}');
+SELECT pg_temp.assert_true((SELECT status='rejected' AND class_id IS NULL AND version=4 AND note='' FROM public.photo_reviews LIMIT 1),'rejection accepts omitted note');
+SELECT pg_temp.assert_true((SELECT class_id='frog_eye' FROM public.analyses LIMIT 1),'optional note reviews preserve original prediction');
+SELECT pg_temp.assert_true((SELECT count(*)=1 FROM storage.objects),'rejection without note keeps private photo');
 SELECT pg_temp.assert_true(NOT public.account_can_send('00000000-0000-0000-0000-000000000004',now()+interval '1 day'),'future clock rejected');
 RESET ROLE;
 -- Simulate successful auth deletion after storage cleanup, followed by a lost response.
@@ -80,5 +85,5 @@ DELETE FROM auth.users WHERE id='00000000-0000-0000-0000-000000000002';
 SET LOCAL ROLE service_role;
 SELECT pg_temp.assert_true(public.admin_command('00000000-0000-0000-0000-000000000004','delete_begin','{"id":"00000000-0000-0000-0000-000000000002"}')->>'gone'='true','finished deletion can be retried');
 SELECT pg_temp.assert_true((SELECT count(*)=0 FROM public.photo_reviews),'account deletion cascades reviews');
-SELECT pg_temp.assert_true((SELECT count(*)=2 FROM public.admin_audit WHERE action='review'),'deletion preserves audit');
+SELECT pg_temp.assert_true((SELECT count(*)=4 FROM public.admin_audit WHERE action='review'),'deletion preserves audit');
 ROLLBACK;

@@ -8,7 +8,10 @@ import androidx.lifecycle.viewModelScope
 import br.com.leafcare.LeafCareApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -28,9 +31,12 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
     constructor(application: Application) : this(application, AdminRepository((application as LeafCareApplication).supabaseClientHolder))
     private val mutable = MutableStateFlow(AdminState())
     val state = mutable.asStateFlow()
+    private val invitationEvents = MutableSharedFlow<String>()
+    val invitationLinks = invitationEvents.asSharedFlow()
     private var owner: String? = null
     private var generation = 0
     private var work: Job? = null
+    private var accessWork: Job? = null
     private var filters = JSONObject()
     private val reviewedIds = mutableSetOf<String>()
 
@@ -38,18 +44,28 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
         if (owner != userId) { clear(); owner = userId }
         if (userId != null) checkAccess()
     }
-    fun clear() { generation++; work?.cancel(); mutable.value = AdminState(); owner = null; filters = JSONObject(); reviewedIds.clear() }
+    fun clear() { generation++; work?.cancel(); accessWork?.cancel(); mutable.value = AdminState(); owner = null; filters = JSONObject(); reviewedIds.clear() }
     fun checkAccess() {
+        accessWork?.cancel()
         val revision = generation
-        viewModelScope.launch {
-            try {
-                val policy = api.policy()
-                if (revision == generation) {
-                    if (policy.optString("role") == "superadmin") mutable.value = mutable.value.copy(allowed = true)
-                    else deny()
+        accessWork = viewModelScope.launch {
+            repeat(3) { attempt ->
+                try {
+                    val policy = api.policy()
+                    if (revision == generation) {
+                        if (policy.optString("role") == "superadmin") mutable.value = mutable.value.copy(allowed = true)
+                        else deny()
+                    }
+                    return@launch
+                } catch (e: CancellationException) { throw e }
+                catch (_: AdminAccessException) { if (revision == generation) deny(); return@launch }
+                catch (_: Exception) {
+                    if (revision != generation) return@launch
+                    // A network failure does not revoke a role already verified in this session.
+                    // Every administrative operation still checks the current role on the server.
+                    if (attempt < 2) delay(1_000L * (attempt + 1))
                 }
-            } catch (e: CancellationException) { throw e }
-            catch (_: Exception) { if (revision == generation) deny() }
+            }
         }
     }
     private fun deny() { generation++; work?.cancel(); mutable.value = AdminState(error = "Administração exige conexão e permissão de superadmin.") }
@@ -167,6 +183,11 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
         run {
             if (operation == "review") { saveReview(payload); return@run }
             var result = JSONObject(api.command(operation, payload))
+            if (operation == "invite_link") {
+                val link = result.optString("link")
+                check(link.startsWith("https://")) { "Não foi possível gerar o convite. Tente novamente." }
+                invitationEvents.emit(link)
+            }
             if (operation == "delete") {
                 // The server deletes at most 100 objects per request; cancellation is resumable.
                 while (result.optBoolean("pending")) result = JSONObject(api.command(operation, payload))
@@ -188,4 +209,5 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
         return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
     }
     fun history(id: String) = load("audit", query = JSONObject().put("id", id))
+    fun shareFailed() { mutable.value = mutable.value.copy(error = "Não foi possível abrir o compartilhamento. Tente enviar por e-mail.") }
 }

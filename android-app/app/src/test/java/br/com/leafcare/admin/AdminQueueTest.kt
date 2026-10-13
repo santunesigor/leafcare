@@ -3,10 +3,12 @@ package br.com.leafcare.admin
 import android.app.Application
 import android.graphics.Bitmap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.test.runTest
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -24,8 +26,9 @@ import java.io.ByteArrayOutputStream
 class AdminQueueTest {
     private lateinit var api: FakeAdminApi
     private lateinit var vm: AdminViewModel
+    private val dispatcher = UnconfinedTestDispatcher()
     @Before fun setup() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
+        Dispatchers.setMain(dispatcher)
         api = FakeAdminApi()
         vm = AdminViewModel(Application(), api)
         vm.checkAccess()
@@ -176,6 +179,53 @@ class AdminQueueTest {
         assertNull(vm.state.value.bitmap)
     }
 
+    @Test fun transientPolicyFailureKeepsPreviouslyVerifiedEntry() {
+        api.policyFailure = IllegalStateException("Sem conexão")
+        vm.checkAccess()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.state.value.allowed)
+    }
+    @Test fun initialPolicyFailureRetriesAndRevealsAdminEntry() {
+        vm.clear()
+        api.policyFailuresRemaining = 1
+        vm.checkAccess()
+        assertFalse(vm.state.value.allowed)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.state.value.allowed)
+    }
+    @Test fun explicitPolicyDenialAndAccountChangeClearPreviouslyVerifiedEntry() {
+        api.policyFailure = AdminAccessException("Revogado")
+        vm.checkAccess()
+        assertFalse(vm.state.value.allowed)
+        api.policyFailure = null
+        vm.checkAccess()
+        assertTrue(vm.state.value.allowed)
+        api.policyRole = "user"
+        vm.bind("outra-conta")
+        assertFalse(vm.state.value.allowed)
+    }
+    @Test fun invitationLinkIsEmittedOnceAndNeverStoredInState() = runTest(dispatcher) {
+        vm.load("users")
+        // Generation with no screen listening must not be replayed later.
+        vm.action("invite_link", JSONObject().put("email", "pessoa@exemplo.com"))
+        val received = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.invitationLinks.collect { received += it } }
+        assertTrue(received.isEmpty())
+        vm.action("invite_link", JSONObject().put("email", "pessoa@exemplo.com"))
+        assertEquals(listOf("https://auth.example.test/invite"), received)
+        assertFalse(vm.state.value.toString().contains("https://auth.example.test/invite"))
+    }
+    @Test fun failedInvitationDoesNotEmitLink() = runTest(dispatcher) {
+        vm.load("users")
+        val received = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.invitationLinks.collect { received += it } }
+        api.invitationFailure = true
+        vm.action("invite_link", JSONObject().put("email", "pessoa@exemplo.com"))
+        assertTrue(received.isEmpty())
+        assertNotNull(vm.state.value.error)
+        assertFalse(vm.state.value.busy)
+    }
+
     private class FakeAdminApi : AdminApi {
         val rows = mutableListOf<JSONObject>()
         val saved = mutableListOf<String>()
@@ -184,13 +234,26 @@ class AdminQueueTest {
         var reviewFailure: Exception? = null
         var failedPhoto: String? = null
         var listFailure = false
+        var policyFailure: Exception? = null
+        var policyFailuresRemaining = 0
+        var policyRole = "superadmin"
+        var invitationFailure = false
         private val bytes = ByteArrayOutputStream().also { Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
         fun seed(count: Int, status: String = "pending") {
             repeat(count) { rows += JSONObject().put("id", "photo-$it").put("class_id", "frog_eye").put("review_status", status).put("review_version", 0) }
         }
-        override suspend fun policy() = JSONObject().put("role", "superadmin")
+        override suspend fun policy(): JSONObject {
+            policyFailure?.let { throw it }
+            if (policyFailuresRemaining > 0) { policyFailuresRemaining--; error("Sem conexão") }
+            return JSONObject().put("role", policyRole)
+        }
         override suspend fun photo(id: String): ByteArray { if (failedPhoto == id) error("Não foi possível carregar a foto"); return bytes }
         override suspend fun command(operation: String, payload: JSONObject): String = when (operation) {
+            "users" -> "[]"
+            "invite_link" -> {
+                if (invitationFailure) error("Não foi possível gerar o convite")
+                JSONObject().put("link", "https://auth.example.test/invite").toString()
+            }
             "dashboard" -> {
                 if (listFailure) error("Falha ao buscar painel")
                 JSONObject().put("photos", rows.size).put("reviewed", rows.count { it.optString("review_status") != "pending" }).toString()

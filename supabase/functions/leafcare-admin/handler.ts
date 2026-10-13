@@ -5,7 +5,7 @@ export class ApiError extends Error {
 }
 export type Dependencies = { client: SupabaseClient;  };
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
-const externalActions = new Set(['invite', 'reinvite', 'recovery', 'delete']);
+const externalActions = new Set(['invite', 'invite_link', 'reinvite', 'recovery', 'delete']);
 const rpcActions = new Set(['dashboard', 'users', 'photos', 'photo', 'audit', 'review', 'role', 'pause']);
 
 export function makeHandler({ client }: Dependencies) {
@@ -40,9 +40,18 @@ export function makeHandler({ client }: Dependencies) {
         return new Response(data, { headers: { 'Content-Type': data.type || 'image/jpeg', 'Cache-Control': 'no-store' } });
       }
       if (rpcActions.has(operation)) return json(await command(operation, payload));
-      if (operation === 'invite') {
+      if (operation === 'invite' || operation === 'invite_link') {
         const email = String(payload.email ?? '').trim();
         if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ApiError(400, 'E-mail inválido');
+        if (operation === 'invite_link') {
+          const { data, error: failure } = await client.auth.admin.generateLink({
+            type: 'invite', email, options: { redirectTo: 'leafcare://auth/reset-password' },
+          });
+          if (failure || !data?.properties?.action_link || !data.user?.id) throw new ApiError(400, 'Não foi possível gerar o convite. Confira o e-mail e tente novamente.');
+          // Do not log or audit the link: it grants access to the invited account.
+          await command('record_event', { id: data.user.id, action: 'invite' });
+          return json({ link: data.properties.action_link });
+        }
         const { data, error: failure } = await client.auth.admin.inviteUserByEmail(email, { redirectTo: 'leafcare://auth/reset-password' });
         if (failure) throw new ApiError(400, 'Não foi possível enviar o convite. Confira a conta e tente novamente.');
         await command('record_event', { id: data.user.id, action: 'invite' });
