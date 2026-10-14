@@ -34,7 +34,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable internal fun UserDetails(actions: AdminActions, row: JSONObject, busy: Boolean, error: String?) {
+@Composable internal fun UserDetails(actions: AdminActions, row: JSONObject, state: AdminState) {
+    val busy = state.busy
+    val error = state.error
+    val manageable = canManageAccount(state, row)
+    var chosenRole by remember(row) { mutableStateOf(row.optString("role")) }
     var confirmation by remember(row) { mutableStateOf("") }
     var operation by remember(row) { mutableStateOf<String?>(null) }
     val deleting = row.optBoolean("deletion_pending")
@@ -51,14 +55,15 @@ import org.json.JSONObject
                     Text(when(action) {
                         "delete" -> "Exclui conta, análises, revisões e fotos remotas. Cópias em aparelhos offline permanecem. Digite o e-mail da conta para confirmar."
                         "pause" -> if (row.optBoolean("uploads_enabled")) "Login, uso local e leitura continuam. Novos envios ficarão pausados." else "Só resultados novos poderão ser enviados. O acumulado fica local."
-                        "role" -> "Esta permissão dá acesso completo à administração de contas e fotos."
+                        "role" -> "Admin revisa fotos. Superadmin gerencia admins e usuários. Apenas o proprietário gerencia superadmins; sua conta permanece protegida."
                         else -> "As instruções serão enviadas por e-mail para esta conta."
                     }, color = LeafColors.Muted)
+                    if (action == "role") Choice("Novo papel", chosenRole, roleChoices(state.role), !busy) { chosenRole = it }
                     if (action == "delete") OutlinedTextField(confirmation, { confirmation = it }, label = { Text("E-mail da conta") }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
                 }
-                Button(enabled = !busy && (action != "delete" || confirmation.equals(row.label("email"), true)), onClick = {
+                Button(enabled = manageable && !busy && (action != "role" || chosenRole != row.optString("role")) && (action != "delete" || confirmation.equals(row.label("email"), true)), onClick = {
                     actions.action(action, JSONObject().put("id", row.getString("id")).put("enabled", !row.optBoolean("uploads_enabled"))
-                        .put("role", if (row.optString("role") == "superadmin") "user" else "superadmin").put("confirmation", confirmation)); operation = null
+                        .put("role", chosenRole).put("confirmation", confirmation)); operation = null
                 }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (action == "delete") MaterialTheme.colorScheme.error else LeafColors.Green)) { Text(if (action == "delete") "Excluir conta" else "Confirmar") }
                 TextButton(onClick = { operation = null }, modifier = Modifier.fillMaxWidth()) { Text("Cancelar") }
@@ -79,7 +84,7 @@ import org.json.JSONObject
                 item {
                     AdminPanel {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AdminBadge(if (row.optString("role") == "superadmin") "Superadmin" else "Usuário")
+                            AdminBadge(roleLabel(row.optString("role")))
                             AdminBadge(if (deleting) "Exclusão pendente" else if (row.optBoolean("uploads_enabled")) "Envios ativos" else "Envios pausados")
                         }
                         DetailLine("Cadastro", adminDate(row.label("created_at")))
@@ -88,30 +93,33 @@ import org.json.JSONObject
                         Text("${row.optInt("analyses")} análises  ·  ${row.optInt("photos")} fotos", color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
                     }
                 }
+                if (!manageable) item {
+                    AdminNotice(if (state.hierarchyVersion < 1) "A gestão de contas exige a atualização de permissões no servidor." else "Conta protegida. Você pode consultar seus dados, mas não alterar uma conta do mesmo nível, superior ou a sua própria.")
+                }
                 item {
                     AdminPanel {
                         AdminSectionTitle("Acesso e sincronização")
-                        AccountAction(if (row.optBoolean("uploads_enabled")) "Pausar envios" else "Liberar novos envios", "Login e uso offline continuam disponíveis", Icons.Outlined.Sync, !busy && !deleting) { operation = "pause" }
+                        AccountAction(if (row.optBoolean("uploads_enabled")) "Pausar envios" else "Liberar novos envios", "Login e uso offline continuam disponíveis", Icons.Outlined.Sync, !busy && !deleting && manageable) { operation = "pause" }
                         HorizontalDivider(color = LeafColors.Border)
-                        AccountAction(if (row.optString("role") == "superadmin") "Remover superadmin" else "Tornar superadmin", "Permissão para gerir contas e revisar fotos", Icons.Outlined.AdminPanelSettings, !busy && !deleting) { operation = "role" }
+                        AccountAction("Alterar papel", "Escolha o nível de acesso desta pessoa", Icons.Outlined.AdminPanelSettings, !busy && !deleting && manageable) { operation = "role" }
                     }
                 }
                 item {
                     AdminPanel {
                         AdminSectionTitle("Conta")
-                        AccountAction("Reenviar convite / acesso", "Enviar instruções por e-mail", Icons.Outlined.MailOutline, !busy && !deleting) { operation = "reinvite" }
+                        AccountAction("Reenviar convite / acesso", "Enviar instruções por e-mail", Icons.Outlined.MailOutline, !busy && !deleting && manageable) { operation = "reinvite" }
                         HorizontalDivider(color = LeafColors.Border)
-                        AccountAction("Recuperar senha", "O usuário escolhe a nova senha", Icons.Outlined.LockReset, !busy && !deleting) { operation = "recovery" }
+                        AccountAction("Recuperar senha", "O usuário escolhe a nova senha", Icons.Outlined.LockReset, !busy && !deleting && manageable) { operation = "recovery" }
                         HorizontalDivider(color = LeafColors.Border)
                         AccountAction("Ver atividades", "Histórico de ações desta conta", Icons.Outlined.History, !busy) { actions.history(row.getString("id")) }
                     }
                 }
                 item {
                     AdminPanel {
-                        AccountAction(if (deleting) "Retomar exclusão" else "Excluir conta e dados", "Remove os registros e as fotos remotas", Icons.Outlined.DeleteOutline, !busy, danger = true) { operation = "delete" }
+                        AccountAction(if (deleting) "Retomar exclusão" else "Excluir conta e dados", "Remove os registros e as fotos remotas", Icons.Outlined.DeleteOutline, !busy && manageable, danger = true) { operation = "delete" }
                     }
                 }
-                item { SelectionContainer { Text("Identificador: ${row.label("id")}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted) } }
+                item { SelectionContainer { Text("Conta: ${shortId(row.label("id"))}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted) } }
             }
         }
     }

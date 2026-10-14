@@ -56,6 +56,7 @@ internal data class AdminActions(
     val movePhoto: (Int) -> Unit = {},
     val nextPhoto: () -> Unit = {},
     val retryPhoto: () -> Unit = {},
+    val thumbnail: suspend (String) -> android.graphics.Bitmap? = { null },
 )
 
 @Composable
@@ -79,6 +80,7 @@ internal fun AdminScreen(vm: AdminViewModel, onBack: () -> Unit) {
         page = vm::page, select = vm::select, action = vm::action, history = vm::history,
         closeDetails = vm::closeDetails, checkAccess = vm::checkAccess, back = onBack,
         movePhoto = vm::movePhoto, nextPhoto = vm::nextPhoto, retryPhoto = vm::retryPhoto,
+        thumbnail = vm::thumbnail,
     ))
 }
 
@@ -91,6 +93,11 @@ internal fun AdminContent(
     var inviteEmail by rememberSaveable { mutableStateOf("") }
     val validInviteEmail = Patterns.EMAIL_ADDRESS.matcher(inviteEmail.trim()).matches()
     val openTriage = { actions.load("triage", JSONObject()) }
+    val openGallery: (JSONObject) -> Unit = { actions.load("gallery", it) }
+    if (state.allowed && state.section == "gallery") {
+        PhotoGallery(state, actions, classes, catalog)
+        return
+    }
     if (state.allowed && state.section == "photos") {
         ReviewQueue(state, actions, classes, catalog)
         return
@@ -103,7 +110,7 @@ internal fun AdminContent(
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
                 Text("LEAFCARE", color = LeafColors.Green, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
                 Text("Administração", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("Contas, fotos e revisões", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+                Text(roleLabel(state.role), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
             }
             IconButton(onClick = actions.refresh, enabled = state.allowed && !state.busy) { Icon(Icons.Outlined.Refresh, "Atualizar administração", tint = LeafColors.Green) }
         }
@@ -113,7 +120,7 @@ internal fun AdminContent(
             return@Column
         }
         Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("dashboard" to "Resumo", "users" to "Usuários", "triage" to "Triagem", "audit" to "Atividades").forEach { (id, title) ->
+            (listOf("dashboard" to "Resumo") + (if (state.managesAccounts) listOf("users" to "Usuários") else emptyList()) + listOf("triage" to "Triagem", "audit" to "Atividades")).forEach { (id, title) ->
                 val selected = state.section == id
                 val icon = when (id) { "dashboard" -> Icons.Outlined.Dashboard; "users" -> Icons.Outlined.PeopleAlt; "triage" -> Icons.Outlined.Eco; else -> Icons.Outlined.History }
                 Surface(onClick = { actions.load(id, JSONObject()) }, enabled = !state.busy,
@@ -135,8 +142,9 @@ internal fun AdminContent(
                     AdminEmpty(if (state.busy) "Carregando painel…" else "Painel indisponível", if (state.busy) "Buscando os totais de fotos e revisões." else "Confira sua conexão e atualize para tentar novamente.", Icons.Outlined.CloudSync)
                     if (!state.busy) OutlinedButton(onClick = actions.refresh, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Tentar novamente") }
                 } else if (state.section == "triage") {
-                    triageDashboard(state.dashboard, catalog, state.busy) { query -> actions.load("photos", query) }
-                } else item { AdminDashboard(state.dashboard, catalog, state.busy, openTriage) }
+                    triageDashboard(state.dashboard, catalog, state.busy,
+                        evaluate = { actions.load("photos", JSONObject().put("status", "pending")) }, open = openGallery)
+                } else item { AdminDashboard(state.dashboard, catalog, state.busy, openTriage, openGallery, state.managesAccounts) { actions.load("users", JSONObject()) } }
             } else {
                 item {
                     if (state.section == "users") {
@@ -194,7 +202,7 @@ internal fun AdminContent(
         }
     }
     if (state.allowed) state.selected?.let { row ->
-        if (state.section == "users") UserDetails(actions, row, state.busy, state.error)
+        if (state.section == "users") UserDetails(actions, row, state)
     }
 }
 

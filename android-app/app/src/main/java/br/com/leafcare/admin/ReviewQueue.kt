@@ -33,14 +33,6 @@ import org.json.JSONObject
 
 @Composable internal fun ReviewQueue(state: AdminState, actions: AdminActions, classes: List<String>, catalog: DiseaseCatalog) {
     var filtersOpen by remember { mutableStateOf(false) }
-    val query = remember(state.photoQuery) { JSONObject(state.photoQuery) }
-    var status by rememberSaveable(state.photoQuery) { mutableStateOf(state.photoFilterStatus) }
-    var classFilter by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("class_id")) }
-    var model by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("model")) }
-    var user by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("user_id")) }
-    var from by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("from")) }
-    var until by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("until")) }
-    var advancedFilters by rememberSaveable(state.photoQuery) { mutableStateOf(model.isNotBlank() || user.isNotBlank()) }
     val back = { if (!state.busy) actions.load("triage", JSONObject()) }
     BackHandler(onBack = back)
     Column(Modifier.fillMaxSize().background(LeafColors.Pale)) {
@@ -74,26 +66,7 @@ import org.json.JSONObject
             }
         }
     }
-    if (filtersOpen) AdminSheet("Filtrar fotos", { filtersOpen = false }, footer = {
-        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { filtersOpen = false }) { Text("Cancelar") }
-            Button(onClick = {
-                filtersOpen = false
-                actions.load("photos", JSONObject().put("status", status).put("class_id", classFilter)
-                    .put("model", model.trim()).put("user_id", user.trim()).put("from", from.trim()).put("until", until.trim()))
-            }, enabled = !state.busy, modifier = Modifier.weight(1f)) { Text("Aplicar filtros") }
-        }
-    }) {
-        item { Choice("Situação", status, reviewStatuses) { status = it } }
-        item { Choice("Classe prevista", classFilter, linkedMapOf("" to "Todas") + classes.associateWith { catalog.get(it).name }) { classFilter = it } }
-        item { OutlinedTextField(from, { from = it }, label = { Text("De (AAAA-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-        item { OutlinedTextField(until, { until = it }, label = { Text("Até (AAAA-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-        item { TextButton(onClick = { advancedFilters = !advancedFilters }) { Text(if (advancedFilters) "Menos filtros" else "Mais filtros"); Icon(if (advancedFilters) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null) } }
-        if (advancedFilters) {
-            item { OutlinedTextField(user, { user = it }, label = { Text("Identificador do usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(model, { model = it }, label = { Text("Identificador do modelo") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-        }
-    }
+    if (filtersOpen) PhotoFilterSheet(state, classes, catalog, { filtersOpen = false }) { actions.load("photos", it) }
 }
 
 @Composable private fun ReviewPage(row: JSONObject, state: AdminState, actions: AdminActions, classes: List<String>, catalog: DiseaseCatalog, index: Int) {
@@ -194,10 +167,10 @@ import org.json.JSONObject
         item { SelectionContainer { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Enviada por: ${row.label("email")}")
             Text("Data: ${adminDate(row.label("created_at"))}")
-            Text("Modelo de origem: ${row.label("model_sha256")}")
+            Text("Modelo de origem: ${shortId(row.label("model_sha256"))}")
             if (!row.isNull("reviewed_at")) {
                 Text("Última revisão: ${adminDate(row.label("reviewed_at"))}")
-                Text("Revisor: ${row.label("reviewer_id")}")
+                Text("Revisor: ${shortId(row.label("reviewer_id"))}")
                 Text("Classe revisada: ${catalog.get(row.optString("reviewed_class").takeIf { it in classes } ?: row.getString("class_id")).name}")
                 Text("Observação: ${row.label("note")}")
             }
@@ -235,7 +208,7 @@ import org.json.JSONObject
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun AdminSheet(
     title: String, onClose: () -> Unit, dismissEnabled: Boolean = true, heightFraction: Float = .94f,
-    footer: @Composable () -> Unit = { TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(8.dp)) { Text("Fechar") } },
+    footer: @Composable () -> Unit = { TextButton(onClick = onClose, enabled = dismissEnabled, modifier = Modifier.fillMaxWidth().padding(8.dp)) { Text("Fechar") } },
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = { if (dismissEnabled) onClose() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { dismissEnabled || it != SheetValue.Hidden }),

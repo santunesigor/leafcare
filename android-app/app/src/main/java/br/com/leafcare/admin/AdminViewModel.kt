@@ -3,11 +3,16 @@ package br.com.leafcare.admin
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.LruCache
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.leafcare.LeafCareApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -26,7 +31,11 @@ internal data class AdminState(
     val reviewedCount: Int = 0, val reviewConflict: Boolean = false,
     val photoFilterStatus: String = "pending",
     val photoQuery: String = "{}",
-)
+    val role: String = "", val accountId: String? = null, val hierarchyVersion: Int = 0,
+    val galleryOrigin: String = "triage",
+) {
+    val managesAccounts: Boolean get() = role in setOf("owner", "superadmin")
+}
 internal class AdminViewModel(application: Application, private val api: AdminApi) : AndroidViewModel(application) {
     constructor(application: Application) : this(application, AdminRepository((application as LeafCareApplication).supabaseClientHolder))
     private val mutable = MutableStateFlow(AdminState())
@@ -39,12 +48,17 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
     private var accessWork: Job? = null
     private var filters = JSONObject()
     private val reviewedIds = mutableSetOf<String>()
+    private val thumbnailSlots = Semaphore(3)
+    private val thumbnails = object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap) = value.byteCount
+    }
+    private var imageGeneration = 0
 
     fun bind(userId: String?) {
         if (owner != userId) { clear(); owner = userId }
         if (userId != null) checkAccess()
     }
-    fun clear() { generation++; work?.cancel(); accessWork?.cancel(); mutable.value = AdminState(); owner = null; filters = JSONObject(); reviewedIds.clear() }
+    fun clear() { generation++; imageGeneration++; thumbnails.evictAll(); work?.cancel(); accessWork?.cancel(); mutable.value = AdminState(); owner = null; filters = JSONObject(); reviewedIds.clear() }
     fun checkAccess() {
         accessWork?.cancel()
         val revision = generation
@@ -53,8 +67,15 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
                 try {
                     val policy = api.policy()
                     if (revision == generation) {
-                        if (policy.optString("role") == "superadmin") mutable.value = mutable.value.copy(allowed = true)
-                        else deny()
+                        val role = policy.optString("role")
+                        if (role in setOf("admin", "superadmin", "owner")) {
+                            if (mutable.value.allowed && role != mutable.value.role) {
+                                generation++; imageGeneration++; work?.cancel(); thumbnails.evictAll()
+                                mutable.value = AdminState()
+                            }
+                            mutable.value = mutable.value.copy(allowed = true, role = role,
+                                accountId = policy.optString("user_id").ifBlank { owner }, hierarchyVersion = policy.optInt("hierarchy_version"))
+                        } else deny()
                     }
                     return@launch
                 } catch (e: CancellationException) { throw e }
@@ -68,7 +89,7 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
             }
         }
     }
-    private fun deny() { generation++; work?.cancel(); mutable.value = AdminState(error = "Administração exige conexão e permissão de superadmin.") }
+    private fun deny() { generation++; imageGeneration++; thumbnails.evictAll(); work?.cancel(); mutable.value = AdminState(error = "Administração exige conexão e permissão administrativa.") }
     private fun run(block: suspend () -> Unit) {
         if (mutable.value.busy) return
         val revision = generation
@@ -84,15 +105,19 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
     }
     fun load(section: String = mutable.value.section, page: Int = 0, query: JSONObject = if (section == "photos") JSONObject().put("status", "pending") else JSONObject()) {
         if (mutable.value.busy) return
+        if (section == "users" && !mutable.value.managesAccounts) return
         val overview = section == "dashboard" || section == "triage"
         if (overview) mutable.value = mutable.value.copy(section = section, selected = null, bitmap = null, dashboard = JSONObject())
         run {
             val payload = JSONObject(query.toString()).put("page", page)
-            val result = api.command(if (overview) "dashboard" else section, payload)
+            val result = api.command(if (overview) "dashboard" else if (section == "gallery") "photos" else section, payload)
+            val origin = if (mutable.value.section in setOf("dashboard", "triage")) mutable.value.section else mutable.value.galleryOrigin
+            imageGeneration++; thumbnails.evictAll()
             filters = query
             reviewedIds.clear()
             mutable.value = mutable.value.copy(section = section, page = page, selected = null, bitmap = null,
-                photoIndex = 0, photoId = null, reviewedCount = 0, reviewConflict = false,
+                photoIndex = 0, photoId = null, reviewedCount = 0, reviewConflict = false, galleryOrigin = origin,
+                photoFilterStatus = query.optString("status"), photoQuery = query.toString(),
                 dashboard = if (overview) JSONObject(result) else mutable.value.dashboard,
                 rows = if (overview) emptyList() else JSONArray(result).let { array -> List(array.length()) { array.getJSONObject(it) } })
             if (section == "photos") {
@@ -106,7 +131,26 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
     fun select(row: JSONObject) {
         if (mutable.value.section == "photos") { movePhoto(mutable.value.rows.indexOfFirst { it.optString("id") == row.optString("id") }); return }
         run {
-            mutable.value = mutable.value.copy(selected = row)
+            mutable.value = mutable.value.copy(selected = row, bitmap = null)
+            if (mutable.value.section == "gallery") {
+                val bitmap = decodePhoto(api.photo(row.getString("id")), 2048) ?: error("Foto inválida. Tente novamente.")
+                mutable.value = mutable.value.copy(bitmap = bitmap)
+            }
+        }
+    }
+    suspend fun thumbnail(id: String): Bitmap? {
+        if (!mutable.value.allowed) return null
+        val revision = generation
+        val images = imageGeneration
+        thumbnails.get(id)?.let { return it }
+        return thumbnailSlots.withPermit {
+            try {
+                if (revision != generation || images != imageGeneration || !mutable.value.allowed) return@withPermit null
+                val bytes = api.photo(id)
+                val image = withContext(Dispatchers.Default) { decodePhoto(bytes, 384) }
+                if (revision != generation || images != imageGeneration || !mutable.value.allowed) return@withPermit null
+                image?.also { thumbnails.put(id, it) }
+            } catch (e: AdminAccessException) { if (revision == generation) deny(); throw e }
         }
     }
     fun closeDetails() { mutable.value = mutable.value.copy(selected = null, bitmap = null) }

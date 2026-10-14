@@ -27,7 +27,7 @@ import br.com.leafcare.ui.LeafColors
 import org.json.JSONObject
 
 /** Counts come from the full remote overview, never from the current 20-photo batch. */
-internal fun LazyListScope.triageDashboard(data: JSONObject, catalog: DiseaseCatalog, busy: Boolean, open: (JSONObject) -> Unit) {
+internal fun LazyListScope.triageDashboard(data: JSONObject, catalog: DiseaseCatalog, busy: Boolean, evaluate: () -> Unit, open: (JSONObject) -> Unit) {
     val total = data.optInt("photos").coerceAtLeast(0)
     val reviewed = data.optInt("reviewed").coerceIn(0, total)
     val pending = total - reviewed
@@ -44,7 +44,7 @@ internal fun LazyListScope.triageDashboard(data: JSONObject, catalog: DiseaseCat
                 }
                 Text("$pending", color = Color.White, fontSize = 48.sp, lineHeight = 54.sp, fontWeight = FontWeight.ExtraBold)
                 Text(when { total == 0 -> "As fotos aparecerão aqui quando chegarem."; pending == 0 -> "Tudo em dia. Todas as fotos receberam uma revisão."; pending == 1 -> "Uma folha precisa do seu olhar."; else -> "Folhas prontas para receber o seu olhar." }, color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = { open(JSONObject().put("status", "pending")) }, enabled = !busy && pending > 0,
+                Button(onClick = evaluate, enabled = !busy && pending > 0,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF194C2B), disabledContainerColor = Color.White.copy(alpha = .15f), disabledContentColor = Color.White)) {
                     Text(if (pending == 0) "Nenhuma pendência" else "Avaliar pendentes", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
@@ -69,7 +69,7 @@ internal fun LazyListScope.triageDashboard(data: JSONObject, catalog: DiseaseCat
             Text("$reviewed de $total fotos revisadas", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
         }
     }
-    item { AdminSectionTitle("Consultar avaliações", "Escolha a situação que deseja revisar") }
+    item { AdminSectionTitle("Consultar avaliações", "Veja as fotos em galeria, sem alterar a avaliação") }
     item {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

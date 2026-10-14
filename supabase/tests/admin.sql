@@ -29,8 +29,8 @@ SELECT pg_temp.assert_true((SELECT class_id='frog_eye' FROM public.analyses LIMI
 SELECT pg_temp.assert_true((SELECT class_id='healthy' AND version=1 FROM public.photo_reviews LIMIT 1),'human correction saved');
 DO $$ BEGIN
  BEGIN PERFORM public.admin_command('00000000-0000-0000-0000-000000000001','review','{"id":"00000000-0000-0000-0000-000000000003","version":0,"status":"confirmed"}'); RAISE EXCEPTION 'stale overwrite'; EXCEPTION WHEN serialization_failure THEN NULL; END;
- BEGIN PERFORM public.admin_command('00000000-0000-0000-0000-000000000001','role','{"id":"00000000-0000-0000-0000-000000000001","role":"user"}'); RAISE EXCEPTION 'last admin removed'; EXCEPTION WHEN raise_exception THEN IF SQLERRM='last admin removed' THEN RAISE; END IF; END;
- BEGIN PERFORM public.admin_command('00000000-0000-0000-0000-000000000001','delete_begin','{"id":"00000000-0000-0000-0000-000000000001","confirmation":"admin@test.local"}'); RAISE EXCEPTION 'self deleted'; EXCEPTION WHEN raise_exception THEN IF SQLERRM='self deleted' THEN RAISE; END IF; END;
+ BEGIN PERFORM public.admin_command('00000000-0000-0000-0000-000000000001','role','{"id":"00000000-0000-0000-0000-000000000001","role":"user"}'); RAISE EXCEPTION 'last admin removed'; EXCEPTION WHEN SQLSTATE 'LC403' THEN IF SQLERRM='last admin removed' THEN RAISE; END IF; END;
+ BEGIN PERFORM public.admin_command('00000000-0000-0000-0000-000000000001','delete_begin','{"id":"00000000-0000-0000-0000-000000000001","confirmation":"admin@test.local"}'); RAISE EXCEPTION 'self deleted'; EXCEPTION WHEN SQLSTATE 'LC403' THEN IF SQLERRM='self deleted' THEN RAISE; END IF; END;
 END $$;
 SELECT public.admin_command('00000000-0000-0000-0000-000000000001','pause','{"id":"00000000-0000-0000-0000-000000000002","enabled":false}');
 RESET ROLE;
@@ -64,7 +64,7 @@ SELECT pg_temp.assert_true((SELECT deletion_pending FROM public.account_controls
 -- A demoted actor loses access immediately, independent of JWT claims.
 RESET ROLE;
 INSERT INTO auth.users(id,email) VALUES('00000000-0000-0000-0000-000000000004','second@test.local');
-UPDATE public.account_controls SET role='superadmin' WHERE user_id='00000000-0000-0000-0000-000000000004';
+UPDATE public.account_controls SET role='owner' WHERE user_id='00000000-0000-0000-0000-000000000004';
 SET LOCAL ROLE service_role;
 SELECT public.admin_command('00000000-0000-0000-0000-000000000004','role','{"id":"00000000-0000-0000-0000-000000000001","role":"user"}');
 DO $$ BEGIN

@@ -40,10 +40,11 @@ internal class AdminRepository(private val holder: SupabaseClientHolder) : Admin
             connection.setRequestProperty("Cache-Control", "no-store")
             connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             val status = connection.responseCode
-            if (status == 401 || status == 403) throw AdminAccessException("Sem acesso administrativo. Entre novamente ou confira sua permissão.")
             if (status !in 200..299) {
                 val error = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                val code = runCatching { JSONObject(error).optString("code") }.getOrDefault("")
                 val message = runCatching { JSONObject(error).optString("error") }.getOrDefault("")
+                if (status == 401 || (status == 403 && code != "operation_forbidden")) throw AdminAccessException("Sem acesso administrativo. Entre novamente ou confira sua permissão.")
                 if (status == 409) throw AdminReviewConflictException(message.ifBlank { "Revisão mudou; recarregue antes de salvar" })
                 throw IllegalStateException(message.ifBlank { "Serviço indisponível. Confira a conexão e tente novamente." })
             }

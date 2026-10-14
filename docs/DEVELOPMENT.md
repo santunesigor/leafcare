@@ -62,4 +62,4 @@ O APK 1.2.0 usa MobileNetV4 Small destilado. Para validar o bundle: `python vali
 
 ## Backend administrativo
 
-Para validar sem usar produção: `bash supabase/tests/run-local.sh` (Docker/PostgreSQL 18) e `npx --yes deno test supabase/functions/leafcare-admin/handler_test.ts` (Deno 2.9.6). Publicação e bootstrap separados em [SUPERADMIN.md](SUPERADMIN.md).
+Para validar sem usar produção: `bash supabase/tests/run-local.sh` (Docker/PostgreSQL 18) e `npx --yes deno test supabase/functions/leafcare-admin/handler_test.ts` (Deno 2.9.6). Sem Docker, `bash supabase/tests/run-pglite.sh` usa Node/npm e PostgreSQL 18 em WASM, também verificando a migração da hierarquia. Publicação, papéis e bootstrap do proprietário em [SUPERADMIN.md](SUPERADMIN.md).

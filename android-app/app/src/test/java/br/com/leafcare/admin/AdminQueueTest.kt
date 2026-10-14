@@ -226,6 +226,78 @@ class AdminQueueTest {
         assertFalse(vm.state.value.busy)
     }
 
+    @Test fun galleryLoadsRowsWithoutStartingTriageAndKeepsFiltersAndPageAfterDetails() {
+        api.seed(25, "confirmed")
+        vm.load("gallery", query = JSONObject().put("status", "confirmed").put("class_id", "frog_eye"))
+        assertEquals("gallery", vm.state.value.section)
+        assertNull(vm.state.value.photoId)
+        assertEquals(0, api.photoRequests)
+        vm.page(1)
+        assertEquals(5, vm.state.value.rows.size)
+        vm.select(vm.state.value.rows[0])
+        assertNotNull(vm.state.value.bitmap)
+        vm.closeDetails()
+        assertNull(vm.state.value.selected)
+        assertNull(vm.state.value.bitmap)
+        assertEquals(1, vm.state.value.page)
+        assertEquals("confirmed", JSONObject(vm.state.value.photoQuery).getString("status"))
+        assertEquals("frog_eye", api.queries.last().getString("class_id"))
+        assertTrue(api.saved.isEmpty())
+    }
+    @Test fun galleryCanRetryFailedDetailWithoutLosingSelection() {
+        api.seed(1)
+        vm.load("gallery")
+        api.failedPhoto = "photo-0"
+        vm.select(vm.state.value.rows[0])
+        assertNotNull(vm.state.value.error)
+        assertNotNull(vm.state.value.selected)
+        api.failedPhoto = null
+        vm.select(vm.state.value.selected!!)
+        assertNotNull(vm.state.value.bitmap)
+        assertNull(vm.state.value.error)
+    }
+    @Test fun thumbnailCacheIsMemoryOnlyAndClearedOnLogout() = kotlinx.coroutines.runBlocking {
+        val first = vm.thumbnail("photo-0")
+        assertNotNull(first)
+        assertSame(first, vm.thumbnail("photo-0"))
+        assertEquals(1, api.photoRequests)
+        vm.clear()
+        assertNull(vm.thumbnail("photo-0"))
+        vm.checkAccess()
+        assertTrue(vm.state.value.toString(), vm.state.value.allowed)
+        val next = vm.thumbnail("photo-0")
+        assertNotNull(next)
+        assertNotSame(first, next)
+        assertEquals(2, api.photoRequests)
+    }
+    @Test fun pendingThumbnailCannotReturnAfterAccountChanges() = runTest(dispatcher) {
+        val gate = kotlinx.coroutines.CompletableDeferred<ByteArray>()
+        api.photoGate = gate
+        var image: Bitmap? = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val task = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { image = vm.thumbnail("photo-0") }
+        vm.clear()
+        gate.complete(ByteArray(0))
+        task.join()
+        assertNull(image)
+        assertFalse(vm.state.value.allowed)
+    }
+    @Test fun adminRoleCanReviewButDowngradeClearsAccountDetails() {
+        vm.load("users")
+        vm.select(JSONObject().put("id", "other"))
+        api.policyRole = "admin"
+        vm.checkAccess()
+        assertTrue(vm.state.value.allowed)
+        assertEquals("admin", vm.state.value.role)
+        assertNull(vm.state.value.selected)
+        assertEquals("dashboard", vm.state.value.section)
+        vm.load("users")
+        assertEquals("dashboard", vm.state.value.section)
+        api.seed(1)
+        open()
+        save()
+        assertEquals(1, api.saved.size)
+    }
+
     private class FakeAdminApi : AdminApi {
         val rows = mutableListOf<JSONObject>()
         val saved = mutableListOf<String>()
@@ -238,6 +310,8 @@ class AdminQueueTest {
         var policyFailuresRemaining = 0
         var policyRole = "superadmin"
         var invitationFailure = false
+        var photoRequests = 0
+        var photoGate: kotlinx.coroutines.CompletableDeferred<ByteArray>? = null
         private val bytes = ByteArrayOutputStream().also { Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
         fun seed(count: Int, status: String = "pending") {
             repeat(count) { rows += JSONObject().put("id", "photo-$it").put("class_id", "frog_eye").put("review_status", status).put("review_version", 0) }
@@ -245,9 +319,9 @@ class AdminQueueTest {
         override suspend fun policy(): JSONObject {
             policyFailure?.let { throw it }
             if (policyFailuresRemaining > 0) { policyFailuresRemaining--; error("Sem conexão") }
-            return JSONObject().put("role", policyRole)
+            return JSONObject().put("role", policyRole).put("hierarchy_version", 1).put("user_id", "current-account")
         }
-        override suspend fun photo(id: String): ByteArray { if (failedPhoto == id) error("Não foi possível carregar a foto"); return bytes }
+        override suspend fun photo(id: String): ByteArray { photoRequests++; photoGate?.let { return it.await() }; if (failedPhoto == id) error("Não foi possível carregar a foto"); return bytes }
         override suspend fun command(operation: String, payload: JSONObject): String = when (operation) {
             "users" -> "[]"
             "invite_link" -> {

@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public code?: string) { super(message); }
 }
 export type Dependencies = { client: SupabaseClient;  };
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -25,13 +25,14 @@ export function makeHandler({ client }: Dependencies) {
       const command = async (op: string, data: Record<string, unknown> = {}) => {
         const result = await client.rpc('admin_command', { actor_id: user.id, operation: op, payload: data });
         if (result.error) {
-          const status = result.error.code === '42501' ? 403 : result.error.code === '40001' ? 409 : 400;
-          throw new ApiError(status, result.error.code === '42501' ? 'Acesso administrativo negado' : result.error.message);
+          const status = ['42501', 'LC403'].includes(result.error.code) ? 403 : result.error.code === '40001' ? 409 : 400;
+          throw new ApiError(status, result.error.code === '42501' ? 'Acesso administrativo negado' : result.error.message,
+            result.error.code === 'LC403' ? 'operation_forbidden' : undefined);
         }
         return result.data;
       };
       // No action can use the service client before current-role verification.
-      await command('authorize');
+      await command('authorize', { ...payload, operation });
       if (operation === 'photo') {
         const row = await command('photo', { id: payload.id });
         if (!row.object_path) throw new ApiError(404, 'Foto indisponível');
@@ -73,27 +74,30 @@ export function makeHandler({ client }: Dependencies) {
         try {
           // Batch deletion is resumable; always list from offset zero after removing a batch.
           const bucket = client.storage.from('analysis-photos');
+          await command('authorize', { id: payload.id, operation: 'delete' });
           const { data: objects, error: listingError } = await bucket.list(payload.id, { limit: 100, offset: 0 });
           if (listingError) throw listingError;
           if (objects?.length) {
+            await command('authorize', { id: payload.id, operation: 'delete' });
             const { error: removeError } = await bucket.remove(objects.map(o => `${payload.id}/${o.name}`));
             if (removeError) throw removeError;
             return json({ pending: true });
           }
           // Recheck the caller before each destructive service operation.
-          await command('authorize');
+          await command('authorize', { id: payload.id, operation: 'delete' });
           const { error: deleteError } = await client.auth.admin.deleteUser(payload.id);
           if (deleteError) throw deleteError;
           await command('record_event', { id: payload.id, action: 'delete_complete' });
           return json({ pending: false });
-        } catch {
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 403) throw error;
           await command('record_event', { id: payload.id, action: 'delete_failed' });
           throw new ApiError(503, 'Exclusão parcial. A conta está marcada; use Retomar exclusão.');
         }
       }
       throw new ApiError(400, 'Operação inválida');
     } catch (error) {
-      if (error instanceof ApiError) return json({ error: error.message }, error.status);
+      if (error instanceof ApiError) return json({ error: error.message, ...(error.code ? { code: error.code } : {}) }, error.status);
       return json({ error: 'Falha ao processar a operação. Tente novamente.' }, 500);
     }
   };

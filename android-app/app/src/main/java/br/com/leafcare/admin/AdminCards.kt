@@ -64,59 +64,76 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
         Text(subtitle, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
-@Composable internal fun AdminDashboard(data: JSONObject, catalog: DiseaseCatalog, busy: Boolean, onReview: () -> Unit) {
-    val pending = (data.optInt("photos") - data.optInt("reviewed")).coerceAtLeast(0)
+@Composable internal fun AdminDashboard(data: JSONObject, catalog: DiseaseCatalog, busy: Boolean, onReview: () -> Unit,
+    browse: (JSONObject) -> Unit, managesAccounts: Boolean, users: () -> Unit) {
+    val total = data.optInt("photos")
+    val reviewed = data.optInt("reviewed")
+    val pending = (total - reviewed).coerceAtLeast(0)
+    val statuses = data.optJSONObject("statuses")
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        AdminSectionTitle("Visão geral", "O que precisa de atenção agora")
         Surface(color = Color(0xFF194C2B), shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("FILA DE REVISÃO", color = Color(0xFFCEE4CB), fontSize = 10.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
-                    Icon(Icons.AutoMirrored.Outlined.FactCheck, null, tint = Color(0xFFCEE4CB), modifier = Modifier.size(26.dp))
-                }
+                Text("AGUARDANDO AVALIAÇÃO", color = Color(0xFFCEE4CB), style = MaterialTheme.typography.labelSmall)
                 Text("$pending", color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 54.sp)
-                Text(if (pending == 1) "foto aguardando sua avaliação" else "fotos aguardando sua avaliação", color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = onReview, enabled = !busy, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(14.dp),
+                Text(if (pending == 0) "Todas as fotos recebidas foram avaliadas." else "fotos para a equipe revisar", color = Color.White)
+                Button(onClick = onReview, enabled = !busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF194C2B))) {
-                    Text("Abrir painel de triagem", fontWeight = FontWeight.SemiBold); Spacer(Modifier.width(10.dp)); Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp))
+                    Text("Abrir painel de triagem", fontWeight = FontWeight.SemiBold)
                 }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AdminStat("Usuários", data.optInt("users"), Icons.Outlined.PeopleAlt, Modifier.weight(1f))
-            AdminStat("Fotos recebidas", data.optInt("photos"), Icons.Outlined.PhotoLibrary, Modifier.weight(1f))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AdminStat("Revisadas", data.optInt("reviewed"), Icons.Outlined.TaskAlt, Modifier.weight(1f))
-            AdminStat("Envios pausados", data.optInt("paused"), Icons.Outlined.PauseCircle, Modifier.weight(1f))
+            AdminStat("Fotos recebidas", total, Icons.Outlined.PhotoLibrary, Modifier.weight(1f))
+            AdminStat("Revisadas", reviewed, Icons.Outlined.TaskAlt, Modifier.weight(1f))
         }
         AdminPanel {
-            AdminSectionTitle("Previsões recebidas", "Distribuição por classe original")
+            AdminSectionTitle("Resultados das revisões", "Toque para consultar as fotos")
+            listOf(listOf("confirmed", "corrected"), listOf("uncertain", "rejected")).forEach { pair ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    pair.forEach { status ->
+                        Surface(onClick = { browse(JSONObject().put("status", status)) }, enabled = !busy,
+                            modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), color = LeafColors.Pale) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(if (statuses == null) "—" else "${statuses.optInt(status)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                Text(reviewStatuses.getValue(status), style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+            if (statuses == null) Text("Contagens por situação indisponíveis nesta versão do servidor.", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+            OutlinedButton(onClick = { browse(JSONObject().put("status", "")) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Ver todas as fotos") }
+        }
+        if (managesAccounts) AdminPanel {
+            AdminSectionTitle("Contas e envios")
+            Text("${if (data.isNull("users")) "—" else data.optInt("users")} usuários · ${if (data.isNull("paused")) "—" else data.optInt("paused")} com envios pausados", style = MaterialTheme.typography.bodyMedium)
+            TextButton(onClick = users, enabled = !busy) { Text("Gerenciar usuários") }
+        }
+        AdminPanel {
+            AdminSectionTitle("Previsões mais recebidas", "Classes originais das fotos enviadas")
             val counts = data.optJSONObject("classes") ?: JSONObject()
-            val keys = counts.keys().asSequence().toList().sortedByDescending { counts.optInt(it) }
-            val max = keys.maxOfOrNull { counts.optInt(it) }?.coerceAtLeast(1) ?: 1
+            val keys = counts.keys().asSequence().toList().sortedByDescending { counts.optInt(it) }.take(4)
             if (keys.isEmpty()) Text("As classes aparecerão quando chegarem fotos.", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
             keys.forEach { key ->
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(catalog.get(key).name, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                        Text("${counts.optInt(key)}", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, color = LeafColors.Green)
-                    }
-                    LinearProgressIndicator(progress = { counts.optInt(key).toFloat() / max }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape), color = LeafColors.Green, trackColor = LeafColors.Pale)
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(enabled = !busy) { browse(JSONObject().put("status", "").put("class_id", key)) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(catalog.get(key).name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    AdminBadge("${counts.optInt(key)}")
+                    Icon(Icons.Outlined.ChevronRight, null, tint = LeafColors.Muted)
                 }
             }
         }
         AdminPanel {
-            AdminSectionTitle("Modelos de origem", "Identificação das versões que enviaram fotos")
+            AdminSectionTitle("Modelos de origem", "Versões usadas nas previsões recebidas")
             val models = data.optJSONObject("models") ?: JSONObject()
-            models.keys().forEach { key ->
-                var expanded by remember(key) { mutableStateOf(false) }
-                Column(Modifier.fillMaxWidth().clickable { expanded = !expanded }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Memory, null, Modifier.size(20.dp), tint = LeafColors.Muted)
-                        Text(shortId(key), Modifier.weight(1f).padding(horizontal = 10.dp), style = MaterialTheme.typography.bodySmall)
-                        AdminBadge("${models.optInt(key)} fotos")
+            if (models.length() == 0) Text("Nenhum modelo recebido.", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
+            models.keys().asSequence().toList().sortedByDescending { models.optInt(it) }.forEach { key ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Modelo ${shortId(key)}", style = MaterialTheme.typography.bodySmall)
+                        Text("${models.optInt(key)} fotos", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
                     }
-                    if (expanded) SelectionContainer { Text(key, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted) }
+                    TextButton(onClick = { browse(JSONObject().put("status", "").put("model", key)) }, enabled = !busy) { Text("Ver fotos") }
                 }
             }
         }
@@ -144,7 +161,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
                 Icon(Icons.Outlined.ChevronRight, null, tint = LeafColors.Muted)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AdminBadge(if (row.optString("role") == "superadmin") "Superadmin" else "Usuário")
+                AdminBadge(roleLabel(row.optString("role")))
                 AdminBadge(if (row.optBoolean("deletion_pending")) "Exclusão pendente" else if (row.optBoolean("uploads_enabled")) "Envios ativos" else "Envios pausados",
                     if (row.optBoolean("uploads_enabled")) LeafColors.Green else Color(0xFF99620A))
             }
@@ -168,7 +185,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
 }
 @Composable internal fun AdminAuditCard(row: JSONObject, catalog: DiseaseCatalog) {
     var expanded by remember(row) { mutableStateOf(false) }
-    val title = when (row.optString("action")) { "bootstrap" -> "Primeiro superadmin ativado"; "role" -> "Permissão alterada"; "pause" -> "Envios atualizados"; "review" -> "Revisão registrada"; "invite" -> "Convite criado"; "reinvite" -> "Convite reenviado"; "recovery" -> "Recuperação enviada"; "delete_begin" -> "Exclusão iniciada"; "delete_complete" -> "Exclusão concluída"; "delete_failed" -> "Exclusão pendente"; else -> "Ação administrativa" }
+    val title = when (row.optString("action")) { "bootstrap" -> "Proprietário ativado"; "owner_migration" -> "Proprietário protegido"; "role" -> "Permissão alterada"; "pause" -> "Envios atualizados"; "review" -> "Revisão registrada"; "invite" -> "Convite criado"; "reinvite" -> "Convite reenviado"; "recovery" -> "Recuperação enviada"; "delete_begin" -> "Exclusão iniciada"; "delete_complete" -> "Exclusão concluída"; "delete_failed" -> "Exclusão pendente"; else -> "Ação administrativa" }
     AdminPanel {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.size(36.dp).background(LeafColors.Pale, CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.History, null, Modifier.size(20.dp), tint = LeafColors.Green) }
@@ -181,20 +198,20 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
                     if (!after.isNull("class_id")) Text(catalog.get(after.getString("class_id")).name, style = MaterialTheme.typography.bodySmall)
                     after.optString("note").takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted) }
                 }
-                if (row.optString("action") == "role" && details.has("role")) Text(if (details.optString("role") == "superadmin") "Acesso de superadmin concedido" else "Acesso de superadmin removido", style = MaterialTheme.typography.bodySmall)
+                if (row.optString("action") == "role" && details.has("role")) Text("Novo papel: ${roleLabel(details.optString("role"))}", style = MaterialTheme.typography.bodySmall)
                 if (row.optString("action") == "pause" && details.has("enabled")) Text(if (details.optBoolean("enabled")) "Novos envios liberados" else "Envios pausados", style = MaterialTheme.typography.bodySmall)
             }
         }
         TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(0.dp)) { Text(if (expanded) "Ocultar identificação" else "Ver identificação", fontSize = 12.sp) }
         if (expanded) SelectionContainer { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Responsável: ${row.label("actor_id")}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-            Text("Registro: ${row.label("target_id")}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+            Text("Responsável: ${shortId(row.label("actor_id"))}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+            Text("Registro: ${shortId(row.label("target_id"))}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
             row.optJSONObject("details")?.optJSONObject("before")?.let { before ->
                 Text("Revisão anterior: ${reviewStatuses[before.optString("status")] ?: "Sem revisão"}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
                 if (!before.isNull("class_id")) Text(catalog.get(before.getString("class_id")).name, style = MaterialTheme.typography.bodySmall)
                 before.optString("note").takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted) }
                 if (!before.isNull("reviewed_at")) Text(adminDate(before.getString("reviewed_at")), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-                if (!before.isNull("reviewer_id")) Text("Revisor anterior: ${before.getString("reviewer_id")}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+                if (!before.isNull("reviewer_id")) Text("Revisor anterior: ${shortId(before.getString("reviewer_id"))}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
             }
         } }
     }
