@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -26,7 +27,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.ResolverStyle
 import br.com.leafcare.data.DiseaseCatalog
 import br.com.leafcare.ui.LeafColors
 import kotlinx.coroutines.CancellationException
@@ -172,17 +179,66 @@ import org.json.JSONObject
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = close) { Text("Cancelar") }
             Button(onClick = { close(); apply(JSONObject().put("status", status).put("class_id", classFilter).put("model", model.trim()).put("user_id", user.trim()).put("from", from.trim()).put("until", until.trim())) },
-                enabled = !state.busy, modifier = Modifier.weight(1f)) { Text("Aplicar filtros") }
+                enabled = !state.busy && from != "!invalid!" && until != "!invalid!", modifier = Modifier.weight(1f)) { Text("Aplicar filtros") }
         }
     }) {
         item { Choice("Situação", status, reviewStatuses) { status = it } }
         item { Choice("Classe prevista", classFilter, linkedMapOf("" to "Todas") + classes.associateWith { catalog.get(it).name }) { classFilter = it } }
-        item { OutlinedTextField(from, { from = it }, label = { Text("De (AAAA-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-        item { OutlinedTextField(until, { until = it }, label = { Text("Até (AAAA-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+        item { AdminDateField("De", from) { from = it } }
+        item { AdminDateField("Até", until) { until = it } }
         item { TextButton(onClick = { advanced = !advanced }) { Text(if (advanced) "Menos filtros" else "Mais filtros") } }
         if (advanced) {
             item { OutlinedTextField(user, { user = it }, label = { Text("Identificador do usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
             item { OutlinedTextField(model, { model = it }, label = { Text("Identificador do modelo") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable private fun AdminDateField(label: String, isoDate: String, onDateChange: (String) -> Unit) {
+    val displayFormat = DateTimeFormatter.ofPattern("dd/MM/uuuu")
+    val isoFormat = DateTimeFormatter.ISO_LOCAL_DATE.withResolverStyle(ResolverStyle.STRICT)
+    fun parse(value: String): LocalDate? = runCatching { LocalDate.parse(value, isoFormat) }.getOrNull()
+    var text by remember { mutableStateOf(parse(isoDate)?.format(displayFormat).orEmpty()) }
+    LaunchedEffect(isoDate) { if (isoDate != "!invalid!") text = parse(isoDate)?.format(displayFormat).orEmpty() }
+    var showPicker by remember { mutableStateOf(false) }
+    val selected = parse(isoDate) ?: parse(text)
+    OutlinedTextField(
+        value = text,
+        onValueChange = { input ->
+            val digits = input.filter(Char::isDigit).take(8)
+            text = buildString {
+                digits.forEachIndexed { index, char ->
+                    if (index == 2 || index == 4) append('/')
+                    append(char)
+                }
+            }
+            onDateChange(parse(text)?.format(isoFormat) ?: if (text.isEmpty()) "" else "!invalid!")
+        },
+        label = { Text(label) },
+        placeholder = { Text("DD/MM/AAAA") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        trailingIcon = { IconButton(onClick = { showPicker = true }) { Icon(Icons.Outlined.CalendarMonth, "Escolher data") } },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp)
+    )
+    if (showPicker) {
+        val pickerState = rememberDatePickerState(initialSelectedDateMillis = selected?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli())
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { millis ->
+                        val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                        onDateChange(date.format(isoFormat))
+                        text = date.format(displayFormat)
+                    }
+                    showPicker = false
+                }) { Text("Selecionar") }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancelar") } },
+            colors = DatePickerDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.White)
+        ) { DatePicker(state = pickerState, showModeToggle = false) }
     }
 }

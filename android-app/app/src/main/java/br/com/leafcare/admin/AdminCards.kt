@@ -226,8 +226,8 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
             }
             Icon(Icons.Outlined.ExpandMore, null, tint = LeafColors.Muted)
         }
-        DropdownMenu(expanded, { expanded = false }, modifier = Modifier.heightIn(max = 360.dp)) {
-            options.forEach { (key, name) -> DropdownMenuItem(text = { Text(name) }, onClick = { onChange(key); expanded = false }) }
+        DropdownMenu(expanded, { expanded = false }, modifier = Modifier.heightIn(max = 360.dp), shape = RoundedCornerShape(16.dp), containerColor = Color.White, tonalElevation = 4.dp) {
+            options.forEach { (key, name) -> DropdownMenuItem(text = { Text(name, color = if (key == value) LeafColors.Green else LeafColors.Text) }, onClick = { onChange(key); expanded = false }, leadingIcon = if (key == value) ({ Icon(Icons.Outlined.Check, null, tint = LeafColors.Green) }) else null) }
         }
     }
 }
