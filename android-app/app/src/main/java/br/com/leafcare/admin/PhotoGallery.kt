@@ -225,6 +225,27 @@ import org.json.JSONObject
     )
     if (showPicker) {
         val pickerState = rememberDatePickerState(initialSelectedDateMillis = selected?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli())
+        val pickerColors = DatePickerDefaults.colors(
+            containerColor = androidx.compose.ui.graphics.Color.White,
+            titleContentColor = LeafColors.Text,
+            headlineContentColor = LeafColors.Text,
+            weekdayContentColor = LeafColors.Muted,
+            subheadContentColor = LeafColors.Muted,
+            yearContentColor = LeafColors.Text,
+            currentYearContentColor = LeafColors.Green,
+            selectedYearContentColor = androidx.compose.ui.graphics.Color.White,
+            selectedYearContainerColor = LeafColors.Green,
+            dayContentColor = LeafColors.Text,
+            disabledDayContentColor = LeafColors.Muted.copy(alpha = .38f),
+            selectedDayContentColor = androidx.compose.ui.graphics.Color.White,
+            disabledSelectedDayContentColor = androidx.compose.ui.graphics.Color.White.copy(alpha = .38f),
+            selectedDayContainerColor = LeafColors.Green,
+            todayContentColor = LeafColors.Green,
+            todayDateBorderColor = LeafColors.Green,
+            dayInSelectionRangeContentColor = LeafColors.Text,
+            dayInSelectionRangeContainerColor = LeafColors.Pale,
+            dividerColor = LeafColors.Border
+        )
         DatePickerDialog(
             onDismissRequest = { showPicker = false },
             confirmButton = {
@@ -238,7 +259,9 @@ import org.json.JSONObject
                 }) { Text("Selecionar") }
             },
             dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancelar") } },
-            colors = DatePickerDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.White)
-        ) { DatePicker(state = pickerState, showModeToggle = false) }
+            shape = RoundedCornerShape(24.dp),
+            tonalElevation = 0.dp,
+            colors = pickerColors
+        ) { DatePicker(state = pickerState, showModeToggle = false, colors = pickerColors) }
     }
 }

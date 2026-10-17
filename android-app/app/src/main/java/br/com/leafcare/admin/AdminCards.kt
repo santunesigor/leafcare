@@ -226,8 +226,31 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
             }
             Icon(Icons.Outlined.ExpandMore, null, tint = LeafColors.Muted)
         }
-        DropdownMenu(expanded, { expanded = false }, modifier = Modifier.heightIn(max = 360.dp), shape = RoundedCornerShape(16.dp), containerColor = Color.White, tonalElevation = 4.dp) {
-            options.forEach { (key, name) -> DropdownMenuItem(text = { Text(name, color = if (key == value) LeafColors.Green else LeafColors.Text) }, onClick = { onChange(key); expanded = false }, leadingIcon = if (key == value) ({ Icon(Icons.Outlined.Check, null, tint = LeafColors.Green) }) else null) }
+        val menuShape = RoundedCornerShape(14.dp)
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 360.dp).border(1.dp, LeafColors.Border, menuShape),
+            shape = menuShape,
+            containerColor = Color.White,
+            tonalElevation = 0.dp
+        ) {
+            options.forEach { (key, name) ->
+                val selected = key == value
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            name,
+                            color = LeafColors.Text,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    },
+                    onClick = { onChange(key); expanded = false },
+                    modifier = Modifier.padding(horizontal = 8.dp).clip(RoundedCornerShape(10.dp))
+                        .background(if (selected) LeafColors.Pale else Color.Transparent),
+                    leadingIcon = if (selected) ({ Icon(Icons.Outlined.Check, null, tint = LeafColors.Green) }) else null
+                )
+            }
         }
     }
 }
