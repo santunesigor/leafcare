@@ -23,6 +23,7 @@ private const val MAX_ATTEMPTS = 5
 
 /** Private bucket holding analysis photos at `{user_id}/{analysis_id}.jpg`. */
 internal const val PHOTOS_BUCKET = "analysis-photos"
+internal const val TRAINING_PHOTOS_BUCKET = "training-photos"
 
 /** Schedules a sync pass: runs only with network, with exponential backoff. */
 fun requestAnalysisSync(context: Context) {
@@ -78,7 +79,9 @@ class SyncAnalysesWorker(
             photoFile = { name ->
                 require(File(name).name == name)
                 File(photosDir, name)
-            }
+            },
+            consentDao = app.database.trainingConsentDao(),
+            trainingApi = PostgrestTrainingConsentSyncApi(client.postgrest, client.storage[TRAINING_PHOTOS_BUCKET]),
         )
         val pushFailures = when (val push = runner.syncOnce(userId)) {
             is SyncRunResult.SkippedNoAuth -> return Result.success()

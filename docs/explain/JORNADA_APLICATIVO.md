@@ -460,8 +460,10 @@ Para transformar as fotos em dados úteis, será necessário:
 6. Versionar dados e avaliar novos candidatos com métricas por classe, cobertura das previsões aceitas e custo real no aparelho.
 7. Integrar um bundle aprovado e distribuir uma nova versão do aplicativo.
 
+O bucket `analysis-photos` é apenas backup do histórico e não equivale a consentimento para treinamento. O bucket separado `training-photos` está sem política de inserção para clientes enquanto faltarem prazo de retenção e URLs oficiais; mesmo depois de habilitado, somente autorizações globais/individuais e a revisão humana em `photo_reviews` poderão liberar o uso. A exportação está documentada em [`machine-learning/README.md`](../../machine-learning/README.md#fotos-autorizadas-para-triagem).
+
 > [!warning] A previsão não é um rótulo confirmado
-> O `class_id` salvo é a saída do modelo. Usá-lo diretamente como verdade de treino pode reforçar os erros do próprio sistema. O schema atual não possui uma estrutura específica de revisão agronômica, consentimento de treino ou identificação de planta/propriedade/sessão; esses requisitos do ciclo futuro não devem ser tratados como já implementados.
+> O `class_id` salvo é a saída do modelo. Usá-lo diretamente como verdade de treino pode reforçar os erros do próprio sistema. O schema agora registra consentimento e revisão em `photo_reviews`; ainda não há identificação de planta, propriedade ou sessão, então esses agrupamentos dependem de metadados externos controlados.
 
 O hash e a versão ajudam a investigar falhas: “qual modelo gerou essa hipótese?”. Não respondem “qual é o diagnóstico verdadeiro?”. As duas informações têm funções distintas.
 

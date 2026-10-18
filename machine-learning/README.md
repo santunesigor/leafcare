@@ -18,6 +18,7 @@ O modelo atual é **MobileNetV4 Small destilado**, TFLite float32 de 9,70 MiB co
 | `export_tflite.py`, `legacy/` | Pipeline Keras histórico; rejeita o modelo destilado atual. |
 | `experiments/dinov2/`, `experiments/vision/` | Benchmarks históricos e utilitários de métricas usados pelos experimentos. |
 | `data/`, `import_tla.py`, `prepare_dataset.py`, `tla_class_map.yaml` | Dataset, split e proveniência; nenhuma alteração nesta promoção. |
+| `export_authorized_training.py` | Exportação de fotos com consentimento vigente e revisão humana, para pasta local privada ignorada pelo Git. |
 
 `docs/` é irmã de `machine-learning/`. Nenhum experimento ou relatório entra no APK; somente o bundle e catálogo dos assets Android.
 
@@ -38,3 +39,7 @@ python deploy_distilled.py --install --pixel-parity-dir /tmp/leafcare-distilled-
 ```
 
 O backend Keras não possui modelo correspondente ao aluno. Arquivos `model.keras` locais antigos não participam da inferência atual. Novos testes permanecem isolados em `experiments/`; sua promoção ao app exige solicitação explícita.
+
+### Fotos autorizadas para triagem
+
+O app mantém o fluxo de consentimento preparado, mas a coleta, o upload no cliente e a exportação estão desativados até existir prazo de retenção e URLs oficiais de Termos/Privacidade. O bucket `training-photos` é separado do backup de histórico e não possui política de `INSERT` para clientes autenticados. Por segurança, `python export_authorized_training.py` encerra sem consultar ou baixar fotos enquanto `TRAINING_EXPORT_ENABLED` permanecer falso. Não altere esse bloqueio antes de publicar os dados legais. Quando houver autorização para habilitar o pipeline, ele deverá reconciliar cada exportação com o estado remoto atual, exigir revisão humana (`confirmed`/`corrected`), validar qualidade, remover EXIF/identificadores e gravar somente em `data/authorized_training/`, ignorada pelo Git. A chave de serviço será exclusiva do pipeline confiável: nunca deve ser colocada no APK, em arquivos versionados ou em logs.

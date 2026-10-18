@@ -114,7 +114,7 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
     val admin: AdminViewModel = viewModel()
     val adminState by admin.state.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(user?.id) { admin.bind(user?.id) }
+    LaunchedEffect(user?.id) { admin.bind(user?.id); vm.bindTrainingConsent(user?.id) }
     DisposableEffect(lifecycleOwner, user?.id) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) admin.bind(user?.id) }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -153,9 +153,11 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                     ProfileScreen(
                         authViewModel,
                         onBack = { nav.popBackStack() },
-                        onChangePassword = { nav.navigate("change-password") }
+                        onChangePassword = { nav.navigate("change-password") },
+                        onTrainingPrivacy = { nav.navigate("training-privacy") }
                     )
                 }
+                composable("training-privacy") { TrainingConsentScreen(vm, onBack = { nav.popBackStack() }) }
                 composable("admin") { AdminScreen(admin, onBack = { nav.popBackStack() }) }
                 composable("change-password") {
                     NewPasswordScreen(

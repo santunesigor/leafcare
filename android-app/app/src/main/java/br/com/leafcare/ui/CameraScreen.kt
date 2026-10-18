@@ -44,6 +44,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import br.com.leafcare.data.TRAINING_UPLOADS_ENABLED
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,11 +61,15 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
     var lens by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var ready by remember { mutableStateOf(false) }
     var capturing by remember { mutableStateOf(false) }
+    var pendingImage by remember { mutableStateOf<Pair<Uri, File?>?>(null) }
+    var authorizeTraining by remember { mutableStateOf(false) }
+    val consent by vm.trainingConsent.collectAsState()
+    val trainingConsentActive = TRAINING_UPLOADS_ENABLED && consent?.granted == true && consent?.termsVersion == br.com.leafcare.data.TRAINING_TERMS_VERSION && consent?.userId == vm.currentConsentUserId()
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER; implementationMode = PreviewView.ImplementationMode.COMPATIBLE } }
     val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
     val executor = remember { ContextCompat.getMainExecutor(context) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permitted = it }
-    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { vm.analyze(it) } }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { authorizeTraining = false; pendingImage = it to null } }
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) permitted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -110,7 +115,7 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
             imageCapture.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), executor,
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        capturing = false; vm.analyze(Uri.fromFile(file), file)
+                        capturing = false; authorizeTraining = false; pendingImage = Uri.fromFile(file) to file
                     }
                     override fun onError(error: ImageCaptureException) {
                         capturing = false; file.delete(); vm.error("Falha na captura: ${error.message}")
@@ -123,6 +128,26 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
             Button(onClick = { permission.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.permission_allow_button)) }
             TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) }) { Text(stringResource(R.string.permission_settings_button), color = Color.White) }
         }
+    }
+    pendingImage?.let { (uri, temporary) ->
+        AlertDialog(
+            onDismissRequest = { temporary?.delete(); pendingImage = null },
+            title = { Text("Analisar fotografia") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (trainingConsentActive) "A análise funciona normalmente. A contribuição para treinamento é opcional." else "A análise funciona normalmente. O envio para treinamento está desativado até a publicação dos termos, política de privacidade e prazo de retenção.")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = authorizeTraining, enabled = trainingConsentActive, onCheckedChange = { authorizeTraining = it })
+                        Text("Também autorizo esta foto para treinamento", color = if (trainingConsentActive) LeafColors.Text else LeafColors.Muted)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = {
+                vm.analyze(uri, temporary, authorizeTraining && trainingConsentActive)
+                pendingImage = null
+            }) { Text("Analisar", color = LeafColors.Green) } },
+            dismissButton = { TextButton(onClick = { temporary?.delete(); pendingImage = null }) { Text("Cancelar", color = LeafColors.Muted) } }
+        )
     }
     if (help) HelpSheet(onDismiss = { help = false })
 }

@@ -529,7 +529,8 @@ fun NewPasswordScreen(
 fun ProfileScreen(
     viewModel: AuthViewModel,
     onBack: () -> Unit,
-    onChangePassword: () -> Unit = {}
+    onChangePassword: () -> Unit = {},
+    onTrainingPrivacy: () -> Unit = {},
 ) {
     val displayName = viewModel.getDisplayName()
     val email = viewModel.getEmail()
@@ -572,6 +573,15 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(32.dp))
+
+        Button(
+            onClick = onTrainingPrivacy,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, LeafColors.Border),
+            colors = ButtonDefaults.buttonColors(containerColor = LeafColors.Pale, contentColor = LeafColors.Text)
+        ) { Text("Privacidade e uso de fotos", fontWeight = FontWeight.SemiBold) }
+        Spacer(Modifier.height(12.dp))
 
         Button(
             onClick = onChangePassword,

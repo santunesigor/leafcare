@@ -51,6 +51,9 @@ internal fun AnalysisEntity.canUploadPhoto(): Boolean =
 internal fun remotePhotoPath(userId: String, analysisId: String): String =
     "$userId/$analysisId.jpg"
 
+internal fun trainingPhotoPath(userId: String, analysisId: String): String =
+    "$userId/$analysisId.jpg"
+
 /**
  * Converts a `public.analyses` row into a local entity. Reuses the remote UUID
  * (never invented); the local photo name follows the same `{id}.img`
@@ -158,4 +161,35 @@ internal class PostgrestAnalysisSyncApi(
     override suspend fun downloadPhoto(path: String): ByteArray {
         return bucket.downloadAuthenticated(path)
     }
+}
+
+/** Separate consent channel and bucket: analysis history never grants training access. */
+internal interface TrainingConsentSyncApi {
+    suspend fun saveConsent(userId: String, consent: TrainingConsentEntity)
+    suspend fun saveAuthorization(userId: String, authorization: TrainingPhotoAuthorizationEntity)
+    suspend fun upload(path: String, bytes: ByteArray)
+    suspend fun delete(paths: List<String>)
+}
+
+internal class PostgrestTrainingConsentSyncApi(postgrest: Postgrest, private val bucket: BucketApi) : TrainingConsentSyncApi {
+    private val consents = postgrest["training_consents"]
+    private val authorizations = postgrest["training_photo_authorizations"]
+
+    override suspend fun saveConsent(userId: String, consent: TrainingConsentEntity) {
+        consents.upsert(buildJsonObject {
+            put("user_id", userId); put("terms_version", consent.termsVersion)
+            put("granted", consent.granted); put("decided_at", Instant.fromEpochMilliseconds(consent.decidedAt).toString())
+        }, onConflict = "user_id")
+    }
+
+    override suspend fun saveAuthorization(userId: String, authorization: TrainingPhotoAuthorizationEntity) {
+        authorizations.upsert(buildJsonObject {
+            put("user_id", userId); put("analysis_id", authorization.analysisId)
+            put("terms_version", authorization.termsVersion); put("authorized", authorization.authorized)
+            put("decided_at", Instant.fromEpochMilliseconds(authorization.decidedAt).toString())
+        }, onConflict = "user_id,analysis_id")
+    }
+
+    override suspend fun upload(path: String, bytes: ByteArray) { bucket.upload(path, bytes, upsert = true) }
+    override suspend fun delete(paths: List<String>) { if (paths.isNotEmpty()) bucket.delete(paths) }
 }
