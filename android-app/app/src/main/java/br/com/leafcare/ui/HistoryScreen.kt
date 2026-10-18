@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,11 +51,10 @@ import java.util.Locale
 fun percent(value: Float) = String.format(Locale.forLanguageTag("pt-BR"), "%.0f%%", value * 100)
 
 @Composable
-fun HistoryScreen(vm: LeafCareViewModel, onCamera: () -> Unit, onResult: (String) -> Unit, onProfile: () -> Unit = {}, displayName: String? = null) {
+fun HistoryScreen(vm: LeafCareViewModel, onCamera: () -> Unit, onResult: (String) -> Unit, onProfile: () -> Unit = {}, displayName: String? = null, onAdmin: (() -> Unit)? = null) {
     val rows by vm.analyses.collectAsStateWithLifecycle()
-    val threshold by vm.threshold.collectAsStateWithLifecycle()
     val modelError = vm.getModelError()
-    HistoryContent(rows, threshold, onCamera, onResult, { vm.getPhoto(it) }, modelError, onProfile, displayName)
+    HistoryContent(rows, onCamera, onResult, { vm.getPhoto(it) }, modelError, onProfile, displayName, onAdmin)
 }
 
 /**
@@ -65,8 +65,8 @@ internal fun homeGreeting(displayName: String?): String =
     if (displayName.isNullOrBlank()) "Olá" else "Olá, $displayName"
 
 @Composable
-fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: Float, onCamera: () -> Unit, onResult: (String) -> Unit,
-    photo: (String) -> Any, modelError: String?, onProfile: () -> Unit = {}, displayName: String? = null) {
+fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: () -> Unit, onResult: (String) -> Unit,
+    photo: (String) -> Any, modelError: String?, onProfile: () -> Unit = {}, displayName: String? = null, onAdmin: (() -> Unit)? = null) {
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("Todas") }
     var collapsedDays by rememberSaveable { mutableStateOf(listOf<String>()) }
@@ -79,10 +79,14 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
     val grouped = filtered.groupBy { Instant.ofEpochMilli(it.createdAt).atZone(ZoneId.systemDefault()).toLocalDate() }
     val formatter = remember { DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("pt-BR")) }
     Scaffold(floatingActionButtonPosition = FabPosition.Center,
-        floatingActionButton = { Surface(onClick = onCamera, shape = CircleShape, shadowElevation = 12.dp, color = LeafColors.Green,
-            modifier = Modifier.padding(bottom = 6.dp).size(68.dp), border = BorderStroke(6.dp, Color.White)) {
-            Box(contentAlignment = Alignment.Center) { FigmaIcon(R.drawable.v3_camera, stringResource(R.string.camera_button_desc), 28) }
-        } }) { padding ->
+        floatingActionButton = {
+            Box(Modifier.size(80.dp)) {
+                Surface(onClick = onCamera, shape = CircleShape, shadowElevation = 12.dp, color = LeafColors.Green,
+                    modifier = Modifier.align(Alignment.Center).size(68.dp), border = BorderStroke(6.dp, Color.White)) {
+                    Box(contentAlignment = Alignment.Center) { FigmaIcon(R.drawable.v3_camera, stringResource(R.string.camera_button_desc), 28) }
+                }
+            }
+        }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(24.dp, 28.dp, 24.dp, 110.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
@@ -98,6 +102,15 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                         Text(stringResource(R.string.history_subtitle), fontSize = 14.sp, color = LeafColors.Muted)
                     }
                     Spacer(Modifier.width(12.dp))
+                    onAdmin?.let { open ->
+                        Surface(onClick = open, shape = CircleShape, color = LeafColors.Pale,
+                            border = BorderStroke(1.dp, LeafColors.Border), modifier = Modifier.size(48.dp)) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(Icons.Outlined.AdminPanelSettings, "Abrir administração", tint = LeafColors.Green, modifier = Modifier.size(24.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                    }
                     Surface(onClick = onProfile, shape = CircleShape, color = LeafColors.Pale,
                         border = BorderStroke(1.dp, LeafColors.Border), modifier = Modifier.size(48.dp)) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -270,29 +283,7 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, threshold: F
                     }
                 }
             }
-            if (rows.isNotEmpty()) item {
-                Column(
-                    Modifier.fillMaxWidth()
-                        .animateItem(placementSpec = tween(220, easing = FastOutSlowInEasing))
-                        .padding(top = 12.dp, bottom = 8.dp)
-                ) {
-                    Text(
-                        stringResource(R.string.confidence_threshold_label,
-                            String.format(Locale.forLanguageTag("pt-BR"), "%.2f%%", threshold * 100)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = LeafColors.Muted,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        stringResource(R.string.confidence_threshold_help),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = LeafColors.Muted,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
+
         }
     }
 }

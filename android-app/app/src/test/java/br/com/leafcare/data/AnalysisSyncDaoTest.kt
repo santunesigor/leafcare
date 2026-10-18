@@ -279,6 +279,28 @@ class AnalysisSyncDaoTest {
         } finally { db.close() }
     }
 
+    @Test fun localOnlyPolicySurvivesReopenAndDoesNotRequeueSyncedPhotosOrTombstones() = runBlocking {
+        val name = "policy-${System.nanoTime()}.db"
+        files += context.getDatabasePath(name)
+        var db = Room.databaseBuilder(context, AppDatabase::class.java, name).allowMainThreadQueries().build()
+        val dao = db.analysisDao()
+        dao.insert(entity().copy(id = "backlog"))
+        dao.insert(entity().copy(id = "synced", syncStatus = SyncState.SYNCED, photoSyncStatus = PhotoSyncState.SYNCED))
+        dao.insert(entity().copy(id = "deleted", syncStatus = SyncState.PENDING_DELETE, deletedAt = 10))
+        dao.markLocalOnly("backlog")
+        dao.markPhotoLocalOnly("synced")
+        dao.markLocalOnly("deleted")
+        db.close()
+        db = Room.databaseBuilder(context, AppDatabase::class.java, name).allowMainThreadQueries().build()
+        try {
+            assertEquals(SyncState.LOCAL_ONLY, db.analysisDao().get("backlog")?.syncStatus)
+            assertEquals(PhotoSyncState.LOCAL_ONLY, db.analysisDao().get("backlog")?.photoSyncStatus)
+            assertEquals(PhotoSyncState.SYNCED, db.analysisDao().get("synced")?.photoSyncStatus)
+            assertTrue(db.analysisDao().getPendingUploads().isEmpty())
+            assertEquals(listOf("deleted"), db.analysisDao().getPendingDeletes().map { it.id })
+        } finally { db.close() }
+    }
+
     private fun legacyEntity() = LegacyAnalysisEntity(
         id = "a-1",
         photoName = "a-1.img",

@@ -118,7 +118,7 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
             if (!disease.reviewed) Text(stringResource(R.string.unreviewed_notice), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
             val date = Instant.ofEpochMilli(analysis.createdAt).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm", Locale.forLanguageTag("pt-BR")))
             Text(stringResource(R.string.saved_at_format, date), Modifier.padding(top = 18.dp), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-            Text(stringResource(R.string.inference_info_format, analysis.inferenceMs, percent(analysis.threshold)), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+            Text(stringResource(R.string.inference_info_format, analysis.inferenceMs), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
             Spacer(Modifier.height(22.dp))
             LeafButton(stringResource(R.string.button_back), onBack)
             Spacer(Modifier.height(10.dp))

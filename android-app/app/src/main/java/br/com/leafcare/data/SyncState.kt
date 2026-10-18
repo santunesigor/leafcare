@@ -5,13 +5,15 @@ import androidx.room.TypeConverter
 /**
  * Local synchronization state of an analysis.
  *
- * - PENDING_UPLOAD: created locally, never confirmed remotely (covers LOCAL_ONLY).
+ * - PENDING_UPLOAD: created locally, never confirmed remotely.
+ * - LOCAL_ONLY: excluded permanently by the server resume cutoff.
  * - SYNCED: confirmed remotely via idempotent upsert on the local UUID.
  * - PENDING_DELETE: hidden from UI (tombstone); remote deletion still pending.
  * - ERROR: last attempt failed; retried later. Rows with a tombstone retry
  *   through the delete path (never re-upserted), so deletions can't resurrect.
  */
 enum class SyncState {
+    LOCAL_ONLY,
     PENDING_UPLOAD,
     SYNCED,
     PENDING_DELETE,

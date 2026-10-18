@@ -58,6 +58,12 @@ interface AnalysisDao {
     @Query("UPDATE analyses SET syncStatus = 'PENDING_DELETE', deletedAt = :deletedAt WHERE id = :id")
     suspend fun markDeleted(id: String, deletedAt: Long)
 
+    @Query("UPDATE analyses SET syncStatus = 'LOCAL_ONLY', photoSyncStatus = 'LOCAL_ONLY' WHERE id = :id AND deletedAt IS NULL AND syncStatus IN ('PENDING_UPLOAD', 'ERROR')")
+    suspend fun markLocalOnly(id: String)
+
+    @Query("UPDATE analyses SET photoSyncStatus = 'LOCAL_ONLY' WHERE id = :id AND photoSyncStatus IN ('PENDING_UPLOAD', 'ERROR')")
+    suspend fun markPhotoLocalOnly(id: String)
+
     // Photo queue: only for analyses already confirmed remotely, never for
     // tombstones (their remote photo is removed through the delete path).
     @Query("SELECT * FROM analyses WHERE photoSyncStatus IN ('PENDING_UPLOAD', 'ERROR') AND deletedAt IS NULL AND syncStatus = 'SYNCED' AND inconclusive = 0 AND confidence >= threshold AND confidence BETWEEN 0 AND 1 AND threshold BETWEEN 0 AND 1")

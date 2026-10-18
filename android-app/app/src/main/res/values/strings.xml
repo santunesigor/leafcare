@@ -25,10 +25,6 @@
     <string name="empty_search_subtitle">Experimente outra pesquisa ou filtro.</string>
     <string name="camera_button_desc">Abrir câmera</string>
 
-    <!-- Threshold (read-only display) -->
-    <string name="confidence_threshold_label">Confiança mínima: %1$s</string>
-    <string name="confidence_threshold_help">Abaixo desse valor, a análise aparece como inconclusiva.</string>
-
     <!-- Model Error -->
     <string name="model_error_title">Preparação do modelo pendente</string>
 
@@ -54,7 +50,7 @@
     <string name="symptom_evolution">EVOLUÇÃO DOS SINTOMAS</string>
     <string name="unreviewed_notice">Conteúdo informativo: revisão agronômica pendente.</string>
     <string name="saved_at_format">Salva neste aparelho em %1$s</string>
-    <string name="inference_info_format">Inferência: %1$.1f ms • Limite: %2$s</string>
+    <string name="inference_info_format">Inferência: %1$.1f ms</string>
     <string name="button_back">Voltar ao histórico</string>
     <string name="button_retake">Fotografar novamente</string>
     <string name="button_delete">Excluir análise</string>

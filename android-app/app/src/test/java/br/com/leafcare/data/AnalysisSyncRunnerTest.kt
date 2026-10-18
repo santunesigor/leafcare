@@ -95,6 +95,12 @@ internal class FakeAnalysisDao(initial: List<AnalysisEntity> = emptyList()) : An
         update(id) { it.copy(photoSyncStatus = PhotoSyncState.REMOTE_ONLY) }
     }
 
+    override suspend fun markLocalOnly(id: String) {
+        update(id) { it.copy(syncStatus = SyncState.LOCAL_ONLY, photoSyncStatus = PhotoSyncState.LOCAL_ONLY) }
+    }
+    override suspend fun markPhotoLocalOnly(id: String) {
+        update(id) { it.copy(photoSyncStatus = PhotoSyncState.LOCAL_ONLY) }
+    }
     override suspend fun markPhotoError(id: String) {
         update(id) { it.copy(photoSyncStatus = PhotoSyncState.ERROR) }
     }
@@ -232,6 +238,51 @@ class AnalysisSyncRunnerTest {
         photoDeleter = { deletedPhotos += it },
         photoFile = { name -> File(photosDir, name) }
     )
+
+    @Test fun pausedPolicyPreservesQueuesAndStillAllowsRestore() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(entity(), entity(id = "deleted", syncStatus = SyncState.PENDING_DELETE, deletedAt = 10)))
+        val api = FakeAnalysisSyncApi()
+        val runner = AnalysisSyncRunner(dao, api, "test", uploadPolicy = { UploadPolicy(enabled = false) })
+        assertEquals(SyncRunResult.Completed(0), runner.syncOnce("user"))
+        assertTrue(api.upsertCalls.isEmpty())
+        assertTrue(api.uploadCalls.isEmpty())
+        assertTrue(api.deleteCalls.isEmpty())
+        assertEquals(SyncState.PENDING_UPLOAD, dao.get("a-1")?.syncStatus)
+        assertNotNull(dao.get("deleted"))
+        assertEquals(SyncRunResult.Completed(0), runner.restoreOnce("user"))
+        assertEquals(1, api.fetchCalls)
+    }
+
+    @Test fun missingPolicyFailsClosedWithoutChangingLocalRows() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(entity()))
+        val api = FakeAnalysisSyncApi()
+        val runner = AnalysisSyncRunner(dao, api, "test", uploadPolicy = { throw IOException("offline") })
+        assertEquals(SyncRunResult.Completed(1), runner.syncOnce("user"))
+        assertTrue(api.upsertCalls.isEmpty())
+        assertEquals(SyncState.PENDING_UPLOAD, dao.get("a-1")?.syncStatus)
+    }
+
+    @Test fun resumeExcludesBacklogPermanentlyButProcessesNewResultsAndTombstones() = runTest(dispatcher) {
+        val cutoff = entity().createdAt
+        val dao = FakeAnalysisDao(listOf(entity(), entity(id = "new").copy(createdAt = cutoff + 1),
+            entity(id = "photo", syncStatus = SyncState.SYNCED),
+            entity(id = "deleted", syncStatus = SyncState.PENDING_DELETE, deletedAt = 10)))
+        val api = FakeAnalysisSyncApi()
+        localPhoto("new.img")
+        val runner = AnalysisSyncRunner(dao, api, "test", uploadPolicy = { UploadPolicy(cutoffMs = cutoff) },
+            photoFile = { File(photosDir, it) })
+        assertEquals(SyncRunResult.Completed(0), runner.syncOnce("user"))
+        assertEquals(listOf("new"), api.upsertCalls)
+        assertEquals(listOf("user/new.jpg"), api.uploadCalls)
+        assertEquals(listOf("deleted"), api.deleteCalls)
+        assertEquals(SyncState.LOCAL_ONLY, dao.get("a-1")?.syncStatus)
+        assertEquals(PhotoSyncState.LOCAL_ONLY, dao.get("a-1")?.photoSyncStatus)
+        assertEquals(SyncState.SYNCED, dao.get("photo")?.syncStatus)
+        assertEquals(PhotoSyncState.LOCAL_ONLY, dao.get("photo")?.photoSyncStatus)
+        assertNull(dao.get("deleted"))
+        runner.syncOnce("user")
+        assertEquals(listOf("new"), api.upsertCalls)
+    }
 
     @Test fun newAnalysisUploadsWithSameUuidAndMarksSynced() = runTest(dispatcher) {
         val dao = FakeAnalysisDao(listOf(entity()))

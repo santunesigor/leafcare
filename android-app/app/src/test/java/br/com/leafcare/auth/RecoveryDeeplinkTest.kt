@@ -38,6 +38,11 @@ class RecoveryDeeplinkTest {
         assertEquals(AuthDeeplink.RecoveryTokens("at123", "rt123"), link)
     }
 
+    @Test fun invitationOpensInitialPasswordFlow() {
+        assertEquals(AuthDeeplink.RecoveryTokens("at", "rt"), parseAuthDeeplink(
+            "leafcare://auth/reset-password#access_token=at&refresh_token=rt&type=invite"))
+    }
+
     @Test fun confirmAndRecovery_areNeverConfused() {
         val confirm = parseAuthDeeplink("leafcare://auth/confirm-email?code=abc")
         val recovery = parseAuthDeeplink("leafcare://auth/reset-password?code=abc")

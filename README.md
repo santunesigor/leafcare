@@ -13,7 +13,7 @@ O LeafCare é um aplicativo Android para triagem visual de doenças e alteraçõ
 3. Salva a análise e o histórico no banco local Room.
 4. Depois do primeiro acesso autenticado, câmera, galeria, classificação e histórico ficam disponíveis offline. Quando há conexão, o app sincroniza o histórico e as fotos de análises conclusivas com o Supabase em segundo plano. Fotos inconclusivas ficam somente no aparelho.
 
-O Supabase cuida da autenticação e da sincronização; ele não classifica as imagens.
+O Supabase cuida da autenticação e da sincronização; ele não classifica as imagens. A [administração restrita](docs/SUPERADMIN.md) permite gerir contas e revisar fotos online, mantendo a previsão original.
 
 ### Dataset e modelo
 
