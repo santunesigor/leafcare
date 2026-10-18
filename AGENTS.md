@@ -8,6 +8,7 @@
 - Confira branch e working tree antes de editar; trabalhe na branch atual e não faça push sem autorização.
 - Execute validações proporcionais à mudança e relate somente resultados realmente obtidos.
 - Sempre gere e disponibilize um APK debug ao concluir mudanças; o usuário testa pelo APK.
+- Atualize a versão do app a cada entrega de mudanças: novas funcionalidades incrementam `1.x.0` (minor) e corrigem bugs incrementando `1.x.y` (patch), reiniciando o patch em `0` ao subir o minor. Reserve o primeiro número para mudanças maiores, somente quando explicitamente definido. Incremente também `versionCode` a cada nova versão do APK. Aplique essa regra a partir da versão atual, sem voltar versões.
 - O usuário autoriza push em branches separadas. Não faça push na `main` sem solicitação explícita.
 - Preserve alterações existentes do usuário.
 
