@@ -138,7 +138,7 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
             title = { Text("Analisar fotografia") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (trainingConsentActive) "A análise funciona normalmente. A contribuição para treinamento é opcional." else "A análise funciona normalmente. O envio para treinamento está desativado até a publicação dos termos, política de privacidade e prazo de retenção.")
+                    Text(if (trainingConsentActive) "A análise funciona normalmente. A contribuição para treinamento é opcional e exige sua escolha para esta foto." else "A análise funciona normalmente. Para contribuir com fotos, leia e aceite a política de treinamento no Perfil.")
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = authorizeTraining,
@@ -147,7 +147,7 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                             modifier = Modifier.semantics {
                                 contentDescription = "Autorização individual desta foto para treinamento"
                                 stateDescription = if (!trainingConsentActive) {
-                                    "Indisponível até a publicação do prazo de retenção e dos links oficiais"
+                                    "Não autorizada: ative o consentimento geral no Perfil para escolher esta foto"
                                 } else if (authorizeTraining) {
                                     "Autorizada"
                                 } else {

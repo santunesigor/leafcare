@@ -66,8 +66,8 @@ class TrainingConsentSyncTest {
         assertFalse(events.contains("upload"))
     }
 
-    @Test fun pendingImageNeverUploadsWhileLegalGateIsDisabled() = runTest {
-        assertFalse(TRAINING_UPLOADS_ENABLED)
+    @Test fun explicitlyAuthorizedImageUploadsAfterRemoteConsentIsConfirmed() = runTest {
+        assertTrue(TRAINING_UPLOADS_ENABLED)
         val events = mutableListOf<String>()
         val image = Files.createTempFile("training", ".jpg").toFile().apply { writeBytes(byteArrayOf(1, 2, 3)) }
         try {
@@ -82,8 +82,8 @@ class TrainingConsentSyncTest {
                 trainingApi = ConsentApiFake(events),
             )
             runner.syncOnce("user-1")
-            assertEquals(listOf("consent:false", "photo-auth:false", "delete"), events)
-            assertFalse(events.contains("upload"))
+            assertEquals(listOf("consent:true", "photo-auth:true", "upload"), events)
+            assertTrue(events.contains("upload"))
         } finally { image.delete() }
     }
 
@@ -101,7 +101,7 @@ class TrainingConsentSyncTest {
                 consentDao = localConsent, trainingApi = ConsentApiFake(events, failConsent = true),
             ).syncOnce("user-1")
             assertEquals(SyncRunResult.Completed(1), result)
-            assertEquals(listOf("consent:false"), events)
+            assertEquals(listOf("consent:true"), events)
             assertEquals("PENDING", localConsent.getPendingPhotos("user-1").single().syncState)
         } finally { image.delete() }
     }

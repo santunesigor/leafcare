@@ -103,7 +103,7 @@ private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
         AuthHeader(logoSize = 56, title = "Documentos atualizados", subtitle = "Leia e escolha se deseja continuar")
         Spacer(Modifier.height(12.dp))
         Text(
-            "Atualizamos os Termos de Uso e a Política de Privacidade. Leia as versões 1.2, publicadas em 19/10/2026, e confirme para continuar usando os recursos conectados.",
+            "Atualizamos os Termos de Uso e a Política de Privacidade. Leia as versões 1.3, publicadas em 19/10/2026, e confirme para continuar usando os recursos conectados.",
             style = MaterialTheme.typography.bodyMedium,
             color = LeafColors.Text,
             textAlign = TextAlign.Center

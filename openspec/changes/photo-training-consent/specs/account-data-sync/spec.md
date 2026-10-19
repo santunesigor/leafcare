@@ -1,10 +1,10 @@
 # Spec Delta
 
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Consentimento de treinamento independente do histórico
 
-A sincronização SHALL manter as decisões de treinamento separadas das análises e fotos de histórico. SHALL transmitir autorizações e revogações pendentes antes de qualquer foto para treinamento, e somente após confirmação remota enviar fotos marcadas individualmente.
+A sincronização SHALL manter as decisões de treinamento separadas das análises e fotos de histórico. SHALL transmitir autorizações e revogações pendentes antes de qualquer foto para treinamento, e somente após confirmação remota enviar fotos marcadas individualmente. O envio SHALL exigir recibo atual dos Termos e da Política.
 
 #### Scenario: Foto de histórico sem autorização de treino
 - **WHEN** uma análise conclusiva sincroniza sua foto normal de histórico sem autorização individual de treinamento
@@ -15,3 +15,8 @@ A sincronização SHALL manter as decisões de treinamento separadas das anális
 - **WHEN** o usuário revogou localmente enquanto há fotos de treinamento pendentes
 - **THEN** o runner sincroniza a revogação primeiro e não envia as fotos pendentes
 - **AND** os dados locais permanecem disponíveis para a análise normal
+
+#### Scenario: Recibo legal atual pendente
+- **WHEN** a conta ainda não aceitou as versões atuais dos documentos legais
+- **THEN** nenhuma foto de treinamento é enviada
+- **AND** a classificação local continua disponível

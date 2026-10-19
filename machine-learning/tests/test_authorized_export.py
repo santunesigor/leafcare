@@ -39,22 +39,23 @@ class AuthorizedExportTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "vazio"):
             valid_image(b"")
 
-    def test_export_is_disabled_until_legal_documents_are_published(self):
+    def test_export_honors_explicit_configuration_off_switch(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "output"
             output.mkdir()
             (output / "old.jpg").write_bytes(b"stale")
-            with self.assertRaisesRegex(RuntimeError, "desativada"):
-                export("https://example.test", "secret", output)
+            with patch("export_authorized_training.TRAINING_EXPORT_ENABLED", False):
+                with self.assertRaisesRegex(RuntimeError, "desativada"):
+                    export("https://example.test", "secret", output)
             self.assertFalse(output.exists())
 
     def test_export_requires_matching_current_consent_and_review(self):
         rows = [
-            {"analysis_id": "a", "terms_version": "1.0", "training_consents": {"granted": True, "terms_version": "1.0"},
+            {"analysis_id": "a", "terms_version": "1.1", "training_consents": {"granted": True, "terms_version": "1.1"},
              "analyses": {"user_id": "private-user", "deleted_at": None, "photo_reviews": {"status": "corrected", "class_id": "frog_eye"}}},
             {"analysis_id": "b", "terms_version": "old", "training_consents": {"granted": True, "terms_version": "new"},
              "analyses": {"user_id": "private-user", "deleted_at": None, "photo_reviews": {"status": "confirmed", "class_id": "frog_eye"}}},
-            {"analysis_id": "c", "terms_version": "1.0", "training_consents": {"granted": True, "terms_version": "1.0"},
+            {"analysis_id": "c", "terms_version": "1.1", "training_consents": {"granted": True, "terms_version": "1.1"},
              "analyses": {"user_id": "private-user", "deleted_at": None, "photo_reviews": {"status": "uncertain", "class_id": "frog_eye"}}},
         ]
         duplicate = dict(rows[0], analysis_id="duplicate")

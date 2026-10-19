@@ -36,10 +36,10 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Uso de fotos no treinamento", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
-            Text("A contribuição de fotos para treinamento está desativada. Ela continuará indisponível até que o canal de privacidade seja monitorado e a rotina automática de expiração esteja instalada e testada.", color = LeafColors.Text)
+            Text("Você decide se quer contribuir. A autorização é opcional e pode ser revogada nesta tela; recusar não altera a análise nem o histórico.", color = LeafColors.Text)
             Text("Política de privacidade", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
-            Text("Quando a coleta for habilitada, somente fotos com autorização global e individual serão copiadas para uma área privada separada do histórico. Cada cópia será apagada em até 90 dias do envio ou antes, se a autorização for revogada. Exportações locais serão apagadas em até 30 dias.", color = LeafColors.Text)
-            Text("A classe prevista pelo aplicativo não é um diagnóstico validado. Se a coleta for habilitada, uma foto só poderá entrar em um conjunto de treinamento após revisão humana e validação de qualidade. Identificadores da conta e metadados EXIF serão removidos na exportação.", color = LeafColors.Text)
+            Text("Somente fotos com sua autorização nesta tela e uma confirmação individual antes de cada análise poderão ser copiadas para uma área privada separada do histórico. Cada cópia será apagada em até 90 dias do envio ou antes, quando a autorização for revogada. Exportações locais de treinamento serão apagadas em até 30 dias.", color = LeafColors.Text)
+            Text("A classe prevista pelo aplicativo não é um diagnóstico validado. Uma foto autorizada só poderá entrar em um conjunto de treinamento após revisão humana e validação de qualidade. Identificadores da conta e metadados EXIF serão removidos na exportação.", color = LeafColors.Text)
             Text("A análise local e o histórico continuam disponíveis offline após autenticação. Futuras cópias de treinamento poderão ser revogadas e excluídas, mas isso não reverte automaticamente pesos de modelos já treinados.", color = LeafColors.Text)
             PrivacyContactCard()
             Surface(shape = RoundedCornerShape(16.dp), color = LeafColors.Pale, border = BorderStroke(1.dp, LeafColors.Border)) {
@@ -52,14 +52,12 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                             contentDescription = "Consentimento global opcional para uso de fotos no treinamento"
                             stateDescription = if (TRAINING_UPLOADS_ENABLED) {
                                 if (granted) "Autorizado" else "Não autorizado"
-                            } else {
-                                "Indisponível até o monitoramento do canal de privacidade e a validação da expiração automática"
-                            }
+                            } else "Não autorizado"
                         },
                         colors = CheckboxDefaults.colors(checkedColor = LeafColors.Green),
                     )
-                    Text(if (TRAINING_UPLOADS_ENABLED) "Autorizo o uso opcional das fotos" else "Envio desativado", modifier = Modifier.weight(1f), color = LeafColors.Muted)
-                    Text(if (consent?.syncState == "SYNCED") "Sincronizado" else "Desativado", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
+                    Text("Autorizo o uso opcional das fotos", modifier = Modifier.weight(1f), color = LeafColors.Muted)
+                    Text(if (consent?.syncState == "SYNCED") "Sincronizado" else "Pendente", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

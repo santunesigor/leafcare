@@ -6,19 +6,67 @@ Permitir que cada pessoa escolha, de forma informada e revogável, se fotos espe
 
 ## ADDED Requirements
 
-### Requirement: Coleta desativada até publicar informações legais
+### Requirement: Reaceite de versões materiais por contas existentes
 
-O app, o servidor e o pipeline SHALL manter gravação e exportação de fotos de treinamento desativadas até que um canal de privacidade monitorado e a rotina automática de expiração estejam publicados, implantados e testados. A análise local e o histórico SHALL permanecer disponíveis.
+O app SHALL verificar no servidor se a conta autenticada possui recibo das versões atuais dos Termos e da Política. Quando faltar recibo, SHALL apresentar os documentos no próprio app e exigir confirmação explícita antes de liberar funções conectadas. O recibo SHALL ser criado no servidor somente após essa ação, com timestamp do servidor, e SHALL ser imutável. Falha de rede SHALL NOT criar recibo nem impedir classificação local offline.
+
+#### Scenario: Conta existente sem recibo atual
+- **WHEN** uma conta autenticada não tem recibo das versões atuais e há conexão
+- **THEN** os documentos atuais são apresentados dentro do app
+- **AND** o recibo só é criado após confirmação explícita
+
+#### Scenario: Reaceite indisponível sem rede
+- **WHEN** a verificação ou o registro de aceite falha por indisponibilidade de rede
+- **THEN** nenhum recibo é criado pelo app
+- **AND** classificação local continua disponível
+- **AND** o app verifica novamente ao retornar ao primeiro plano
+
+### Requirement: Identificação do projeto e contato
+
+A Política SHALL identificar o projeto acadêmico, a equipe LeafCare de cinco integrantes, Ígor da Silva Antunes como representante e igorsantunes@outlook.com como contato. SHALL informar que não há CNPJ nem endereço institucional. Essas informações SHALL NOT bloquear o consentimento de treinamento.
+
+#### Scenario: Entender quem responde pelo projeto
+- **WHEN** a pessoa consulta a Política de Privacidade
+- **THEN** encontra a equipe, o representante, o contato e a informação de que não há CNPJ ou endereço institucional
+
+### Requirement: Backups manuais no Google Drive
+
+A Política SHALL informar que a equipe mantém backups manuais do banco no Google Drive, com acesso restrito e retenção máxima de 30 dias. SHALL informar que exportações SQL não incluem arquivos do Storage. A falta de backup automático do plano Supabase SHALL NOT bloquear o consentimento de treinamento.
+
+#### Scenario: Entender o prazo e o conteúdo dos backups
+- **WHEN** a pessoa consulta a Política de Privacidade
+- **THEN** encontra o prazo máximo de 30 dias e o limite das exportações SQL quanto aos arquivos do Storage
+
+## RENAMED Requirements
+
+### Requirement: Coleta desativada até publicar informações legais
+- FROM: `### Requirement: Coleta desativada até publicar informações legais`
+- TO: `### Requirement: Coleta opcional e separada do histórico`
+
+## MODIFIED Requirements
+
+### Requirement: Coleta opcional e separada do histórico
+
+O app SHALL exigir aceite explícito dos documentos atuais, consentimento geral opcional e autorização individual antes de coletar cada foto. A opção SHALL ficar desmarcada por padrão e SHALL NOT surgir do cadastro ou do envio ao histórico. A falta de CNPJ, endereço institucional ou substituto do contato SHALL NOT bloquear a coleta. A recusa SHALL manter análise local e histórico disponíveis.
+
+#### Scenario: Primeira utilização
+- **WHEN** a conta ainda não tem consentimento de treinamento
+- **THEN** a opção aparece desmarcada e nenhuma foto é enviada para treinamento
+- **AND** câmera, galeria, análise local e histórico continuam disponíveis
 
 #### Scenario: Informações ainda não publicadas
-- **WHEN** falta canal de privacidade monitorado ou rotina automática de expiração
-- **THEN** nenhuma opção de consentimento permite aceitar o uso de fotos
-- **AND** nenhum byte de foto é enviado ou exportado para treinamento
-- **AND** a tela informa por que a contribuição está indisponível
+- **WHEN** o projeto não possui CNPJ, endereço institucional ou pessoa substituta do contato
+- **THEN** a pessoa ainda pode decidir pelo consentimento opcional após ler os documentos atuais
+- **AND** nenhum dado é enviado sem as escolhas geral e individual
+
+#### Scenario: Aceite explícito e autorização por foto
+- **WHEN** a pessoa aceitou os documentos atuais, ativou a opção geral e autorizou uma foto específica
+- **THEN** o app pode sincronizar aquela foto para o bucket privado após confirmação do servidor
+- **AND** fotos sem as duas escolhas continuam fora da coleta
 
 ### Requirement: Consentimento versionado e opcional
 
-O sistema SHALL registrar por conta a decisão explícita, a versão dos termos e a data da autorização. A decisão inicial e qualquer versão de termos ainda não aceita SHALL permanecer negadas, sem impedir a análise normal.
+O sistema SHALL registrar por conta a decisão explícita, a versão dos termos de treinamento e a data da autorização, gerada pelo servidor. A decisão inicial e qualquer versão de termos ainda não aceita SHALL permanecer negadas, sem impedir a análise normal. Uma concessão SHALL exigir aceite das versões atuais dos Termos e da Política.
 
 #### Scenario: Primeira utilização
 - **WHEN** uma conta ainda não tem decisão registrada
@@ -92,26 +140,9 @@ O pipeline SHALL incluir somente imagens com consentimento vigente, autorizaçã
 - **THEN** a imagem é excluída da exportação
 - **AND** a classe prevista automaticamente não é tratada como rótulo confirmado
 
-### Requirement: Reaceite de versões materiais por contas existentes
-
-O app SHALL verificar no servidor se a conta autenticada possui recibo das versões atuais dos Termos e da Política. Quando faltar recibo, SHALL apresentar os documentos no próprio app e exigir confirmação explícita antes de liberar funções conectadas. O recibo SHALL ser criado no servidor somente após essa ação, com timestamp do servidor, e SHALL ser imutável. Falha de rede SHALL NOT criar recibo nem impedir classificação local offline.
-
-#### Scenario: Conta existente sem recibo atual
-- **WHEN** uma conta autenticada não tem recibo das versões atuais e há conexão
-- **THEN** os documentos atuais são apresentados dentro do app
-- **AND** o recibo só é criado após confirmação explícita
-
-#### Scenario: Reaceite indisponível sem rede
-- **WHEN** a verificação ou o registro de aceite falha por indisponibilidade de rede
-- **THEN** nenhum recibo é criado pelo app
-- **AND** classificação local continua disponível
-- **AND** o app verifica novamente ao retornar ao primeiro plano
-
-## MODIFIED Requirements
-
 ### Requirement: Informação transparente e retenção
 
-O app SHALL disponibilizar os termos e o aviso de privacidade antes da autorização, explicando finalidade, dados usados, armazenamento, retenção, revogação e limites de remoção após treinamento. O histórico remoto SHALL ser mantido enquanto a conta estiver ativa, salvo exclusão solicitada; cópias de treinamento SHALL expirar em até 90 dias e exportações locais em até 30 dias.
+O app SHALL disponibilizar Termos e Política antes da autorização, explicando finalidade, dados usados, armazenamento, retenção, revogação e limites de remoção após treinamento. O histórico remoto SHALL ser mantido enquanto a conta estiver ativa, salvo exclusão solicitada; cópias de treinamento SHALL expirar em até 90 dias e exportações locais em até 30 dias.
 
 #### Scenario: Consultar informações
 - **WHEN** a pessoa abre as informações sobre uso de fotos
@@ -139,7 +170,8 @@ O app SHALL disponibilizar os termos e o aviso de privacidade antes da autoriza�
 #### Scenario: Exclusão e backups
 - **WHEN** os dados ativos são excluídos a pedido da pessoa
 - **THEN** os sistemas ativos processam a exclusão em até 30 dias
-- **AND** cópias de recuperação do banco podem persistir por até 30 dias conforme o plano do provedor
+- **AND** exportações manuais do banco guardadas pela equipe no Google Drive podem persistir por até 30 dias
+- **AND** a Política informa que exportações SQL não incluem arquivos do Storage
 
 #### Scenario: Modelo já treinado
 - **WHEN** uma cópia de treinamento é excluída após a revogação
@@ -166,15 +198,3 @@ A tela de cadastro SHALL mostrar uma única declaração com links inline verdes
 - **THEN** o app envia as versões exibidas dos Termos de Uso e da Política de Privacidade
 - **AND** o servidor registra essas versões com seu próprio timestamp
 - **AND** o recibo não autoriza treinamento de fotos
-
-### Requirement: Público adulto
-
-Os Termos de Uso SHALL informar que o LeafCare é destinado a pessoas com 18 anos ou mais.
-
-#### Scenario: Consultar idade mínima
-- **WHEN** a pessoa abre os Termos de Uso pelo cadastro
-- **THEN** encontra a informação de que menores de 18 anos não devem criar conta nem usar o serviço
-
-#### Scenario: Termos gerais não autorizam treinamento
-- **WHEN** a pessoa lê ou aceita os termos gerais para criar uma conta
-- **THEN** nenhuma autorização global ou individual para treinamento de fotos é criada

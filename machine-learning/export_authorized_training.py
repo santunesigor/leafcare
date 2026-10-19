@@ -19,8 +19,8 @@ from PIL import Image, ImageOps
 
 OUTPUT = Path(__file__).parent / "data" / "authorized_training"
 MIN_SIDE = 128
-CURRENT_TERMS_VERSION = "1.0"
-TRAINING_EXPORT_ENABLED = False
+CURRENT_TERMS_VERSION = "1.1"
+TRAINING_EXPORT_ENABLED = True
 EXPORT_RETENTION = timedelta(days=30)
 
 
@@ -71,7 +71,7 @@ def export(base_url: str, key: str, output: Path = OUTPUT) -> dict:
     if output.exists():
         shutil.rmtree(output)
     if not TRAINING_EXPORT_ENABLED:
-        raise RuntimeError("Exportação de treinamento desativada até a publicação dos termos, política de privacidade e prazo de retenção.")
+        raise RuntimeError("Exportação de treinamento desativada por configuração.")
     query = urllib.parse.urlencode({
         "select": "analysis_id,terms_version,training_consents!inner(granted,terms_version),analyses!inner(id,user_id,deleted_at,photo_reviews!inner(status,class_id))",
         "authorized": "eq.true", "training_consents.granted": "eq.true",
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     if not TRAINING_EXPORT_ENABLED:
         if OUTPUT.exists():
             shutil.rmtree(OUTPUT)
-        raise SystemExit("Exportação desativada até a publicação dos termos, política de privacidade e prazo de retenção.")
+        raise SystemExit("Exportação de treinamento desativada por configuração.")
     url, secret = os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     if not url or not secret:
         raise SystemExit("Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no ambiente.")
