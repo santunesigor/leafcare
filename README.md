@@ -71,8 +71,6 @@ O modelo só deve ser substituído após solicitação explícita e validação 
 - [OpenSpec](openspec/README.md)
 - [Histórico de versões](CHANGELOG.md)
 
-Relatos de experimentos e jornadas em `docs/explain/` são material histórico e educacional; instruções operacionais atuais ficam nos guias acima.
-
 ## Estrutura do repositório
 
 ```text

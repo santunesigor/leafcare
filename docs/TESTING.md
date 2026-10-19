@@ -1,112 +1,55 @@
 # Testes e QA
 
-## Comandos
+Use as verificações adequadas às partes alteradas. Os testes automatizados não substituem os fluxos que dependem de um aparelho ou de um projeto Supabase configurado.
 
-Python/ML, dentro de `machine-learning`:
+## Android
 
-```powershell
+Na pasta `android-app`:
+
+```bash
+bash ./gradlew testDebugUnitTest verifyModelAssets lintDebug assembleDebug
+```
+
+No Windows, execute os equivalentes com `gradlew.bat`. Com aparelho ou emulador conectado, rode também os testes instrumentados:
+
+```bash
+bash ./gradlew connectedDebugAndroidTest
+```
+
+## Machine Learning
+
+Com Python 3.12 e dependências instaladas, no diretório `machine-learning/`:
+
+```bash
 python -m pytest -q
 python validate_bundle.py --require-model
 ```
 
-Android, dentro de `android-app`:
+O treino e a promoção exigem dataset e caches locais; consulte [Machine Learning](MACHINE_LEARNING.md). Não promova um modelo como parte da validação de rotina.
 
-```powershell
-.\gradlew.bat testDebugUnitTest
-.\gradlew.bat verifyModelAssets
-.\gradlew.bat lintDebug
-.\gradlew.bat assembleDebug
+## Backend e especificações
+
+Na raiz do repositório:
+
+```bash
+bash supabase/tests/run-pglite.sh
+npx --yes deno test supabase/functions/leafcare-admin/handler_test.ts
+openspec validate --all --strict --no-interactive
+openspec validate --archived --strict --no-interactive
 ```
 
-Com aparelho/emulador conectado, os testes instrumentados podem ser executados com `.\gradlew.bat connectedDebugAndroidTest`.
+Os cenários PGlite usam banco efêmero. Não use testes locais para aplicar migrations, gravar dados ou validar mudanças no projeto Supabase remoto.
 
-## Evidências históricas
+## Checklist manual Android
 
-O checklist físico anterior registrou uma rodada em dispositivo em 2026-09-29. Os itens abaixo são o estado registrado naquela rodada, não uma execução feita ao editar este documento.
-
-- **Registrado como OK:** instalação limpa e ícone; cadastro e confirmação de e-mail; perfil; senha incorreta e recuperação de senha; análise online e offline; sincronização, retry e exclusão; reinstalação e restore de histórico/fotos; uso offline após restore; isolamento de contas no mesmo aparelho; conexão instável; importação JPEG/PNG; resultado inconclusivo; inspeção de RLS, bucket privado e trigger de perfil.
-- **Somente visual:** login/logout e persistência de sessão.
-- **Parcial:** câmera abriu e capturou; uma foto de baixa confiança mostrou “Inconclusivo”. O teste de negar permissão não tinha resultado registrado.
-- **Não executado:** restore em segundo aparelho, por indisponibilidade de outro dispositivo.
-
-Os quatro fluxos de Auth foram reportados pelo usuário como aprovados manualmente em dispositivo em 2026-09-29.
-
-### Observações daquela rodada
-
-O checklist também registrou: mensagem antiga de login incorreto não era limpa ao iniciar cadastro logo em seguida; após criar conta e sair, o app voltava à tela de criar conta; imagens dos cards do histórico às vezes demoravam; e havia um breve flash da tela de login ao restaurar sessão. A captura em baixa luz retornou cerca de 30% e “Inconclusivo”, sem aviso específico de pouca luz. Essas observações são históricas e precisam ser reproduzidas antes de tratá-las como defeitos atuais.
-
-## Roteiro manual
-
-Ao validar mudanças que afetem o app, cubra os fluxos relevantes:
-
-- Auth: cadastro, confirmação, login/logout, recuperação, troca de senha e sessão persistida.
+- Cadastro, confirmação de e-mail, login, logout, recuperação de senha e retorno do deep link ao app.
 - Câmera e galeria: permissões, captura, JPEG/PNG, imagem grande e orientação EXIF.
-- Inferência e histórico: Top-3, inconclusivo, persistência, busca, filtros e exclusão.
-- Offline e sync: criar análise offline, reconectar, retry sem duplicação, foto, exclusão e restore.
-- Contas: alternar usuários no aparelho e confirmar isolamento remoto com duas sessões.
-- Segundo aparelho: quando disponível, validar restore e exclusões entre dispositivos.
+- Classificação e histórico: Top-3, resultado inconclusivo, persistência, busca, filtros e exclusão.
+- Offline e sincronização: análise sem rede, retry sem duplicação, sincronização de fotos elegíveis, exclusão e restauração.
+- Troca de contas no mesmo aparelho e isolamento do histórico.
+- Treinamento opcional: opção desligada por padrão, recusa, autorização geral e por foto, revogação e continuidade da análise/histórico.
+- Administração, quando aplicável: papel autorizado, revisão, filtros, conflitos e perda de acesso.
 
-Os relatórios XML antigos e o snapshot de ambiente sem consumidores foram removidos. Relatórios de novas execuções ficam em `android-app/app/build/test-results/` e nos artefatos da CI; não substituem o roteiro manual. As capturas históricas usadas na jornada do app ficam em `docs/archive/ui/`.
+## Limites
 
-## APK 1.7.1 — 2026-10-19
-
-- O proprietário testou o APK 1.7.1 (versionCode 15) em aparelho e confirmou que os fluxos estão funcionando, incluindo a contribuição opcional de fotos.
-- `testDebugUnitTest`: 289 testes passaram, sem falhas, erros ou skips. `verifyModelAssets` e `assembleDebug` passaram.
-- `lintDebug` passou com 24 avisos de compatibilidade, manifest e dependências existentes; removido o único recurso Android marcado como não utilizado.
-- A issue [#10](https://github.com/santunesigor/leafcare/issues/10) registra o teste e foi fechada após a confirmação.
-
-## Integração MobileNetV4 Small destilado — 2026-10-08
-
-- Branch `feat/mobilenetv4-distilled`, APK 1.2.0/versionCode 7, schema 2.
-- Replay da promoção: 104 imagens de validação, Top-1 idêntico e erro máximo de probabilidade 0,0000050664 contra logits do checkpoint selecionado. As 103 imagens de teste mantiveram Top-1 85,44%, Macro-F1 0,8083 e Top-3 97,09%. Não houve treino/recalibração ou nova seleção pelo teste.
-- Python padrão: 39 testes passaram; testes explícitos da destilação/exportação: 9 passaram. `validate_bundle.py --require-model` e CLI TFLite executados com sucesso em TensorFlow 2.16.1.
-- Android: 213 testes unitários passaram, zero falhas/skips, incluindo fixtures RGB sintéticas e replay pixel a pixel das 104 imagens decodificadas com `LEAFCARE_PARITY_DIR=/tmp/leafcare-distilled-parity`.
-- Uma execução conjunta de testes/lint foi interrompida (exit 143); a validação final foi executada novamente com duas workers. Houve aviso de limpeza de diretório temporário do Robolectric em uma execução direcionada; ela terminou com sucesso.
-- `verifyModelAssets`, `lintDebug` e `assembleDebug` concluídos com sucesso. O modelo dentro do APK foi extraído e conferido contra o SHA256 do aluno e metadata Python.
-- OpenSpec: specs, changes ativas e arquivo validaram em modo estrito. Nenhum aparelho conectado via ADB; captura/galeria, atualização sobre v1.1.2 e latência completa no Galaxy A06 ainda precisam de teste no aparelho. Os testes JVM não executam inferência no telefone.
-
-Relatórios atuais: [pasta do aluno](model-reports/mobilenetv4-distilled/). Relatórios do ensemble e benchmarks anteriores permanecem históricos.
-
-Entrega: [pré-release v1.2.0](https://github.com/santunesigor/leafcare/releases/tag/v1.2.0), [APK leafcare-1.2.0-cca5514.apk](https://github.com/santunesigor/leafcare/releases/download/v1.2.0/leafcare-1.2.0-cca5514.apk) e [PR #6](https://github.com/santunesigor/leafcare/pull/6). APK/release correspondem ao commit de implementação `cca5514`; o commit posterior registra apenas a conclusão documental. SHA256 APK: `112a962b863fbcafc097cbeaf46c181d172e657b4438d98dba9817d3d00af37c`. A CI remota do PR é acompanhada no GitHub; os resultados acima são das execuções locais.
-
-## Envio somente de fotos conclusivas — 2026-10-08
-
-Branch `feat/conclusive-photo-sync`, APK 1.2.1/versionCode 8. Fotos novas ou retries antigos só enviam bytes quando inconclusive=false e confidence>=threshold da análise. Fotos abaixo do limiar permanecem no aparelho; a linha e classe continuam sincronizadas. Nenhum objeto antigo foi apagado e nenhuma mudança foi aplicada no schema/RLS Supabase.
-
-48 testes direcionados de sincronização e a suíte completa de 220 testes Android passaram, zero falhas/skips. Casos: inconclusiva com retry antigo, confiança abaixo/igual ao limiar, proteção no runner, fila Room real, payload sem caminho remoto, associação classe/UUID e restore sem foto com associação posterior. `verifyModelAssets`, `lintDebug`, `assembleDebug` e OpenSpec estrito (ativo/specs e arquivo) passaram. SHA256 do modelo dentro do APK conferido, mantendo o mesmo MobileNetV4 destilado. Não houve teste com sessão Supabase real/aparelho nesta execução.
-
-Consulta de classe por arquivo: [Supabase](SUPABASE.md#fotos-com-previsão-aceita-e-consulta-da-classe). Testar no aparelho: uma análise conclusiva envia foto; uma inconclusiva conserva histórico/foto local e não cria objeto; retry offline e restauração da análise sem foto não falham.
-
-## Superadmin e triagem — 2026-10-09
-
-Branch `feat/superadmin`, APK 1.3.0/versionCode 9, dependente do PR #7. Implementação e [publicação do backend](SUPERADMIN.md) são etapas separadas; produção não foi alterada nesta rodada.
-
-- PostgreSQL 18 isolado: todas as migrations e cenários SQL passaram. Validados: acesso somente à própria política, proibição de elevar papel/gravar revisão diretamente, RPC inacessível ao cliente, negação a não-admin e papel revogado, revisão preservando classe original, versão conflitante, classe/motivo inválidos, último superadmin/autoexclusão, pausa bloqueando insert/update/delete em análises e Storage sem impedir leitura, corte na retomada, relógio futuro, rejeição mantendo foto, exclusão/retomada e auditoria preservada. Bootstrap parametrizado e repetição idempotente também passaram.
-- Edge Function: `deno check` passou; 8 testes passaram. Cobrem JWT ausente/inválido, papel atual, ator não forjável, foto privada sem cache, conflito, convite/recuperação auditados, exclusão em lotes e falha parcial. Auth/Storage são simulados; não enviam e-mails nem apagam dados reais.
-- Android: **227 testes passaram**, zero falhas/erros/skips, incluindo backlog permanentemente local, fotos antigas, política indisponível, pausa com leitura e tombstones, persistência Room após reabrir, convite para definir senha e entrada administrativa condicional no Perfil.
-- `verifyModelAssets`, `lintDebug` e `assembleDebug` passaram. Lint: zero erros, 24 avisos em manifest, dependências e recursos existentes. O único TFLite dentro do APK foi extraído e seu SHA256 conferido contra o arquivo versionado, sem alteração do modelo.
-- OpenSpec: 4 specs, 4 changes ativas e 1 arquivada passaram em modo estrito. Specs de administração e política de envio sincronizadas.
-- Nenhum aparelho conectado via ADB. Teste físico e integração com Supabase publicado continuam pendentes; os testes locais não certificam entrega real de e-mail ou navegação no telefone.
-
-Após publicar em ambiente autorizado: validar conta comum sem Administração; conta superadmin com as cinco telas; filtros/paginação/zoom; dois revisores concorrentes; convite e definição de senha; pausa com análise offline, retomada sem enviar acumulado e exclusões pendentes; exclusão retomável em conta descartável; revogação de papel, logout/troca de conta e perda de conexão. Conferir que rejeitar mantém a foto e que corrigir não altera a previsão exibida no histórico do proprietário.
-
-Entrega da administração: [PR #8](https://github.com/santunesigor/leafcare/pull/8), base `feat/conclusive-photo-sync`, implementação `a17c106`. APK debug em `android-app/app/build/outputs/apk/distribution/debug/`, nomeado com a versão e o HEAD final da branch. Na entrega inicial, publicação em produção e ativação da primeira conta estavam pendentes; foram autorizadas e executadas na rodada abaixo.
-
-### Ocultar limiar nas telas — 2026-10-09
-
-Removidos os textos de confiança mínima/explicação do histórico, o limite no resultado e as referências ao limiar na administração, incluindo o filtro de confiança mínima. Confiança da previsão e política interna permanecem. Os 7 testes de `VisualV3Test`, `verifyModelAssets`, `lintDebug`, `assembleDebug` e OpenSpec estrito (ativo e arquivado) passaram. Nenhuma mudança no modelo, limiar ou backend; sem teste físico nesta rodada.
-
-## Publicação do backend administrativo — 2026-10-09
-
-Após autorização explícita, schema e conta confirmada foram conferidos no projeto LeafCare. Aplicada migration `20261009181010_superadmin` e publicada Edge Function `leafcare-admin` versão 1/ACTIVE, com autenticação própria via Auth e papel atual no banco. Bootstrap executado uma vez para a conta escolhida; nenhum e-mail de administrador foi adicionado ao repositório. O arquivo local foi renomeado para coincidir com o histórico remoto, sem mudar SQL.
-
-Verificação real: todas as contas inicializadas; primeiro superadmin com envios ativos; RLS habilitada; RPC administrativa negada a anon/authenticated e concedida a service_role; auditoria do bootstrap registrada; painel e listas retornaram 2 usuários e 11 fotos pendentes. Consulta com papel authenticated e identidade da conta confirmou a política e isolamento dos controles. HTTP publicado retornou 401 sem sessão, 401 com token inválido e 405 para GET. Nenhuma análise/foto foi criada, revisada ou removida como teste. Fluxos com sessão real no APK, convites/e-mails e ações administrativas continuam para teste do proprietário.
-
-## Administração: visual e acesso inferior — 2026-10-09
-
-Na branch `feat/superadmin`, o acesso saiu do Perfil e passou para o ícone circular ao lado da câmera, condicionado à permissão administrativa. Resumo, usuários, triagem e atividades receberam cartões, hierarquia visual e estados legíveis; filtros adicionais ficam recolhidos. Revisão abre em tela inteira e ações de conta têm confirmação no próprio painel, evitando diálogos sobrepostos.
-
-- **235 testes Android passaram**, sem falhas/erros/skips. Dez testes administrativos cobrem posição e acionamento dos botões, ausência do acesso para conta comum, abertura da fila pendente, filtros recolhidos, seleção de usuário/foto, confirmação de permissão, exclusão condicionada ao e-mail, motivo obrigatório/versão da revisão, auditoria legível e ocultação dos detalhes após perda de acesso.
-- Capturas Robolectric de telas em largura de 360 dp geradas em `android-app/app/build/reports/screenshots/` e inspecionadas, incluindo acesso inferior, resumo, triagem, avaliação e confirmação de exclusão. Os callbacks dos testes não enviam e-mails nem modificam contas/fotos reais.
-- `verifyModelAssets`, `lintDebug` e `assembleDebug` passaram. Lint sem erros, com 24 avisos já existentes. OpenSpec ativo/specs e arquivado validado em modo estrito. APK 1.3.0/versionCode 9 disponibilizado com o HEAD da entrega.
-- Nenhum aparelho conectado via ADB; instalação, teclado, navegação e ações com sessão real ficam para o teste do proprietário. Nenhuma alteração no modelo ou no backend nesta rodada. PR #8 permanece fechada; o proprietário abrirá a PR após testar.
+Testes JVM e Robolectric não medem latência, qualidade da câmera ou comportamento de provedores no aparelho. Não afirmam que SMTP, deep links ou operações administrativas remotas foram testados; valide esses fluxos manualmente quando a mudança os afetar.
