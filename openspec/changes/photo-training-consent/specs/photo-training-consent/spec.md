@@ -102,6 +102,11 @@ O app SHALL disponibilizar os termos e o aviso de privacidade antes da autoriza�
 - **WHEN** a pessoa abre as informações sobre uso de fotos
 - **THEN** consegue consultar os termos e o aviso de privacidade sem aceitar o consentimento
 
+#### Scenario: Contato de privacidade no app
+- **WHEN** a pessoa consulta a Política de Privacidade
+- **THEN** encontra igorsantunes@outlook.com como contato para solicitações de privacidade
+- **AND** pode copiar o endereço sem abrir navegador ou site externo
+
 #### Scenario: Retenção do histórico
 - **WHEN** uma conta está ativa e não solicitou exclusão de uma análise
 - **THEN** o histórico e a foto permanecem disponíveis para a finalidade de histórico

@@ -29,4 +29,6 @@
 - [x] 4.4 Versionar Termos e Política, mostrar data de publicação e registrar versões aceitas com timestamp gerado pelo servidor; validar RLS de recibos imutáveis.
 - [x] 4.5 Definir retenção por categoria: histórico enquanto a conta estiver ativa, exclusão em até 30 dias, cópia de treino em até 90 dias, exportação em até 30 dias e backups conforme plano (máximo informado de 30 dias).
 - [ ] 4.6 Instalar e testar a limpeza automática de cópias de treinamento e exportações antes de habilitar coleta.
-- [ ] 4.7 Definir e publicar canal de privacidade monitorado; validar representação e endereço institucional do controlador.
+- [x] 4.7 Publicar o e-mail de privacidade fornecido pela equipe nos documentos do app, com ação de cópia no design system LeafCare.
+- [ ] 4.8 Confirmar monitoramento/MFA e pessoa substituta para a caixa; validar representação e endereço institucional do controlador.
+- [x] 4.9 Atualizar os documentos para v1.2, incrementar o APK para 1.4.1 (versionCode 11), registrar a migration de aceites e validar Android, Supabase e OpenSpec.

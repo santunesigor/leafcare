@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- APK 1.4.1 (versionCode 11): documentos legais v1.2 publicam o contato de privacidade no app, com cartão alinhado ao LeafCare e ação para copiar o e-mail. O prazo de 90 dias para cópias de treinamento permanece e a coleta continua bloqueada até o canal ser monitorado e a expiração automática ser operacional.
 - APK 1.2.1 (versionCode 8): envia ao bucket apenas fotos conclusivas com confiança >= limiar da análise, incluindo proteção para retries antigos. Histórico inconclusivo continua sincronizado; sua foto permanece local. Restore sem foto remota não tenta download inexistente.
 - Consulta de arquivo/classe/confiança documentada em `docs/SUPABASE.md`, usando o UUID já associado a cada foto.
 

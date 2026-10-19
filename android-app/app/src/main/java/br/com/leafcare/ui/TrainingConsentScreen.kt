@@ -36,11 +36,12 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Uso de fotos no treinamento", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
-            Text("A contribuição de fotos para treinamento está desativada. Ela continuará indisponível até que o prazo de retenção e os links oficiais de Termos e Privacidade sejam publicados.", color = LeafColors.Text)
+            Text("A contribuição de fotos para treinamento está desativada. Ela continuará indisponível até que o canal de privacidade seja monitorado e a rotina automática de expiração esteja instalada e testada.", color = LeafColors.Text)
             Text("Política de privacidade", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
-            Text("Quando a coleta for habilitada, somente fotos com autorização global e individual serão copiadas para uma área privada separada do histórico. O ciclo de retenção, os termos e o aviso de privacidade serão apresentados antes de qualquer aceite.", color = LeafColors.Text)
+            Text("Quando a coleta for habilitada, somente fotos com autorização global e individual serão copiadas para uma área privada separada do histórico. Cada cópia será apagada em até 90 dias do envio ou antes, se a autorização for revogada. Exportações locais serão apagadas em até 30 dias.", color = LeafColors.Text)
             Text("A classe prevista pelo aplicativo não é um diagnóstico validado. Se a coleta for habilitada, uma foto só poderá entrar em um conjunto de treinamento após revisão humana e validação de qualidade. Identificadores da conta e metadados EXIF serão removidos na exportação.", color = LeafColors.Text)
             Text("A análise local e o histórico continuam disponíveis offline após autenticação. Futuras cópias de treinamento poderão ser revogadas e excluídas, mas isso não reverte automaticamente pesos de modelos já treinados.", color = LeafColors.Text)
+            PrivacyContactCard()
             Surface(shape = RoundedCornerShape(16.dp), color = LeafColors.Pale, border = BorderStroke(1.dp, LeafColors.Border)) {
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
@@ -52,7 +53,7 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                             stateDescription = if (TRAINING_UPLOADS_ENABLED) {
                                 if (granted) "Autorizado" else "Não autorizado"
                             } else {
-                                "Indisponível até a publicação do prazo de retenção e dos links oficiais"
+                                "Indisponível até o monitoramento do canal de privacidade e a validação da expiração automática"
                             }
                         },
                         colors = CheckboxDefaults.colors(checkedColor = LeafColors.Green),
