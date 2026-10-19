@@ -1,0 +1,6 @@
+[Unit]
+Description=Expire LeafCare local training exports
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/Projects/leafcare/machine-learning/export_authorized_training.py --cleanup-only

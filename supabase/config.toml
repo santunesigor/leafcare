@@ -4,3 +4,6 @@ project_id = "leafcare"
 # The handler validates the JWT with Auth.getUser and checks the current database role.
 # Compatible with both legacy and asymmetric Supabase signing keys.
 verify_jwt = false
+
+[functions.cleanup-training-photos]
+verify_jwt = true

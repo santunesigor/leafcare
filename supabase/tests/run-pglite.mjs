@@ -8,7 +8,7 @@ const migrations=readdirSync(`${repo}/migrations`).sort();
 async function setup(beforeHierarchy=false){
  const db=new PGlite({extensions:{uuid_ossp}});
  await db.exec(read('tests/bootstrap.sql'));
- for(const f of migrations){if(beforeHierarchy&&f.includes('admin_role_hierarchy'))break; await db.exec(read(`migrations/${f}`));}
+ for(const f of migrations){if(beforeHierarchy&&f.includes('admin_role_hierarchy'))break;if(f.includes('cleanup_training_retention'))continue;await db.exec(read(`migrations/${f}`));}
  return db;
 }
 const db=await setup();

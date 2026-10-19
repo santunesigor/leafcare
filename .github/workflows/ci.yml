@@ -17,8 +17,12 @@ jobs:
           deno-version: v2.9.6
       - name: Check Edge Function
         run: deno check supabase/functions/leafcare-admin/index.ts
+      - name: Check retention Edge Function
+        run: deno check supabase/functions/cleanup-training-photos/index.ts
       - name: Test authenticated handler
         run: deno test supabase/functions/leafcare-admin/handler_test.ts
+      - name: Test training photo retention
+        run: deno test supabase/functions/cleanup-training-photos/handler_test.ts
       - name: Test migrations and RLS in isolated PostgreSQL
         run: bash supabase/tests/run-local.sh
 

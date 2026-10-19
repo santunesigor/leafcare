@@ -13,6 +13,7 @@ import shutil
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from PIL import Image, ImageOps
 
@@ -20,6 +21,31 @@ OUTPUT = Path(__file__).parent / "data" / "authorized_training"
 MIN_SIDE = 128
 CURRENT_TERMS_VERSION = "1.0"
 TRAINING_EXPORT_ENABLED = False
+EXPORT_RETENTION = timedelta(days=30)
+
+
+def cleanup_expired_export(output: Path = OUTPUT, now: datetime | None = None) -> bool:
+    """Remove a local dataset export once it has reached its 30-day limit."""
+    if not output.exists():
+        return False
+    now = now or datetime.now(timezone.utc)
+    manifest = output / "manifest.json"
+    exported_at = None
+    if manifest.is_file():
+        try:
+            exported_at = json.loads(manifest.read_text()).get("exported_at")
+        except (OSError, json.JSONDecodeError):
+            exported_at = None
+    try:
+        created = datetime.fromisoformat(exported_at) if exported_at else datetime.fromtimestamp(output.stat().st_mtime, timezone.utc)
+    except (ValueError, OSError):
+        created = datetime.fromtimestamp(output.stat().st_mtime, timezone.utc)
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    if now - created.astimezone(timezone.utc) < EXPORT_RETENTION:
+        return False
+    shutil.rmtree(output)
+    return True
 
 
 def valid_image(data: bytes) -> Image.Image:
@@ -41,6 +67,7 @@ def request(url: str, key: str) -> bytes:
 
 
 def export(base_url: str, key: str, output: Path = OUTPUT) -> dict:
+    cleanup_expired_export(output)
     if output.exists():
         shutil.rmtree(output)
     if not TRAINING_EXPORT_ENABLED:
@@ -81,11 +108,23 @@ def export(base_url: str, key: str, output: Path = OUTPUT) -> dict:
             manifest.append({"image": f"{anonymous_id}.jpg", "class_id": review["class_id"], "sha256": digest})
         except (ValueError, OSError, urllib.error.URLError, KeyError):
             rejected["download_or_quality"] += 1
-    (output / "manifest.json").write_text(json.dumps({"images": manifest, "rejected": rejected}, ensure_ascii=False, indent=2))
+    (output / "manifest.json").write_text(json.dumps({
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "images": manifest,
+        "rejected": rejected,
+    }, ensure_ascii=False, indent=2))
     return {"exported": len(manifest), "rejected": sum(rejected.values())}
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cleanup-only", action="store_true")
+    args = parser.parse_args()
+    if args.cleanup_only:
+        print("export_expired" if cleanup_expired_export() else "no_expired_export")
+        raise SystemExit(0)
+    cleanup_expired_export()
     if not TRAINING_EXPORT_ENABLED:
         if OUTPUT.exists():
             shutil.rmtree(OUTPUT)

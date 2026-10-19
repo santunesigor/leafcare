@@ -5,7 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from PIL import Image
-from export_authorized_training import export, valid_image
+from datetime import datetime, timezone
+from export_authorized_training import cleanup_expired_export, export, valid_image
 
 
 def jpeg(size=(180, 160)):
@@ -15,6 +16,22 @@ def jpeg(size=(180, 160)):
 
 
 class AuthorizedExportTest(unittest.TestCase):
+    def test_local_export_is_removed_after_30_days(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            output.mkdir()
+            (output / "manifest.json").write_text(json.dumps({"exported_at": "2026-09-01T00:00:00+00:00"}))
+            self.assertTrue(cleanup_expired_export(output, datetime(2026, 10, 1, tzinfo=timezone.utc)))
+            self.assertFalse(output.exists())
+
+    def test_local_export_is_kept_before_30_days(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            output.mkdir()
+            (output / "manifest.json").write_text(json.dumps({"exported_at": "2026-09-15T00:00:00+00:00"}))
+            self.assertFalse(cleanup_expired_export(output, datetime(2026, 10, 1, tzinfo=timezone.utc)))
+            self.assertTrue(output.exists())
+
     def test_quality_gate(self):
         self.assertEqual(valid_image(jpeg()).size, (180, 160))
         with self.assertRaisesRegex(ValueError, "resolução"):

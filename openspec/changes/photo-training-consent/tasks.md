@@ -28,7 +28,8 @@
 - [x] 4.3 Gerar e disponibilizar APK debug para teste manual; usuário confirmou teste do APK em 19/10/2026.
 - [x] 4.4 Versionar Termos e Política, mostrar data de publicação e registrar versões aceitas com timestamp gerado pelo servidor; validar RLS de recibos imutáveis.
 - [x] 4.5 Definir retenção por categoria: histórico enquanto a conta estiver ativa, exclusão em até 30 dias, cópia de treino em até 90 dias, exportação em até 30 dias e backups conforme plano (máximo informado de 30 dias).
-- [ ] 4.6 Instalar e testar a limpeza automática de cópias de treinamento e exportações antes de habilitar coleta.
+- [x] 4.6 Instalar e testar a limpeza automática diária: Edge Function remove fotos vencidas no Supabase após 90 dias; timer systemd remove exportações locais após 30 dias. A coleta continua bloqueada até a validação das pendências operacionais e jurídicas.
 - [x] 4.7 Publicar o e-mail de privacidade fornecido pela equipe nos documentos do app, com ação de cópia no design system LeafCare.
 - [ ] 4.8 Confirmar monitoramento/MFA e pessoa substituta para a caixa; validar representação e endereço institucional do controlador.
-- [x] 4.9 Atualizar os documentos para v1.2, incrementar o APK para 1.4.1 (versionCode 11), registrar a migration de aceites e validar Android, Supabase e OpenSpec.
+- [x] 4.9 Atualizar os documentos para v1.2, incrementar o APK para 1.5.0 (versionCode 12), registrar migrations de aceites e retenção, e validar Android, Supabase e OpenSpec.
+- [ ] 4.10 Implementar comunicação e novo aceite de versões materiais para contas existentes; nunca criar recibos retroativos sem ação do usuário.

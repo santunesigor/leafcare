@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily cleanup of expired LeafCare training exports
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+Unit=leafcare-training-export-cleanup.service
+
+[Install]
+WantedBy=timers.target
