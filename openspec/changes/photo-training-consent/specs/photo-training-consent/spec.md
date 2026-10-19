@@ -8,10 +8,10 @@ Permitir que cada pessoa escolha, de forma informada e revogável, se fotos espe
 
 ### Requirement: Coleta desativada até publicar informações legais
 
-O app, o servidor e o pipeline SHALL manter gravação e exportação de fotos de treinamento desativadas até que o prazo de retenção e os links oficiais de Termos e Privacidade sejam fornecidos. A análise local e o histórico SHALL permanecer disponíveis.
+O app, o servidor e o pipeline SHALL manter gravação e exportação de fotos de treinamento desativadas até que o controlador, o contato de privacidade e os prazos de retenção sejam definidos e publicados nos documentos legais internos do app. A análise local e o histórico SHALL permanecer disponíveis.
 
 #### Scenario: Informações ainda não publicadas
-- **WHEN** prazo de retenção ou links oficiais ainda não foram definidos
+- **WHEN** controlador, contato de privacidade ou prazos de retenção ainda não foram definidos
 - **THEN** nenhuma opção de consentimento permite aceitar o uso de fotos
 - **AND** nenhum byte de foto é enviado ou exportado para treinamento
 - **AND** a tela informa por que a contribuição está indisponível
@@ -103,3 +103,37 @@ O app SHALL disponibilizar os termos e o aviso de privacidade antes da autoriza�
 #### Scenario: Modelo já treinado
 - **WHEN** uma cópia de treinamento é excluída após a revogação
 - **THEN** a informação apresentada explica que pesos de modelos já treinados não são automaticamente revertidos
+
+### Requirement: Termos e privacidade acessíveis no cadastro
+
+A tela de cadastro SHALL mostrar uma única declaração com links inline verdes, do mesmo tamanho do restante do texto, para os Termos de Uso e a Política de Privacidade. Cada documento SHALL abrir dentro do app e permitir retornar ao cadastro. A declaração geral SHALL NOT autorizar treinamento de fotos.
+
+#### Scenario: Consultar documentos antes do cadastro
+- **WHEN** a pessoa escolhe Termos de Uso ou Política de Privacidade no cadastro
+- **THEN** o documento correspondente abre dentro do aplicativo
+- **AND** a ação de voltar retorna ao formulário de cadastro
+- **AND** câmera, confirmação de e-mail e recuperação continuam usando seus fluxos de retorno ao aplicativo
+
+#### Scenario: Criar conta após consultar a declaração legal
+- **WHEN** a pessoa visualiza o cadastro
+- **THEN** há apenas uma frase informativa com links inline para os dois documentos
+- **AND** cada link abre o documento correspondente em uma tela interna
+- **AND** nenhuma autorização global ou individual para treinamento é criada
+
+#### Scenario: Aceite geral registrado no cadastro
+- **WHEN** a pessoa cria conta a partir do cadastro do LeafCare
+- **THEN** o app envia as versões exibidas dos Termos de Uso e da Política de Privacidade
+- **AND** o servidor registra essas versões com seu próprio timestamp
+- **AND** o recibo não autoriza treinamento de fotos
+
+### Requirement: Público adulto
+
+Os Termos de Uso SHALL informar que o LeafCare é destinado a pessoas com 18 anos ou mais.
+
+#### Scenario: Consultar idade mínima
+- **WHEN** a pessoa abre os Termos de Uso pelo cadastro
+- **THEN** encontra a informação de que menores de 18 anos não devem criar conta nem usar o serviço
+
+#### Scenario: Termos gerais não autorizam treinamento
+- **WHEN** a pessoa lê ou aceita os termos gerais para criar uma conta
+- **THEN** nenhuma autorização global ou individual para treinamento de fotos é criada

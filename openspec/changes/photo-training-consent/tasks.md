@@ -9,10 +9,11 @@
 
 ## 2. Interface e escolhas do usuário
 
-- [x] 2.1 Adicionar aviso de indisponibilidade até existirem prazo de retenção e URLs oficiais; verificar que nenhum aceite pode ser registrado.
+- [x] 2.1 Adicionar aviso de indisponibilidade até existirem controlador, contato de privacidade e prazos de retenção; verificar que nenhum aceite de treinamento pode ser registrado.
 - [x] 2.2 Adicionar estado de treinamento desativado no Perfil usando LeafCareTheme; verificar que a tela explica a pendência e mantém a análise local disponível.
 - [x] 2.3 Mostrar escolha individual desabilitada no fluxo de captura/galeria enquanto a coleta estiver bloqueada; verificar que nenhuma análise cria autorização local nem upload.
-- [ ] 2.4 Revisar acessibilidade e conteúdo informativo sobre bloqueio, revogação futura e modelos previamente treinados no APK debug; registrar QA visual das telas autenticadas como pendente até haver credenciais de teste.
+- [x] 2.4 Revisar acessibilidade e conteúdo informativo sobre bloqueio, revogação futura e modelos previamente treinados no APK debug; revisão estática e lint concluídos. QA visual das telas autenticadas permanece pendente até haver credenciais de teste e dispositivo disponível.
+- [x] 2.5 Exibir no cadastro uma declaração única com links inline verdes, manter leitura e retorno em telas internas, informar público adulto e não misturar aceite geral com consentimento de treinamento; validar ambos os caminhos em teste Compose.
 
 ## 3. Elegibilidade e exportação do dataset
 
@@ -24,4 +25,5 @@
 
 - [x] 4.1 Atualizar documentação técnica da jornada e dos fluxos de dados; verificar referências ao comportamento implementado.
 - [x] 4.2 Executar testes Android, testes Supabase locais, testes Python do exportador e validações OpenSpec estritas; registrar resultados reais.
-- [x] 4.3 Gerar e disponibilizar APK debug para teste manual; verificar arquivo distribuído e instalação/assinatura debug. APK instalado e iniciado no emulador; QA das telas autenticadas aguarda credenciais de teste.
+- [x] 4.3 Gerar e disponibilizar APK debug para teste manual; usuário confirmou teste do APK em 19/10/2026.
+- [x] 4.4 Versionar Termos e Política, mostrar data de publicação e registrar versões aceitas com timestamp gerado pelo servidor; validar RLS de recibos imutáveis.

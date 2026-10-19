@@ -7,6 +7,7 @@ As fotos enviadas para o histórico não têm autorização para treinamento. O 
 ## What Changes
 
 - Adicionar termos e aviso de privacidade consultáveis no app, consentimento desmarcado por padrão e gestão/revogação no Perfil.
+- Exibir no cadastro acesso aos Termos de Uso e à Política de Privacidade em telas internas, sem depender de um site; a navegação retorna ao cadastro.
 - Registrar a versão dos termos, o estado e o instante do consentimento no Room e no Supabase; registrar separadamente a autorização de cada foto.
 - Separar fotos de treinamento das fotos de histórico, exigir confirmação remota do consentimento antes de enviar bytes e bloquear uploads assim que houver revogação local pendente.
 - Excluir remotamente as cópias de treinamento após revogação, mantendo o histórico normal da análise.
@@ -24,10 +25,11 @@ As fotos enviadas para o histórico não têm autorização para treinamento. O 
 ## Impact
 
 - Android: Room, WorkManager, fluxo de captura/galeria e Perfil em Jetpack Compose.
+- Android Auth: cadastro com leitura interna dos documentos legais e retorno ao formulário.
 - Supabase: nova migration, tabelas/RLS e bucket privado separado para cópias de treinamento.
 - Machine Learning: ferramenta de exportação/ingestão que valida consentimento atual, qualidade e rótulo humano antes de incluir uma foto.
 - Documentação: aviso de privacidade e termos versionados no app e explicação de retenção e limitações.
 
 O consentimento será opcional e desmarcado por padrão. Fotos antigas do bucket de histórico não serão promovidas automaticamente para treinamento. O prazo de retenção será definido pelo ciclo de autorização: a cópia fica elegível enquanto o consentimento estiver ativo; a revogação bloqueia novos envios e inicia a exclusão das cópias ainda armazenadas. Nenhuma remoção de foto implica esquecimento automático por modelos já treinados.
 
-O usuário confirmou que o prazo de retenção e as URLs oficiais de Termos/Privacidade ainda não existem. Até fornecer esses dados, o app mostra a coleta como indisponível, o servidor rejeita consentimentos positivos e uploads autenticados, e o exportador encerra sem consultar nem baixar imagens.
+O usuário confirmou que o controlador, o contato de privacidade e os prazos de retenção ainda não foram definidos. Os documentos ficam disponíveis dentro do app, sem depender de site. Até definir esses dados, a coleta permanece indisponível, o servidor rejeita consentimentos positivos e uploads autenticados, e o exportador encerra sem consultar nem baixar imagens. O aceite geral dos documentos é versionado e recebe timestamp de servidor no cadastro.

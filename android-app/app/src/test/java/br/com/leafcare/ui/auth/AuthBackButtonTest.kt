@@ -84,6 +84,26 @@ class AuthBackButtonTest {
         compose.onNodeWithText("Bem-vindo ao LeafCare").assertExists()
     }
 
+    @Test fun signUpLegalStatement_routesOpenInsideAppAndReturnToSignUp() {
+        val vm = viewModel()
+        vm.setScreen(AuthScreen.SignUp)
+        compose.setContent { LeafCareTheme { AuthNavHost(vm) } }
+
+        compose.onNodeWithText("Ao criar uma conta", substring = true).assertIsDisplayed()
+
+        // The inline links target these two in-app screens; back always returns
+        // to signup and neither screen launches a browser or consent flow.
+        vm.setScreen(AuthScreen.TermsOfUse)
+        compose.onNodeWithText("Termos de Uso").assertIsDisplayed()
+        compose.onNodeWithText("Voltar ao cadastro").performClick()
+        compose.onNodeWithText("Crie sua conta").assertIsDisplayed()
+
+        vm.setScreen(AuthScreen.PrivacyPolicy)
+        compose.onNodeWithText("Política de Privacidade").assertIsDisplayed()
+        compose.onNodeWithText("Voltar ao cadastro").performClick()
+        compose.onNodeWithText("Crie sua conta").assertIsDisplayed()
+    }
+
     @Test fun forgotPassword_androidBackReturnsToLogin() {
         val vm = viewModel()
         vm.setScreen(AuthScreen.ForgotPassword)

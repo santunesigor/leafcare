@@ -27,9 +27,11 @@ O Room guarda análises e estados independentes de sincronização; o WorkManage
 
 4. **Escolha por imagem.** A configuração no Perfil registra a autorização e os documentos consultáveis. Na câmera/galeria, cada nova análise recebe uma opção individual desmarcada; sem consentimento global vigente, ela fica desabilitada. A análise local e seu backup normal seguem o fluxo atual.
 
-5. **Conteúdo versionado no app.** Enquanto prazo de retenção e URLs oficiais não forem definidos, o app exibe o motivo da indisponibilidade e mantém desativados o aceite global e a escolha individual. A autorização só será habilitada quando esses dados forem publicados; o conteúdo explicará também que isso não desfaz modelos já treinados.
+5. **Conteúdo versionado no app.** Os documentos abrem em telas internas, com versão e data de publicação. O cadastro envia as versões aceitas e um trigger registra o timestamp do servidor em tabela com leitura somente do próprio titular. Enquanto controlador, contato de privacidade e prazos de retenção não forem definidos, o app explica o motivo da indisponibilidade e mantém desativados o aceite global e a escolha individual para treinamento. A autorização só será habilitada quando esses dados forem publicados; o conteúdo explicará também que isso não desfaz modelos já treinados.
 
 6. **Exportação bloqueada por padrão.** O exportador valida consentimento vigente, qualidade, duplicatas, EXIF e revisão humana, mas termina sem consultar nem baixar fotos enquanto os dados legais não forem publicados. O bucket também não concede INSERT a clientes autenticados. Após habilitação futura, a saída contém classe revisada e identificador anônimo e ficará numa área local ignorada pelo Git.
+
+7. **Documentos legais no app.** O cadastro abre Termos de Uso e Política de Privacidade em telas Compose internas e retorna ao formulário. O fluxo não depende de um site nem abre navegador externo. A leitura ou aceite dos termos gerais permanece separada do consentimento opcional para treinamento.
 
 ## Risks / Trade-offs
 
@@ -41,11 +43,11 @@ O Room guarda análises e estados independentes de sincronização; o WorkManage
 
 ## Migration Plan
 
-1. Aplicar migration aditiva: tabelas, RLS e bucket privado. Não criar política de inserção enquanto faltarem prazo de retenção e URLs oficiais; manter a exclusão própria permitida.
+1. Aplicar migrations aditivas: tabelas e RLS para treinamento e recibo de aceite geral. O recibo é criado pelo trigger de cadastro; usuários só leem seu próprio registro. Não criar política de inserção de fotos enquanto faltarem as definições legais; manter a exclusão própria permitida.
 2. Distribuir o APK com Room v4; dados locais antigos migram como não autorizados.
 3. Atualizar o Supabase/Edge Function antes de habilitar exportações. Sem o contrato remoto, consentimentos ficam em retry e nenhuma foto de treinamento sai do aparelho.
 4. Rollback do app mantém as tabelas e bucket; não apagar consentimentos ou fotos automaticamente. Para rollback do backend, bloquear novos uploads e preservar registros de revogação até a limpeza auditada.
 
 ## Open Questions
 
-O usuário confirmou que ainda não existem prazo de retenção nem URLs oficiais. O aceite global, a autorização por foto, gravações no Storage e a exportação permanecem desativados até receber esses dados.
+O usuário confirmou que o controlador, o contato de privacidade e os prazos de retenção ainda não foram definidos. Os documentos legais são acessados dentro do aplicativo e não dependem de URLs externas. O aceite para treinamento, a autorização por foto, gravações no Storage e a exportação permanecem desativados até receber essas definições.

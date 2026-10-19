@@ -174,7 +174,7 @@ class AuthViewModelTest {
         // Regression guard: signup confirmation OTP stays out (no corporate
         // SMTP domain). VerifyEmail is the link-confirmation screen (no code).
         assertEquals(
-            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.VerifyEmail, AuthScreen.ForgotPassword, AuthScreen.NewPassword, AuthScreen.Profile),
+            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.TermsOfUse, AuthScreen.PrivacyPolicy, AuthScreen.VerifyEmail, AuthScreen.ForgotPassword, AuthScreen.NewPassword, AuthScreen.Profile),
             AuthScreen.values().toSet()
         )
     }

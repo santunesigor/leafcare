@@ -26,6 +26,7 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
 
     var signUpCalls = 0
     var lastSignUp: Triple<String, String, String>? = null
+    var lastAcceptedLegalVersions: Pair<String, String>? = null
     var lastSignUpRedirect: String? = null
     var signInCalls = 0
     var signOutCalls = 0
@@ -50,10 +51,13 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
         email: String,
         password: String,
         displayName: String,
+        termsVersion: String,
+        privacyVersion: String,
         redirectUrl: String?
     ) {
         signUpCalls++
         lastSignUp = Triple(email, password, displayName)
+        lastAcceptedLegalVersions = termsVersion to privacyVersion
         lastSignUpRedirect = redirectUrl
     }
 
@@ -186,6 +190,7 @@ class AuthRepositoryTest {
         repository.signUp("a@b.com", "123456", "Nome Teste")
 
         assertEquals(Triple("a@b.com", "123456", "Nome Teste"), backend.lastSignUp)
+        assertEquals(TERMS_OF_USE_VERSION to PRIVACY_POLICY_VERSION, backend.lastAcceptedLegalVersions)
     }
 
     @Test fun signIn_validationFailureDoesNotCallAuth() = runTest(testDispatcher) {

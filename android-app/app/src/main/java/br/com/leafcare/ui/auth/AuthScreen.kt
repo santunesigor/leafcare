@@ -33,6 +33,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,12 +43,18 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -69,6 +76,12 @@ fun AuthNavHost(viewModel: AuthViewModel) {
     when (uiState.currentScreen) {
         AuthScreen.Login -> LoginScreen(viewModel)
         AuthScreen.SignUp -> SignUpScreen(viewModel)
+        AuthScreen.TermsOfUse -> LegalDocumentScreen(LegalDocument.TermsOfUse) {
+            viewModel.setScreen(AuthScreen.SignUp)
+        }
+        AuthScreen.PrivacyPolicy -> LegalDocumentScreen(LegalDocument.PrivacyPolicy) {
+            viewModel.setScreen(AuthScreen.SignUp)
+        }
         AuthScreen.VerifyEmail -> VerifyEmailScreen(viewModel)
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
         AuthScreen.NewPassword -> NewPasswordScreen(
@@ -361,6 +374,37 @@ fun SignUpScreen(viewModel: AuthViewModel) {
         AuthMessages(error, infoMessage)
         Spacer(Modifier.height(24.dp))
 
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            color = LeafColors.Pale,
+            border = BorderStroke(1.dp, LeafColors.Border)
+        ) {
+            Text(
+                text = buildAnnotatedString {
+                    append("Ao criar uma conta, você confirma que leu e concorda com os ")
+                    withLink(LinkAnnotation.Clickable(
+                        tag = "terms",
+                        styles = TextLinkStyles(SpanStyle(color = LeafColors.Green, textDecoration = TextDecoration.Underline))
+                    ) { viewModel.setScreen(AuthScreen.TermsOfUse) }) {
+                        append("Termos de Uso")
+                    }
+                    append(" e a ")
+                    withLink(LinkAnnotation.Clickable(
+                        tag = "privacy",
+                        styles = TextLinkStyles(SpanStyle(color = LeafColors.Green, textDecoration = TextDecoration.Underline))
+                    ) { viewModel.setScreen(AuthScreen.PrivacyPolicy) }) {
+                        append("Política de Privacidade")
+                    }
+                    append(".")
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = LeafColors.Muted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)
+            )
+        }
+        Spacer(Modifier.height(12.dp))
         AuthButton(label = "Criar conta", loading = isLoading, onClick = { viewModel.signUp() })
         Spacer(Modifier.height(12.dp))
 

@@ -14,6 +14,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,15 +35,28 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
             Text("Privacidade e fotos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = LeafColors.Text)
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Uso de fotos no treinamento", style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
+            Text("Uso de fotos no treinamento", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
             Text("A contribuição de fotos para treinamento está desativada. Ela continuará indisponível até que o prazo de retenção e os links oficiais de Termos e Privacidade sejam publicados.", color = LeafColors.Text)
-            Text("Política de privacidade", style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
+            Text("Política de privacidade", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
             Text("Quando a coleta for habilitada, somente fotos com autorização global e individual serão copiadas para uma área privada separada do histórico. O ciclo de retenção, os termos e o aviso de privacidade serão apresentados antes de qualquer aceite.", color = LeafColors.Text)
             Text("A classe prevista pelo aplicativo não é um diagnóstico validado. Se a coleta for habilitada, uma foto só poderá entrar em um conjunto de treinamento após revisão humana e validação de qualidade. Identificadores da conta e metadados EXIF serão removidos na exportação.", color = LeafColors.Text)
             Text("A análise local e o histórico continuam disponíveis offline após autenticação. Futuras cópias de treinamento poderão ser revogadas e excluídas, mas isso não reverte automaticamente pesos de modelos já treinados.", color = LeafColors.Text)
             Surface(shape = RoundedCornerShape(16.dp), color = LeafColors.Pale, border = BorderStroke(1.dp, LeafColors.Border)) {
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = granted, enabled = TRAINING_UPLOADS_ENABLED, onCheckedChange = { vm.setTrainingConsent(it) }, colors = CheckboxDefaults.colors(checkedColor = LeafColors.Green))
+                    Checkbox(
+                        checked = granted,
+                        enabled = TRAINING_UPLOADS_ENABLED,
+                        onCheckedChange = { vm.setTrainingConsent(it) },
+                        modifier = Modifier.semantics {
+                            contentDescription = "Consentimento global opcional para uso de fotos no treinamento"
+                            stateDescription = if (TRAINING_UPLOADS_ENABLED) {
+                                if (granted) "Autorizado" else "Não autorizado"
+                            } else {
+                                "Indisponível até a publicação do prazo de retenção e dos links oficiais"
+                            }
+                        },
+                        colors = CheckboxDefaults.colors(checkedColor = LeafColors.Green),
+                    )
                     Text(if (TRAINING_UPLOADS_ENABLED) "Autorizo o uso opcional das fotos" else "Envio desativado", modifier = Modifier.weight(1f), color = LeafColors.Muted)
                     Text(if (consent?.syncState == "SYNCED") "Sincronizado" else "Desativado", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
                 }

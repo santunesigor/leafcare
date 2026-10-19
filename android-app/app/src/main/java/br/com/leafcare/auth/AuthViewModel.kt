@@ -178,7 +178,9 @@ class AuthViewModel internal constructor(
             val result = authRepository.signUp(
                 email = state.email.trim(),
                 password = state.password,
-                displayName = state.displayName.trim()
+                displayName = state.displayName.trim(),
+                termsVersion = TERMS_OF_USE_VERSION,
+                privacyVersion = PRIVACY_POLICY_VERSION
             )
             // Signup without session means email confirmation is pending:
             // show the VerifyEmail screen (its static subtitle covers the
@@ -505,6 +507,8 @@ internal enum class AuthBootstrapState {
 enum class AuthScreen {
     Login,
     SignUp,
+    TermsOfUse,
+    PrivacyPolicy,
     VerifyEmail,
     ForgotPassword,
     NewPassword,

@@ -133,7 +133,9 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
     suspend fun signUp(
         email: String,
         password: String,
-        displayName: String
+        displayName: String,
+        termsVersion: String = TERMS_OF_USE_VERSION,
+        privacyVersion: String = PRIVACY_POLICY_VERSION
     ): Result<UserSession> {
         _isLoading.value = true
         _error.value = null
@@ -146,7 +148,9 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
                 return Result.failure(IllegalArgumentException(validationError))
             }
 
-            backend.signUpWithEmail(email, password, displayName, SIGNUP_REDIRECT_URL)
+            backend.signUpWithEmail(
+                email, password, displayName, termsVersion, privacyVersion, SIGNUP_REDIRECT_URL
+            )
 
             val session = backend.loadSession()
             if (session != null) {
@@ -673,7 +677,14 @@ internal interface AuthBackend {
     val sessionStatus: StateFlow<SessionStatus>
     suspend fun loadFromStorage(): Boolean
     suspend fun loadSession(): UserSession?
-    suspend fun signUpWithEmail(email: String, password: String, displayName: String, redirectUrl: String?)
+    suspend fun signUpWithEmail(
+        email: String,
+        password: String,
+        displayName: String,
+        termsVersion: String,
+        privacyVersion: String,
+        redirectUrl: String?
+    )
     suspend fun signInWithEmail(email: String, password: String)
     suspend fun signOut()
     suspend fun requestPasswordRecovery(email: String, redirectUrl: String)
@@ -696,6 +707,8 @@ internal class SupabaseAuthBackend(private val auth: Auth) : AuthBackend {
         email: String,
         password: String,
         displayName: String,
+        termsVersion: String,
+        privacyVersion: String,
         redirectUrl: String?
     ) {
         auth.signUpWith(Email, redirectUrl) {
@@ -703,6 +716,8 @@ internal class SupabaseAuthBackend(private val auth: Auth) : AuthBackend {
             this.password = password
             data = buildJsonObject {
                 put("display_name", displayName)
+                put("terms_version", termsVersion)
+                put("privacy_version", privacyVersion)
             }
         }
     }

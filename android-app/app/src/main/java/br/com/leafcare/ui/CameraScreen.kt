@@ -40,6 +40,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -137,7 +140,21 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(if (trainingConsentActive) "A análise funciona normalmente. A contribuição para treinamento é opcional." else "A análise funciona normalmente. O envio para treinamento está desativado até a publicação dos termos, política de privacidade e prazo de retenção.")
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = authorizeTraining, enabled = trainingConsentActive, onCheckedChange = { authorizeTraining = it })
+                        Checkbox(
+                            checked = authorizeTraining,
+                            enabled = trainingConsentActive,
+                            onCheckedChange = { authorizeTraining = it },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Autorização individual desta foto para treinamento"
+                                stateDescription = if (!trainingConsentActive) {
+                                    "Indisponível até a publicação do prazo de retenção e dos links oficiais"
+                                } else if (authorizeTraining) {
+                                    "Autorizada"
+                                } else {
+                                    "Não autorizada"
+                                }
+                            },
+                        )
                         Text("Também autorizo esta foto para treinamento", color = if (trainingConsentActive) LeafColors.Text else LeafColors.Muted)
                     }
                 }
