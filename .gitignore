@@ -52,3 +52,6 @@ key.properties
 .DS_Store
 Thumbs.db
 /project-source/
+
+# Fotos autorizadas exportadas para triagem local (dados sensíveis)
+machine-learning/data/authorized_training/

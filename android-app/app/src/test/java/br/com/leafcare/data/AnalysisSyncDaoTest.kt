@@ -159,7 +159,7 @@ class AnalysisSyncDaoTest {
 
         val migrated = Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
             .allowMainThreadQueries()
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
         try {
             val row = migrated.analysisDao().get("a-1")
@@ -168,6 +168,8 @@ class AnalysisSyncDaoTest {
             assertEquals("Olho-de-rã", row?.displayName)
             assertEquals(SyncState.PENDING_UPLOAD, row?.syncStatus)
             assertNull(row?.deletedAt)
+            assertNull(migrated.trainingConsentDao().get("previous-account"))
+            assertTrue(migrated.trainingConsentDao().getAllPhotos("previous-account").isEmpty())
         } finally {
             migrated.close()
         }
@@ -189,7 +191,7 @@ class AnalysisSyncDaoTest {
 
         val reopened = Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
             .allowMainThreadQueries()
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
         try {
             val row = reopened.analysisDao().get("a-1")
@@ -205,7 +207,7 @@ class AnalysisSyncDaoTest {
         val file = dbFile("sync-delete-all")
         val db = Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
             .allowMainThreadQueries()
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
         try {
             db.analysisDao().insert(entity())
@@ -217,6 +219,22 @@ class AnalysisSyncDaoTest {
         } finally {
             db.close()
         }
+    }
+
+    @Test fun trainingConsentAndRevocationAreIsolatedPerAccount() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries().build()
+        try {
+            val dao = db.trainingConsentDao()
+            dao.save(TrainingConsentEntity("account-a", granted = true, decidedAt = 1))
+            dao.save(TrainingConsentEntity("account-b", granted = true, decidedAt = 2))
+            dao.savePhoto(TrainingPhotoAuthorizationEntity("account-a", "analysis-a", TRAINING_TERMS_VERSION, true, 3))
+            dao.savePhoto(TrainingPhotoAuthorizationEntity("account-b", "analysis-b", TRAINING_TERMS_VERSION, true, 4))
+            dao.revokeAllPhotos("account-a")
+            assertTrue(requireNotNull(dao.get("account-b")).granted)
+            assertTrue(dao.getAllPhotos("account-a").single().authorized.not())
+            assertTrue(dao.getAllPhotos("account-b").single().authorized)
+        } finally { db.close() }
     }
 
     @Test fun migration2To3PreservesExistingAnalyses() = runBlocking {        val file = dbFile("sync-migrate-photo")
@@ -248,7 +266,7 @@ class AnalysisSyncDaoTest {
 
         val migrated = Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
             .allowMainThreadQueries()
-            .addMigrations(MIGRATION_2_3)
+            .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
             .build()
         try {
             val row = migrated.analysisDao().get("a-1")

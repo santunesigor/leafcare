@@ -90,6 +90,43 @@ interface AnalysisDao {
     suspend fun deleteAll()
 }
 
+@Entity(tableName = "training_consent")
+data class TrainingConsentEntity(
+    @PrimaryKey val userId: String,
+    val termsVersion: String = TRAINING_TERMS_VERSION,
+    val granted: Boolean = false,
+    val decidedAt: Long = 0L,
+    val syncState: String = "PENDING",
+)
+
+@Entity(tableName = "training_photo_authorizations", primaryKeys = ["userId", "analysisId"])
+data class TrainingPhotoAuthorizationEntity(
+    val userId: String,
+    val analysisId: String,
+    val termsVersion: String,
+    val authorized: Boolean,
+    val decidedAt: Long,
+    val syncState: String = "PENDING",
+)
+
+@Dao
+interface TrainingConsentDao {
+    @Query("SELECT * FROM training_consent WHERE userId = :userId") fun observe(userId: String): Flow<TrainingConsentEntity?>
+    @Query("SELECT * FROM training_consent WHERE userId = :userId") suspend fun get(userId: String): TrainingConsentEntity?
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun save(consent: TrainingConsentEntity)
+    @Query("SELECT * FROM training_photo_authorizations WHERE userId = :userId AND syncState = 'PENDING'") suspend fun getPendingPhotos(userId: String): List<TrainingPhotoAuthorizationEntity>
+    @Query("SELECT * FROM training_photo_authorizations WHERE userId = :userId") suspend fun getAllPhotos(userId: String): List<TrainingPhotoAuthorizationEntity>
+    @Query("UPDATE training_photo_authorizations SET authorized = 0, syncState = 'PENDING' WHERE userId = :userId AND authorized = 1") suspend fun revokeAllPhotos(userId: String)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun savePhoto(authorization: TrainingPhotoAuthorizationEntity)
+    @Query("UPDATE training_consent SET syncState = 'SYNCED' WHERE userId = :userId") suspend fun markConsentSynced(userId: String)
+    @Query("UPDATE training_photo_authorizations SET syncState = 'SYNCED' WHERE userId = :userId AND analysisId = :id") suspend fun markPhotoSynced(userId: String, id: String)
+    @Query("SELECT EXISTS(SELECT 1 FROM training_consent)") suspend fun hasConsentRows(): Boolean
+}
+
+const val TRAINING_TERMS_VERSION = "1.0"
+/** Disabled until published retention terms and official privacy URLs are configured. */
+const val TRAINING_UPLOADS_ENABLED = false
+
 /** v1 -> v2: sync columns. Existing rows default to pending upload. */
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -105,6 +142,16 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
-@Database(entities = [AnalysisEntity::class], version = 3, exportSchema = true)
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS training_consent (userId TEXT NOT NULL, termsVersion TEXT NOT NULL, granted INTEGER NOT NULL, decidedAt INTEGER NOT NULL, syncState TEXT NOT NULL, PRIMARY KEY(userId))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS training_photo_authorizations (userId TEXT NOT NULL, analysisId TEXT NOT NULL, termsVersion TEXT NOT NULL, authorized INTEGER NOT NULL, decidedAt INTEGER NOT NULL, syncState TEXT NOT NULL, PRIMARY KEY(userId, analysisId))")
+    }
+}
+
+@Database(entities = [AnalysisEntity::class, TrainingConsentEntity::class, TrainingPhotoAuthorizationEntity::class], version = 4, exportSchema = true)
 @TypeConverters(SyncStateConverter::class, PhotoSyncStateConverter::class)
-abstract class AppDatabase : RoomDatabase() { abstract fun analysisDao(): AnalysisDao }
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun analysisDao(): AnalysisDao
+    abstract fun trainingConsentDao(): TrainingConsentDao
+}

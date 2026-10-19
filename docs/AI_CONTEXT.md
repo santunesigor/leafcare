@@ -15,6 +15,7 @@ O app já inclui captura/importação de imagens, classificação local, resulta
 - Sincronização usa UUID estável, WorkManager e retry; falhas remotas não podem invalidar a análise local.
 - Tombstones de exclusão não podem ressuscitar durante restore.
 - Fotos conclusivas (confiança >= limiar registrado) são enviadas ao bucket privado; inconclusivas ficam apenas locais. Estado de sync da foto é independente da análise. Classe de cada foto em analyses.class_id pelo UUID.
+- Treinamento é separado do histórico, mas permanece desativado enquanto prazo de retenção e URLs oficiais não forem definidos. Room isola escolhas por conta; mesmo um estado legado positivo não libera upload enquanto o bloqueio de produto e as políticas remotas estiverem ativos.
 - Dados devem permanecer isolados por conta; RLS restringe acesso remoto pelo usuário autenticado.
 
 ## Machine Learning
@@ -29,6 +30,7 @@ Não altere modelo, treinamento, dataset, ordem das classes ou threshold sem sol
 - Mantenha RLS ativa e o bucket de fotos privado.
 - Auth usa confirmação por link e recuperação por deep link: `leafcare://auth/confirm-email` e `leafcare://auth/reset-password`.
 - Não adicione login social nem pipeline de coleta de fotos para treinamento sem solicitação explícita.
+- O pipeline autorizado usa revisão humana da classe e remove EXIF/identificadores antes da exportação local; revogação bloqueia novos envios e remove cópias remotas, sem reverter automaticamente modelos previamente treinados.
 
 ## Débitos conhecidos
 

@@ -13,7 +13,7 @@ async function setup(beforeHierarchy=false){
 }
 const db=await setup();
 console.log((await db.query('select version()')).rows[0]);
-for(const f of ['admin.sql','admin-hierarchy.sql']){await db.exec(read(`tests/${f}`));console.log(`${f}: passed`);}
+for(const f of ['admin.sql','admin-hierarchy.sql','training-consent.sql']){await db.exec(read(`tests/${f}`));console.log(`${f}: passed`);}
 await db.exec("INSERT INTO auth.users(id,email,email_confirmed_at) VALUES('00000000-0000-0000-0000-000000000009','bootstrap@test.local',now())");
 const bootstrap=read('scripts/bootstrap-superadmin.sql').replace(":'superadmin_email'","'bootstrap@test.local'");
 await db.exec(bootstrap);await db.exec(bootstrap);

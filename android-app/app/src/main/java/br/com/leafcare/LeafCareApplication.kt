@@ -9,6 +9,7 @@ import br.com.leafcare.data.AppDatabase
 import br.com.leafcare.data.DiseaseCatalog
 import br.com.leafcare.data.MIGRATION_1_2
 import br.com.leafcare.data.MIGRATION_2_3
+import br.com.leafcare.data.MIGRATION_3_4
 import br.com.leafcare.data.shouldWipeForAccountSwitch
 import br.com.leafcare.data.requestAnalysisSync
 import br.com.leafcare.ml.LeafClassifier
@@ -16,7 +17,7 @@ import br.com.leafcare.ml.LeafClassifier
 class LeafCareApplication : Application(), Configuration.Provider {
     val database by lazy {
         Room.databaseBuilder(this, AppDatabase::class.java, "leafcare.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
     }
     val catalog by lazy { DiseaseCatalog(this) }
@@ -48,7 +49,8 @@ class LeafCareApplication : Application(), Configuration.Provider {
     suspend fun ensureAccountIsolation(userId: String) {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val stored = prefs.getString(KEY_LAST_USER_ID, null)
-        if (shouldWipeForAccountSwitch(stored, userId, repository.hasLocalRows())) {
+        val hasConsentState = database.trainingConsentDao().hasConsentRows()
+        if (shouldWipeForAccountSwitch(stored, userId, repository.hasLocalRows() || hasConsentState)) {
             repository.clearAllLocal()
         }
         prefs.edit().putString(KEY_LAST_USER_ID, userId).apply()
