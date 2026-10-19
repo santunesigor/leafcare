@@ -511,7 +511,7 @@ O APK sai em `app/build/outputs/apk/debug/app-debug.apk`. Dataset bruto, caches,
 | Comparação completa | [Benchmark de modelos](../benchmarks/BENCHMARK_MODELOS.md), [`comparison.csv`](../../machine-learning/benchmark_artifacts/vision/comparison.csv) |
 | Treinamento atual | [`train_ensemble.py`](../../machine-learning/train_ensemble.py), [`protocol.json`](../../machine-learning/benchmark_artifacts/ensemble/protocol.json), [`benchmark_artifacts/ensemble/`](../../machine-learning/benchmark_artifacts/ensemble/) |
 | Modelo distribuído | [`model_metadata.json`](../../machine-learning/artifacts/model_metadata.json), [`metrics.json`](../../machine-learning/artifacts/metrics.json), [`conversion_parity.json`](../model-reports/ensemble/conversion_parity.json) |
-| Contrato Android | [`LeafClassifier.kt`](../../android-app/app/src/main/java/br/com/leafcare/ml/LeafClassifier.kt), [`EnsembleBundleTest.kt`](../../android-app/app/src/test/java/br/com/leafcare/EnsembleBundleTest.kt) |
+| Contrato Android | [`LeafClassifier.kt`](../../android-app/app/src/main/java/br/com/leafcare/ml/LeafClassifier.kt), [`ModelBundleTest.kt`](../../android-app/app/src/test/java/br/com/leafcare/ModelBundleTest.kt) |
 | Operação e próximos dados | [Machine Learning](../MACHINE_LEARNING.md), [Supabase](../SUPABASE.md), [Testes e QA](../TESTING.md) |
 
 ### 11.4 Marcos no Git

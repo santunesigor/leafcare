@@ -1,9 +1,19 @@
 # Changelog — LeafCare
 
-## [Unreleased]
+## [1.7.1] - 2026-10-19
 
-- APK 1.5.0 (versionCode 12): agenda diária de expiração para fotos de treinamento no Supabase (90 dias) e limpeza local de exportações (30 dias). A coleta continua bloqueada até a equipe confirmar o canal de privacidade e os dados do controlador.
-- APK 1.4.1 (versionCode 11): documentos legais v1.2 publicam o contato de privacidade no app, com cartão alinhado ao LeafCare e ação para copiar o e-mail. O prazo de 90 dias para cópias de treinamento permanece e a coleta continua bloqueada até o canal ser monitorado e a expiração automática ser operacional.
+- APK 1.7.1 (versionCode 15): contato de privacidade apresentado como texto padronizado no final dos Termos de Uso e da Política de Privacidade. O usuário testou os fluxos no aparelho e confirmou que estão funcionando.
+
+## [1.7.0] - 2026-10-19
+
+- APK 1.7.0 (versionCode 14): habilita contribuição opcional de fotos para treinamento com aceite legal atual, consentimento geral e autorização individual por foto; recusar ou revogar mantém classificação e histórico.
+- Termos e Política v1.3 descrevem a equipe acadêmica, contato, retenção e backups manuais no Google Drive. Cópias de treinamento expiram em até 90 dias e exportações locais em até 30 dias.
+- Migration `20261019194328_enable_photo_training_consent_uploads` aplicada; upload e leitura ficam restritos por RLS e autorização vigente.
+
+## [Versões anteriores]
+
+- APK 1.5.0 (versionCode 12): agenda diária de expiração para fotos de treinamento no Supabase (90 dias) e limpeza local de exportações (30 dias). Naquela versão, a coleta ainda aguardava decisões operacionais que foram concluídas na 1.7.0.
+- APK 1.4.1 (versionCode 11): documentos legais v1.2 publicam o contato de privacidade no app. A coleta de treinamento ainda não estava habilitada nessa versão.
 - APK 1.2.1 (versionCode 8): envia ao bucket apenas fotos conclusivas com confiança >= limiar da análise, incluindo proteção para retries antigos. Histórico inconclusivo continua sincronizado; sua foto permanece local. Restore sem foto remota não tenta download inexistente.
 - Consulta de arquivo/classe/confiança documentada em `docs/SUPABASE.md`, usando o UUID já associado a cada foto.
 

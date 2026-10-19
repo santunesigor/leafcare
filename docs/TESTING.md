@@ -48,6 +48,13 @@ Ao validar mudanças que afetem o app, cubra os fluxos relevantes:
 
 Os relatórios XML antigos e o snapshot de ambiente sem consumidores foram removidos. Relatórios de novas execuções ficam em `android-app/app/build/test-results/` e nos artefatos da CI; não substituem o roteiro manual. As capturas históricas usadas na jornada do app ficam em `docs/archive/ui/`.
 
+## APK 1.7.1 — 2026-10-19
+
+- O proprietário testou o APK 1.7.1 (versionCode 15) em aparelho e confirmou que os fluxos estão funcionando, incluindo a contribuição opcional de fotos.
+- `testDebugUnitTest`: 289 testes passaram, sem falhas, erros ou skips. `verifyModelAssets` e `assembleDebug` passaram.
+- `lintDebug` passou com 24 avisos de compatibilidade, manifest e dependências existentes; removido o único recurso Android marcado como não utilizado.
+- A issue [#10](https://github.com/santunesigor/leafcare/issues/10) registra o teste e foi fechada após a confirmação.
+
 ## Integração MobileNetV4 Small destilado — 2026-10-08
 
 - Branch `feat/mobilenetv4-distilled`, APK 1.2.0/versionCode 7, schema 2.

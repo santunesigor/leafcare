@@ -1,117 +1,89 @@
 # LeafCare
 
-## Sobre o aplicativo
+LeafCare é um aplicativo Android de triagem visual de doenças e alterações em folhas de fumo. A imagem é classificada no próprio aparelho com um modelo MobileNetV4 Small; o Supabase fornece autenticação e sincronização, não faz a inferência.
 
-O LeafCare é um aplicativo Android para triagem visual de doenças e alterações em folhas de fumo. Ele analisa fotos feitas com a câmera ou escolhidas na galeria. A classificação acontece no próprio aparelho; o app não envia a imagem a um serviço para obter a previsão.
+O resultado apresenta até três hipóteses e pode ser marcado como inconclusivo. A pontuação é uma estimativa do modelo, não um diagnóstico agronômico. Confirme resultados importantes com um profissional qualificado.
 
-> O LeafCare é uma ferramenta de triagem e não substitui diagnóstico agronômico ou avaliação profissional.
+## O que o app faz
 
-### Como funciona
+- Captura uma foto ou importa uma imagem da galeria e classifica a folha localmente.
+- Mantém análises e histórico no aparelho; após o primeiro acesso autenticado, essas funções ficam disponíveis offline.
+- Sincroniza com a conta as análises e as fotos elegíveis quando há conexão. Fotos de previsões inconclusivas permanecem no aparelho.
+- Oferece contribuição de fotos para treinamento como opção separada: é necessário ativar o consentimento geral e autorizar cada foto. Recusar ou revogar mantém a classificação e o histórico disponíveis.
+- Abre os Termos de Uso e a Política de Privacidade dentro do app. O LeafCare não tem site; confirmações e recuperações de acesso retornam ao aplicativo por deep link.
 
-1. O app prepara a imagem e a classifica localmente com um MobileNetV4 Small destilado em um único TFLite de 9,70 MiB.
-2. Mostra até três hipóteses. Se a maior pontuação ficar abaixo do limiar calibrado definido no bundle, o resultado é apresentado como inconclusivo.
-3. Salva a análise e o histórico no banco local Room.
-4. Depois do primeiro acesso autenticado, câmera, galeria, classificação e histórico ficam disponíveis offline. Quando há conexão, o app sincroniza o histórico e as fotos de análises conclusivas com o Supabase em segundo plano. Fotos inconclusivas ficam somente no aparelho.
+## Baixar e instalar
 
-O Supabase cuida da autenticação e da sincronização; ele não classifica as imagens. A [administração restrita](docs/SUPERADMIN.md) permite gerir contas e revisar fotos online, mantendo a previsão original.
+Consulte a página de [releases](https://github.com/santunesigor/leafcare/releases) para baixar o APK debug mais recente. No Android, permita a instalação do arquivo baixado e abra o LeafCare. APKs debug são destinados a teste.
 
-### Dataset e modelo
+## Executar localmente
 
-O modelo foi treinado com 696 imagens em 16 classes, usando a seção TV3 bruta do dataset [TLA — Tobacco Leaf Abnormality](https://doi.org/10.3389/fpls.2024.1333236). O conjunto foi dividido em treino, validação e teste (70% / 15% / 15%), com separação por grupos para reduzir vazamento entre imagens relacionadas.
+Requisitos: Android Studio, JDK 17, Android SDK 35 e Git. Para compilar no Linux ou macOS:
 
-As imagens completas do dataset não são distribuídas neste repositório. O mapa de classes está em [`machine-learning/tla_class_map.yaml`](machine-learning/tla_class_map.yaml), o registro da importação em [`machine-learning/data/import_report.json`](machine-learning/data/import_report.json) e as fontes/licenças das imagens de referência em [`docs/legal/referencias_manifest.csv`](docs/legal/referencias_manifest.csv).
-
-No teste conhecido de 103 imagens, o aluno integrado obteve 85,44% de Top-1, Macro-F1 de 0,8083 e Top-3 de 97,09%. O limiar de 0,506676 foi escolhido na validação; no teste, aceitou 90/103 previsões e acertou 81 (90%). É um teste interno pequeno, sem validação de campo. O ensemble anterior está preservado na release `v1.1.2`. Mais detalhes estão em [Machine Learning](docs/MACHINE_LEARNING.md).
-
-## Desenvolvimento
-
-### Requisitos
-
-- Android Studio, JDK 17 e Android SDK 35 para desenvolver e executar o app.
-- Python 3.12 apenas para trabalhar no pipeline de Machine Learning.
-- Uma chave publicável do Supabase para testar autenticação e sincronização. A classificação local não depende de conexão após o acesso autenticado.
-
-### Configurar e executar o app
-
-No Windows/PowerShell, crie a configuração local e preencha `sdk.dir` e `SUPABASE_PUBLISHABLE_KEY` em `android-app/local.properties`:
-
-```powershell
+```bash
 cd android-app
-Copy-Item local.properties.example local.properties
+cp local.properties.example local.properties
 ```
 
-Abra `android-app` no Android Studio para executar em um emulador ou aparelho. Também é possível instalar a versão debug em um aparelho conectado:
+Edite `local.properties` com o caminho do Android SDK e a chave **publicável** do Supabase (`SUPABASE_PUBLISHABLE_KEY`). Não versione esse arquivo nem use uma chave `service_role` no aplicativo. Abra a pasta `android-app` no Android Studio ou use o wrapper:
 
-```powershell
-.\gradlew.bat installDebug
+```bash
+bash ./gradlew assembleDebug
 ```
 
-Não compartilhe nem versione `local.properties`. Use somente a chave publicável; nunca inclua `service_role` ou credenciais administrativas.
+O APK padrão fica em `android-app/app/build/outputs/apk/debug/app-debug.apk`. O build também cria um APK de distribuição com versão e commit em `android-app/app/build/outputs/apk/distribution/debug/`.
 
-### Criar o APK e validar mudanças
+No Windows, use `gradlew.bat` no lugar de `bash ./gradlew` e crie a configuração com `Copy-Item local.properties.example local.properties` no PowerShell.
 
-Dentro de `android-app`, gere o APK debug com:
+## Validar mudanças
 
-```powershell
-.\gradlew.bat assembleDebug
+Na pasta `android-app`:
+
+```bash
+bash ./gradlew testDebugUnitTest verifyModelAssets lintDebug assembleDebug
 ```
 
-O APK para instalar fica em `android-app/app/build/outputs/apk/distribution/debug/leafcare-<versão>-<commit>.apk`, por exemplo `leafcare-1.2.0-<commit>.apk`. O nome é gerado automaticamente pelo `assembleDebug` e usado no download da CI. Antes de enviar mudanças, rode os testes e as verificações relevantes:
+Testes do backend e as validações estritas do OpenSpec ficam na raiz do repositório:
 
-```powershell
-.\gradlew.bat testDebugUnitTest verifyModelAssets lintDebug
+```bash
+bash supabase/tests/run-pglite.sh
+openspec validate --all --strict --no-interactive
+openspec validate --archived --strict --no-interactive
 ```
 
-O código Android fica em `android-app/app/src/main/java/br/com/leafcare/`: `ui/` contém as telas, `auth/` a autenticação, `data/` persistência e sincronização, e `ml/` o processamento e a inferência de imagens. A explicação dos fluxos e das relações entre esses módulos está em [Arquitetura](docs/ARCHITECTURE.md).
+O roteiro manual de autenticação, câmera, histórico, modo offline e sincronização está em [Testes e QA](docs/TESTING.md).
 
-### Validar e integrar o modelo
+## Machine Learning
 
-O dataset completo não está no repositório. Para treinar, disponibilize os dados locais esperados em `machine-learning/data/raw/` e use Python 3.12. No PowerShell:
+O bundle Android atual contém MobileNetV4 Small destilado em TFLite, com 16 classes. O dataset completo não é distribuído neste repositório. Para comandos do pipeline, requisitos de Python, avaliação e limites das métricas, consulte [Machine Learning](docs/MACHINE_LEARNING.md) e [machine-learning/README.md](machine-learning/README.md).
 
-```powershell
-cd machine-learning
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python predict.py ../samples/reference_frog_eye.jpg
-# Com dados e caches do experimento disponíveis:
-python deploy_distilled.py --install
-python validate_bundle.py --require-model
-```
+O modelo só deve ser substituído após solicitação explícita e validação do contrato Android. O processo de treino e exportação está separado da inferência incluída no app.
 
-A promoção do checkpoint selecionado atualiza o bundle usado pelo app em `android-app/app/src/main/assets/`. Depois de alterar o modelo, valide também o contrato Android:
+## Documentação
 
-```powershell
-cd ../android-app
-.\gradlew.bat verifyModelAssets testDebugUnitTest
-```
+- [Arquitetura Android](docs/ARCHITECTURE.md)
+- [Desenvolvimento e ferramentas](docs/DEVELOPMENT.md)
+- [Testes e QA](docs/TESTING.md)
+- [Machine Learning](docs/MACHINE_LEARNING.md) e [benchmarks](docs/benchmarks/BENCHMARK_MODELOS.md)
+- [Supabase, migrations e sincronização](docs/SUPABASE.md)
+- [Administração e revisão de fotos](docs/SUPERADMIN.md)
+- [Contexto de desenvolvimento e limites](docs/AI_CONTEXT.md)
+- [OpenSpec](openspec/README.md)
+- [Histórico de versões](CHANGELOG.md)
 
-Formato de entrada, ordem das classes, pré-processamento, threshold e exportação precisam permanecer consistentes entre Python e Android. O passo a passo e as restrições do pipeline estão em [Machine Learning](docs/MACHINE_LEARNING.md).
+Relatos de experimentos e jornadas em `docs/explain/` são material histórico e educacional; instruções operacionais atuais ficam nos guias acima.
 
-## Documentação do projeto
-
-- [Desenvolvimento](docs/DEVELOPMENT.md): setup e comandos Android/Python.
-- [Arquitetura](docs/ARCHITECTURE.md): módulos, banco local, inferência e sincronização.
-- [Machine Learning](docs/MACHINE_LEARNING.md): dataset, contrato do modelo, métricas e pipeline de treino/exportação.
-- [Jornada do Machine Learning](docs/explain/JORNADA_MACHINE_LEARNING.md): preparação dos dados, experimentos, decisão pelo ensemble e roadmap, em formato compatível com Obsidian.
-- [Jornada do aplicativo](docs/explain/JORNADA_APLICATIVO.md): criação do Android, telas, fluxo offline, bancos, autenticação, sincronização e evolução com fotos do bucket, em formato compatível com Obsidian.
-- [Benchmark de modelos](docs/benchmarks/BENCHMARK_MODELOS.md): comparação histórica e experimentos DINOv2, MobileNetV4, TinyViT e MobileCLIP2.
-- [Supabase](docs/SUPABASE.md): autenticação, migrations, RLS e Storage.
-- [Testes e QA](docs/TESTING.md): validações automatizadas e evidências históricas.
-- [Contexto e regras do projeto](docs/AI_CONTEXT.md): limites importantes para mudanças.
-- [OpenSpec](openspec/README.md): fluxo de mudanças, specs do comportamento atual e integração Codex.
-- [Organização do ML](machine-learning/README.md) e [mapa do repositório](docs/explain/MAPA_REPOSITORIO.md): modelo atual, relatórios, legado e decisões de limpeza.
-- [Licença da fonte Inter](docs/legal/Inter-OFL.txt) e [fontes das imagens](docs/legal/referencias_manifest.csv).
-- [Histórico de versões](CHANGELOG.md).
-
-## Estrutura
+## Estrutura do repositório
 
 ```text
-android-app/       aplicativo Android
-machine-learning/  dados de referência, pipeline e artefatos do modelo
-supabase/          migrations do backend
-docs/              arquitetura, setup e evidências de QA
-samples/           imagens e fixtures de validação
-openspec/          especificações e histórico de mudanças
-.agents/skills/    workflows OpenSpec para Codex
+android-app/       aplicativo Android, testes e bundle TFLite
+machine-learning/  pipeline, artefatos de pesquisa e ferramentas de exportação
+supabase/          migrations, funções e testes locais do backend
+docs/              arquitetura, operação, QA, proveniência e relatórios
+openspec/          especificações atuais e mudanças arquivadas
+.agents/skills/    workflows OpenSpec usados no projeto
 ```
+
+## Licenças e proveniência
+
+As licenças das fontes e a proveniência das imagens de referência estão em [`docs/legal/`](docs/legal/). O dataset TLA completo não está incluído. Consulte as licenças originais antes de redistribuir dados ou materiais derivados.

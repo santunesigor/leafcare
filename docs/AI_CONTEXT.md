@@ -1,51 +1,40 @@
 # Contexto do LeafCare
 
-Referência operacional para mudanças no projeto. Código, testes e migrations são a fonte de verdade; investigue divergências antes de atualizar a documentação.
+Guia operacional para mudanças neste repositório. Código, testes, migrations e artefatos do modelo são a fonte de verdade; corrija divergências documentais quando encontrá-las.
 
-## Produto e estado esperado
+## Produto e comportamento
 
-LeafCare é um app Android de triagem visual de alterações em folhas de fumo, não um diagnóstico agronômico definitivo. A conta exige internet no primeiro acesso. Depois da autenticação, câmera, galeria, classificação e histórico devem funcionar offline.
+- LeafCare é um app Android de triagem visual de alterações em folhas de fumo; não fornece diagnóstico agronômico definitivo.
+- A inferência MobileNetV4 Small roda no aparelho. Depois da autenticação inicial, câmera, galeria, classificação e histórico local funcionam offline.
+- Room é a fonte observada pela interface. Salve a análise local antes da sincronização; falhas de rede não podem descartar o resultado local.
+- UUIDs estáveis, retry, tombstones e isolamento por conta preservam a sincronização sem ressuscitar exclusões.
+- Fotos de resultados inconclusivos permanecem locais. Fotos elegíveis do histórico são sincronizadas para armazenamento privado; a previsão original é mantida.
 
-O app já inclui captura/importação de imagens, classificação local, resultado Top-3/inconclusivo, histórico Room, autenticação Supabase e sincronização de análises e fotos.
+## Treinamento de fotos e privacidade
+
+- A contribuição para treinamento está habilitada como opt-in. Exige documentos atuais aceitos, consentimento geral afirmativo e autorização individual por foto; a opção é desmarcada por padrão.
+- Recusar ou revogar mantém a classificação e o histórico normais. Revogações devem ser sincronizadas antes de qualquer upload pendente; estados positivos antigos nunca autorizam upload.
+- Fotos de treinamento e exportações locais são separadas do histórico. A retenção máxima é de 90 dias para cópias remotas e 30 dias para exportações locais; backups manuais do banco no Google Drive têm acesso restrito e retenção máxima de 30 dias.
+- O e-mail de privacidade é `igorsantunes@outlook.com`. Os Termos e a Política v1.3, publicados em 19/10/2026, abrem dentro do app; o servidor registra a versão e o horário de aceite. O aceite legal não substitui o consentimento de treinamento.
+- URLs de confirmação e recuperação devem retornar ao app pelos deep links `leafcare://auth/confirm-email` e `leafcare://auth/reset-password`; não há site do produto.
 
 ## Arquitetura e dados
 
-- Inferência sempre local; o backend não classifica imagens.
-- Room é a fonte observada pela UI. Salve a análise local antes de tentar sincronizar.
-- Sincronização usa UUID estável, WorkManager e retry; falhas remotas não podem invalidar a análise local.
-- Tombstones de exclusão não podem ressuscitar durante restore.
-- Fotos conclusivas (confiança >= limiar registrado) são enviadas ao bucket privado; inconclusivas ficam apenas locais. Estado de sync da foto é independente da análise. Classe de cada foto em analyses.class_id pelo UUID.
-- Treinamento é separado do histórico e permanece desativado até monitorar o canal de privacidade e instalar/testar a rotina de expiração. Histórico remoto permanece enquanto a conta estiver ativa ou até exclusão; cópias de treinamento têm limite de 90 dias e exportações locais, 30 dias. Backup de banco pode preservar dados apagados por até 30 dias conforme plano/configuração. O contato de privacidade é igorsantunes@outlook.com. Os documentos legais abrem dentro do app, estão na versão 1.2 (19/10/2026), e o cadastro envia as versões aceitas para registrar timestamp no servidor; isso não autoriza treinamento. Room isola escolhas por conta; estado positivo legado não libera upload.
-- Dados devem permanecer isolados por conta; RLS restringe acesso remoto pelo usuário autenticado.
+- Android: Kotlin, Jetpack Compose, Room, CameraX e WorkManager.
+- Supabase fornece Auth, PostgREST e Storage privado; não classifica imagens.
+- Mantenha RLS ativa e o isolamento por conta. Não altere schema, políticas, migrations aplicadas, dados de produção ou funções remotas sem pedido explícito.
+- Não inclua credenciais, `local.properties`, `.env`, chaves de serviço ou material de assinatura em arquivos versionados.
 
-## Machine Learning
+## Modelo
 
-O bundle integrado é MobileNetV4 Small destilado, schema 2, TFLite float32 de 9,70 MiB, 16 classes e entrada `[1,224,224,3]` RGB 0–255. Resize bicúbico do lado menor para 256 e crop central 224; normalização ImageNet e temperatura 1,888204 embarcadas; limiar 0,506676. Teste conhecido: Top-1 85,44%, Macro-F1 0,8083, Top-3 97,09%. Promoção: `deploy_distilled.py --install`; receita em `experiments/distillation/`. Relatórios atuais: `docs/model-reports/mobilenetv4-distilled/`. Ensemble anterior: tag `v1.1.2` e relatórios históricos separados. Meta de três segundos no Galaxy A06 pendente de aparelho conectado.
+O bundle atual é MobileNetV4 Small destilado, schema 2, float32 TFLite, 16 classes, entrada RGB `[1,224,224,3]`, resize bicúbico do lado menor a 256 e crop central 224. Normalização, temperatura e limiar estão registrados nos metadados do bundle. Métricas e limitações ficam em [Machine Learning](MACHINE_LEARNING.md).
 
-Não altere modelo, treinamento, dataset, ordem das classes ou threshold sem solicitação explícita. Confiança softmax não é certeza agronômica. Detalhes e comandos estão em [MACHINE_LEARNING.md](MACHINE_LEARNING.md).
+Não altere pesos, pipeline de treino, dataset, ordem das classes, pré-processamento ou limiar sem pedido explícito. Resultados de teste interno não equivalem a validação de campo; não transforme medições em desktop em alegações de velocidade no aparelho.
 
-## Segurança e autenticação
+## Validação e documentação
 
-- Não inclua service_role, senha de banco, JWT secret ou credenciais administrativas no app.
-- Mantenha RLS ativa e o bucket de fotos privado.
-- Auth usa confirmação por link e recuperação por deep link: `leafcare://auth/confirm-email` e `leafcare://auth/reset-password`.
-- Não adicione login social nem pipeline de coleta de fotos para treinamento sem solicitação explícita.
-- O pipeline autorizado usa revisão humana da classe e remove EXIF/identificadores antes da exportação local; revogação bloqueia novos envios e remove cópias remotas, sem reverter automaticamente modelos previamente treinados.
-
-## Débitos conhecidos
-
-- O threshold usado por AnalysisRepository vem de LeafClassifier e do bundle. Análises anteriores preservam o limiar e hash registrados.
-- Os fluxos Auth foram reportados aprovados manualmente em dispositivo em 2026-09-29. Validação em segundo aparelho não foi executada por indisponibilidade.
-- Atualize limitações e estado de QA sem transformar resultados antigos em evidência de uma execução nova.
-
-## Regras de trabalho
-
-- Prefira a menor mudança suficiente; não inicie refatorações amplas para remover dívida de baixo impacto.
-- Leia apenas arquivos necessários e preserve o comportamento offline-first.
-- Antes de editar, confira `git status`, branch atual e histórico recente.
-- Execute testes relacionados e documente limitações reais. Nunca afirme que um teste passou sem executá-lo.
-- Não faça push sem autorização explícita.
-
-## Fonte de verdade
-
-Em caso de conflito: código, testes, migrations/schema, artefatos do modelo, documentação técnica e, por último, este contexto. Não altere ML ou schema para resolver divergência documental.
+- Leia este arquivo, [README](../README.md) e [Desenvolvimento](DEVELOPMENT.md) antes de mudanças relevantes.
+- Rode os testes e verificações proporcionais ao escopo; não relate validações que não executou.
+- O proprietário testou no aparelho os fluxos do APK 1.7.1 e confirmou funcionamento. Isso não substitui testes físicos de fluxos que não foram relatados como testados.
+- Atualize documentação operacional quando o comportamento mudar; preserve benchmarks, licenças, proveniência e relatos históricos que ainda servem como evidência.
+- Não faça push para `main` sem autorização explícita.
