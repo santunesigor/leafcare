@@ -27,7 +27,7 @@ O Room guarda análises e estados independentes de sincronização; o WorkManage
 
 4. **Escolha por imagem.** A configuração no Perfil registra a autorização e os documentos consultáveis. Na câmera/galeria, cada nova análise recebe uma opção individual desmarcada; sem consentimento global vigente, ela fica desabilitada. A análise local e seu backup normal seguem o fluxo atual.
 
-5. **Conteúdo versionado no app.** Os documentos abrem em telas internas, com versão e data de publicação. O cadastro envia as versões aceitas e um trigger registra o timestamp do servidor em tabela com leitura somente do próprio titular. Enquanto controlador, contato de privacidade e prazos de retenção não forem definidos, o app explica o motivo da indisponibilidade e mantém desativados o aceite global e a escolha individual para treinamento. A autorização só será habilitada quando esses dados forem publicados; o conteúdo explicará também que isso não desfaz modelos já treinados.
+5. **Conteúdo versionado no app.** Os documentos abrem em telas internas, com versão 1.1 e data 19/10/2026. O cadastro envia as versões aceitas e o banco registra o timestamp do servidor. A equipe LeafCare (cinco pessoas, sem CNPJ informado) é o controlador declarado pelo projeto. O histórico remoto fica enquanto a conta estiver ativa; exclusões são processadas em até 30 dias; cópias de treinamento expiram em 90 dias; exportações locais em 30 dias; backups do banco podem reter cópias por até 30 dias conforme o plano. A coleta continua desativada até publicar um canal monitorado e instalar/testar limpeza automática.
 
 6. **Exportação bloqueada por padrão.** O exportador valida consentimento vigente, qualidade, duplicatas, EXIF e revisão humana, mas termina sem consultar nem baixar fotos enquanto os dados legais não forem publicados. O bucket também não concede INSERT a clientes autenticados. Após habilitação futura, a saída contém classe revisada e identificador anônimo e ficará numa área local ignorada pelo Git.
 
@@ -43,11 +43,11 @@ O Room guarda análises e estados independentes de sincronização; o WorkManage
 
 ## Migration Plan
 
-1. Aplicar migrations aditivas: tabelas e RLS para treinamento e recibo de aceite geral. O recibo é criado pelo trigger de cadastro; usuários só leem seu próprio registro. Não criar política de inserção de fotos enquanto faltarem as definições legais; manter a exclusão própria permitida.
+1. Aplicar migrations aditivas: tabelas/RLS para treinamento e recibo de aceite geral, com versões documentais 1.0/1.1. O recibo é criado pelo trigger de cadastro; usuários só leem seus próprios registros. A retenção de fotos de treinamento e exportações exige limpeza automática agendada antes de liberar uploads.
 2. Distribuir o APK com Room v4; dados locais antigos migram como não autorizados.
 3. Atualizar o Supabase/Edge Function antes de habilitar exportações. Sem o contrato remoto, consentimentos ficam em retry e nenhuma foto de treinamento sai do aparelho.
 4. Rollback do app mantém as tabelas e bucket; não apagar consentimentos ou fotos automaticamente. Para rollback do backend, bloquear novos uploads e preservar registros de revogação até a limpeza auditada.
 
 ## Open Questions
 
-O usuário confirmou que o controlador, o contato de privacidade e os prazos de retenção ainda não foram definidos. Os documentos legais são acessados dentro do aplicativo e não dependem de URLs externas. O aceite para treinamento, a autorização por foto, gravações no Storage e a exportação permanecem desativados até receber essas definições.
+O projeto declarou a equipe LeafCare, composta por cinco pessoas e sem CNPJ informado, como controladora. A retenção está definida, mas ainda falta canal de privacidade monitorado e a rotina automática de expiração. Os documentos são internos ao app; aceite de treinamento, autorização por foto, gravações no Storage e exportação permanecem desativados até as duas pendências serem resolvidas.

@@ -8,10 +8,10 @@ Permitir que cada pessoa escolha, de forma informada e revogável, se fotos espe
 
 ### Requirement: Coleta desativada até publicar informações legais
 
-O app, o servidor e o pipeline SHALL manter gravação e exportação de fotos de treinamento desativadas até que o controlador, o contato de privacidade e os prazos de retenção sejam definidos e publicados nos documentos legais internos do app. A análise local e o histórico SHALL permanecer disponíveis.
+O app, o servidor e o pipeline SHALL manter gravação e exportação de fotos de treinamento desativadas até que um canal de privacidade monitorado e a rotina automática de expiração estejam publicados, implantados e testados. A análise local e o histórico SHALL permanecer disponíveis.
 
 #### Scenario: Informações ainda não publicadas
-- **WHEN** controlador, contato de privacidade ou prazos de retenção ainda não foram definidos
+- **WHEN** falta canal de privacidade monitorado ou rotina automática de expiração
 - **THEN** nenhuma opção de consentimento permite aceitar o uso de fotos
 - **AND** nenhum byte de foto é enviado ou exportado para treinamento
 - **AND** a tela informa por que a contribuição está indisponível
@@ -94,11 +94,30 @@ O pipeline SHALL incluir somente imagens com consentimento vigente, autorizaçã
 
 ### Requirement: Informação transparente e retenção
 
-O app SHALL disponibilizar os termos e o aviso de privacidade antes da autorização, explicando finalidade, dados usados, armazenamento, ciclo de retenção, revogação e limites de remoção após treinamento. A cópia de treinamento SHALL permanecer elegível somente enquanto a autorização estiver ativa.
+O app SHALL disponibilizar os termos e o aviso de privacidade antes da autorização, explicando finalidade, dados usados, armazenamento, retenção, revogação e limites de remoção após treinamento. O histórico remoto SHALL ser mantido enquanto a conta estiver ativa, salvo exclusão solicitada; cópias de treinamento SHALL expirar em até 90 dias e exportações locais em até 30 dias.
 
 #### Scenario: Consultar informações
 - **WHEN** a pessoa abre as informações sobre uso de fotos
 - **THEN** consegue consultar os termos e o aviso de privacidade sem aceitar o consentimento
+
+#### Scenario: Retenção do histórico
+- **WHEN** uma conta está ativa e não solicitou exclusão de uma análise
+- **THEN** o histórico e a foto permanecem disponíveis para a finalidade de histórico
+- **AND** a pessoa pode excluir o item ou encerrar a conta
+
+#### Scenario: Expiração de cópia de treinamento
+- **WHEN** uma cópia de treinamento alcança 90 dias desde o upload
+- **THEN** a rotina automática remove o objeto do Storage
+- **AND** uma revogação remove a cópia antes desse prazo
+
+#### Scenario: Expiração de exportação
+- **WHEN** uma exportação local alcança 30 dias desde sua criação
+- **THEN** o processo de manutenção remove a pasta privada da exportação
+
+#### Scenario: Exclusão e backups
+- **WHEN** os dados ativos são excluídos a pedido da pessoa
+- **THEN** os sistemas ativos processam a exclusão em até 30 dias
+- **AND** cópias de recuperação do banco podem persistir por até 30 dias conforme o plano do provedor
 
 #### Scenario: Modelo já treinado
 - **WHEN** uma cópia de treinamento é excluída após a revogação

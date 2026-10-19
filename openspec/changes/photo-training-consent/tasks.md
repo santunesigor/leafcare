@@ -27,3 +27,6 @@
 - [x] 4.2 Executar testes Android, testes Supabase locais, testes Python do exportador e validações OpenSpec estritas; registrar resultados reais.
 - [x] 4.3 Gerar e disponibilizar APK debug para teste manual; usuário confirmou teste do APK em 19/10/2026.
 - [x] 4.4 Versionar Termos e Política, mostrar data de publicação e registrar versões aceitas com timestamp gerado pelo servidor; validar RLS de recibos imutáveis.
+- [x] 4.5 Definir retenção por categoria: histórico enquanto a conta estiver ativa, exclusão em até 30 dias, cópia de treino em até 90 dias, exportação em até 30 dias e backups conforme plano (máximo informado de 30 dias).
+- [ ] 4.6 Instalar e testar a limpeza automática de cópias de treinamento e exportações antes de habilitar coleta.
+- [ ] 4.7 Definir e publicar canal de privacidade monitorado; validar representação e endereço institucional do controlador.

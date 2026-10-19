@@ -15,7 +15,7 @@ O app já inclui captura/importação de imagens, classificação local, resulta
 - Sincronização usa UUID estável, WorkManager e retry; falhas remotas não podem invalidar a análise local.
 - Tombstones de exclusão não podem ressuscitar durante restore.
 - Fotos conclusivas (confiança >= limiar registrado) são enviadas ao bucket privado; inconclusivas ficam apenas locais. Estado de sync da foto é independente da análise. Classe de cada foto em analyses.class_id pelo UUID.
-- Treinamento é separado do histórico, mas permanece desativado até definir controlador, contato de privacidade e prazos de retenção. Os documentos legais abrem dentro do app. O cadastro envia as versões aceitas e Supabase registra o timestamp do servidor; isso não autoriza treinamento. Room isola escolhas por conta; mesmo um estado legado positivo não libera upload enquanto o bloqueio de produto e as políticas remotas estiverem ativos.
+- Treinamento é separado do histórico e permanece desativado até publicar um canal de privacidade monitorado e instalar/testar a rotina de expiração. Histórico remoto permanece enquanto a conta estiver ativa ou até exclusão; cópias de treinamento terão limite de 90 dias e exportações locais, 30 dias. Backup de banco pode preservar dados apagados por até 30 dias conforme plano/configuração. Os documentos legais abrem dentro do app, estão na versão 1.1 (19/10/2026), e o cadastro envia as versões aceitas para registrar timestamp no servidor; isso não autoriza treinamento. Room isola escolhas por conta; estado positivo legado não libera upload.
 - Dados devem permanecer isolados por conta; RLS restringe acesso remoto pelo usuário autenticado.
 
 ## Machine Learning

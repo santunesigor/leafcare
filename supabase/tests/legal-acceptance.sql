@@ -4,7 +4,8 @@ BEGIN IF value IS DISTINCT FROM true THEN RAISE EXCEPTION 'Assertion failed: %',
 
 INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES
  ('91000000-0000-0000-0000-000000000001','accepted@test.local','{"terms_version":"1.0","privacy_version":"1.0","display_name":"Accepted"}'),
- ('91000000-0000-0000-0000-000000000002','legacy@test.local','{"display_name":"Legacy"}');
+ ('91000000-0000-0000-0000-000000000002','legacy@test.local','{"display_name":"Legacy"}'),
+ ('91000000-0000-0000-0000-000000000003','accepted-v11@test.local','{"terms_version":"1.1","privacy_version":"1.1","display_name":"Accepted 1.1"}');
 
 SELECT pg_temp.assert_true(
  (SELECT terms_version='1.0' AND privacy_version='1.0' AND accepted_at IS NOT NULL
@@ -13,6 +14,10 @@ SELECT pg_temp.assert_true(
 SELECT pg_temp.assert_true(
  NOT EXISTS(SELECT 1 FROM public.legal_document_acceptances WHERE user_id='91000000-0000-0000-0000-000000000002'),
  'accounts created without the current versions have no acceptance receipt');
+SELECT pg_temp.assert_true(
+ (SELECT terms_version='1.1' AND privacy_version='1.1' AND accepted_at IS NOT NULL
+  FROM public.legal_document_acceptances WHERE user_id='91000000-0000-0000-0000-000000000003'),
+ 'signup saves version 1.1 acceptance');
 
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub','91000000-0000-0000-0000-000000000001',true);

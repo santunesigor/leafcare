@@ -124,7 +124,7 @@ interface TrainingConsentDao {
 }
 
 const val TRAINING_TERMS_VERSION = "1.0"
-/** Disabled until published retention terms and official privacy URLs are configured. */
+/** Disabled until a monitored privacy channel and automated retention cleanup are configured. */
 const val TRAINING_UPLOADS_ENABLED = false
 
 /** v1 -> v2: sync columns. Existing rows default to pending upload. */
