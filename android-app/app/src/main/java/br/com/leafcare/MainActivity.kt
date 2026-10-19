@@ -69,21 +69,36 @@ class MainActivity : ComponentActivity() {
 fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
     val session by authViewModel.session.collectAsStateWithLifecycle()
     val bootstrap by authViewModel.bootstrap.collectAsStateWithLifecycle()
+    val legalAcceptance by authViewModel.legalAcceptance.collectAsStateWithLifecycle()
 
     // On first launch, trigger session restoration
     androidx.compose.runtime.LaunchedEffect(Unit) {
         authViewModel.onSessionRestored()
+    }
+    LaunchedEffect(legalAcceptance) {
+        if (legalAcceptance == br.com.leafcare.auth.LegalAcceptanceState.REQUIRED) {
+            authViewModel.setScreen(br.com.leafcare.auth.AuthScreen.LegalAcceptance)
+        }
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) authViewModel.refreshLegalAcceptance()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Auth gate: Loading until the bootstrap resolves (storage restore or
     // deeplink processing), so the Login screen never flashes and no App
     // frame leaks during auth callbacks. Recovery pending always wins over
     // an authenticated session.
-    when (appGateDestination(session, bootstrap)) {
+    when (appGateDestination(session, bootstrap, legalAcceptance)) {
         AppGate.Loading -> LoadingScreen()
         AppGate.Recovery -> AuthNavHost(authViewModel)
         AppGate.Main -> MainAppNavHost(authViewModel)
         AppGate.Auth -> AuthNavHost(authViewModel)
+        AppGate.LegalAcceptance -> AuthNavHost(authViewModel)
     }
 }
 
@@ -202,7 +217,8 @@ internal enum class AppGate {
     Loading,
     Recovery,
     Main,
-    Auth
+    Auth,
+    LegalAcceptance
 }
 
 /**
@@ -212,7 +228,8 @@ internal enum class AppGate {
  */
 internal fun appGateDestination(
     session: UserSession?,
-    bootstrap: AuthBootstrapState
+    bootstrap: AuthBootstrapState,
+    legalAcceptance: br.com.leafcare.auth.LegalAcceptanceState = br.com.leafcare.auth.LegalAcceptanceState.CURRENT
 ): AppGate =
     when (bootstrap) {
         AuthBootstrapState.CHECKING,
@@ -220,5 +237,12 @@ internal fun appGateDestination(
         AuthBootstrapState.RECOVERY_PENDING ->
             if (session != null) AppGate.Recovery else AppGate.Auth
         AuthBootstrapState.READY ->
-            if (session != null) AppGate.Main else AppGate.Auth
+            when {
+                session == null -> AppGate.Auth
+                legalAcceptance == br.com.leafcare.auth.LegalAcceptanceState.CHECKING ||
+                    legalAcceptance == br.com.leafcare.auth.LegalAcceptanceState.NOT_REQUIRED -> AppGate.Loading
+                legalAcceptance == br.com.leafcare.auth.LegalAcceptanceState.REQUIRED ||
+                    legalAcceptance == br.com.leafcare.auth.LegalAcceptanceState.SUBMITTING -> AppGate.LegalAcceptance
+                else -> AppGate.Main
+            }
     }

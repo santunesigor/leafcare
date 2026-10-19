@@ -27,11 +27,22 @@ SELECT pg_temp.assert_true(
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub','91000000-0000-0000-0000-000000000001',true);
 SELECT pg_temp.assert_true((SELECT count(*)=1 FROM public.legal_document_acceptances),'user can read own receipt');
+SELECT public.accept_current_legal_documents('1.2','1.2');
+SELECT public.accept_current_legal_documents('1.2','1.2');
+SELECT pg_temp.assert_true(
+ (SELECT count(*)=1 FROM public.legal_document_acceptances
+  WHERE user_id=auth.uid() AND terms_version='1.2' AND privacy_version='1.2' AND accepted_at IS NOT NULL),
+ 'existing user explicitly appends one server-timestamped current receipt');
 DO $$ BEGIN
  BEGIN INSERT INTO public.legal_document_acceptances(user_id,terms_version,privacy_version)
    VALUES(auth.uid(),'1.0','1.0'); RAISE EXCEPTION 'client inserted acceptance'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN UPDATE public.legal_document_acceptances SET terms_version='0' WHERE user_id=auth.uid(); RAISE EXCEPTION 'client changed acceptance'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN DELETE FROM public.legal_document_acceptances WHERE user_id=auth.uid(); RAISE EXCEPTION 'client deleted acceptance'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN PERFORM public.accept_current_legal_documents('1.1','1.1'); RAISE EXCEPTION 'accepted obsolete legal version'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
 END $$;
 RESET ROLE;
+SELECT set_config('request.jwt.claim.sub','',true);
+DO $$ BEGIN
+ BEGIN PERFORM public.accept_current_legal_documents('1.2','1.2'); RAISE EXCEPTION 'anonymous acceptance succeeded'; EXCEPTION WHEN invalid_authorization_specification THEN NULL; END;
+END $$;
 ROLLBACK;

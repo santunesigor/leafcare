@@ -61,6 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.leafcare.R
 import br.com.leafcare.auth.AuthScreen
 import br.com.leafcare.auth.AuthViewModel
+import br.com.leafcare.auth.LegalAcceptanceState
 import br.com.leafcare.ui.FigmaIcon
 import br.com.leafcare.ui.LeafColors
 
@@ -77,11 +78,12 @@ fun AuthNavHost(viewModel: AuthViewModel) {
         AuthScreen.Login -> LoginScreen(viewModel)
         AuthScreen.SignUp -> SignUpScreen(viewModel)
         AuthScreen.TermsOfUse -> LegalDocumentScreen(LegalDocument.TermsOfUse) {
-            viewModel.setScreen(AuthScreen.SignUp)
+            viewModel.returnFromLegalDocument()
         }
         AuthScreen.PrivacyPolicy -> LegalDocumentScreen(LegalDocument.PrivacyPolicy) {
-            viewModel.setScreen(AuthScreen.SignUp)
+            viewModel.returnFromLegalDocument()
         }
+        AuthScreen.LegalAcceptance -> ExistingAccountLegalAcceptanceScreen(viewModel)
         AuthScreen.VerifyEmail -> VerifyEmailScreen(viewModel)
         AuthScreen.ForgotPassword -> ForgotPasswordScreen(viewModel)
         AuthScreen.NewPassword -> NewPasswordScreen(
@@ -90,6 +92,45 @@ fun AuthNavHost(viewModel: AuthViewModel) {
             confirmCancelRecovery = true
         )
         AuthScreen.Profile -> ProfileScreen(viewModel, onBack = { viewModel.setScreen(AuthScreen.Login) })
+    }
+}
+
+@Composable
+private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
+    val state by viewModel.legalAcceptance.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    AuthScaffold(onBack = { viewModel.continueOfflineWithoutAccepting() }) {
+        AuthHeader(logoSize = 56, title = "Documentos atualizados", subtitle = "Leia e escolha se deseja continuar")
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Atualizamos os Termos de Uso e a Política de Privacidade. Leia as versões 1.2, publicadas em 19/10/2026, e confirme para continuar usando os recursos conectados.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = LeafColors.Text,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(12.dp))
+        AuthLinkButton("Ler Termos de Uso") { viewModel.setScreen(AuthScreen.TermsOfUse) }
+        AuthLinkButton("Ler Política de Privacidade") { viewModel.setScreen(AuthScreen.PrivacyPolicy) }
+        if (error != null) AuthMessages(error, null)
+        Spacer(Modifier.height(12.dp))
+        AuthButton(
+            label = "Li e concordo",
+            loading = state == LegalAcceptanceState.SUBMITTING,
+            onClick = viewModel::acceptCurrentLegalDocuments
+        )
+        Spacer(Modifier.height(8.dp))
+        TextButton(
+            onClick = viewModel::continueOfflineWithoutAccepting,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Continuar offline sem aceitar", color = LeafColors.Green)
+        }
+        Text(
+            "Sem aceite confirmado, os recursos que dependem de conexão podem ficar indisponíveis. A análise local continua disponível; o app perguntará novamente quando voltar a ficar online.",
+            style = MaterialTheme.typography.bodySmall,
+            color = LeafColors.Muted,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

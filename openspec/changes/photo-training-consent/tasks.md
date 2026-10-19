@@ -32,4 +32,4 @@
 - [x] 4.7 Publicar o e-mail de privacidade fornecido pela equipe nos documentos do app, com ação de cópia no design system LeafCare.
 - [ ] 4.8 Confirmar monitoramento/MFA e pessoa substituta para a caixa; validar representação e endereço institucional do controlador.
 - [x] 4.9 Atualizar os documentos para v1.2, incrementar o APK para 1.5.0 (versionCode 12), registrar migrations de aceites e retenção, e validar Android, Supabase e OpenSpec.
-- [ ] 4.10 Implementar comunicação e novo aceite de versões materiais para contas existentes; nunca criar recibos retroativos sem ação do usuário.
+- [x] 4.10 Implementar comunicação e novo aceite de versões materiais para contas existentes; nunca criar recibos retroativos sem ação do usuário. A verificação ocorre no login/retorno ao app, a confirmação é registrada por RPC imutável, falha de rede não inventa aceite, e a sincronização fica pausada até haver recibo atual. Migration `20261019190156_existing_user_legal_acceptance` aplicada no Supabase; testes Android, PostgreSQL/PGlite e OpenSpec passaram.

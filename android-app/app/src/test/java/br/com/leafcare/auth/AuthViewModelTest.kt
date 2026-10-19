@@ -92,6 +92,16 @@ class AuthViewModelTest {
         assertEquals(AuthScreen.Login, viewModel.uiState.value.currentScreen)
     }
 
+    @Test fun legalDocumentReturnsToExistingAccountAcceptancePrompt() {
+        viewModel.setScreen(AuthScreen.LegalAcceptance)
+        viewModel.setScreen(AuthScreen.TermsOfUse)
+        assertEquals(AuthScreen.TermsOfUse, viewModel.uiState.value.currentScreen)
+
+        viewModel.returnFromLegalDocument()
+
+        assertEquals(AuthScreen.LegalAcceptance, viewModel.uiState.value.currentScreen)
+    }
+
     @Test fun mismatchedPasswords_blockSignUpWithVisibleError() = runTest(dispatcher) {
         viewModel.setDisplayName("Nome Teste")
         viewModel.setEmail("a@b.com")
@@ -174,7 +184,7 @@ class AuthViewModelTest {
         // Regression guard: signup confirmation OTP stays out (no corporate
         // SMTP domain). VerifyEmail is the link-confirmation screen (no code).
         assertEquals(
-            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.TermsOfUse, AuthScreen.PrivacyPolicy, AuthScreen.VerifyEmail, AuthScreen.ForgotPassword, AuthScreen.NewPassword, AuthScreen.Profile),
+            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.TermsOfUse, AuthScreen.PrivacyPolicy, AuthScreen.LegalAcceptance, AuthScreen.VerifyEmail, AuthScreen.ForgotPassword, AuthScreen.NewPassword, AuthScreen.Profile),
             AuthScreen.values().toSet()
         )
     }

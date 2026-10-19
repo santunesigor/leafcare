@@ -29,9 +29,11 @@ O Room guarda análises e estados independentes de sincronização; o WorkManage
 
 5. **Conteúdo versionado no app.** Os documentos abrem em telas internas, com versão 1.2 e data 19/10/2026. O cadastro envia as versões aceitas e o banco registra o timestamp do servidor. A equipe LeafCare (cinco pessoas, sem CNPJ informado) é o controlador declarado pelo projeto. O contato informado é igorsantunes@outlook.com, exibido como texto copiável no app. O histórico remoto fica enquanto a conta estiver ativa; exclusões são processadas em até 30 dias; cópias de treinamento expiram em 90 dias; exportações locais em 30 dias; backups do banco podem reter cópias por até 30 dias conforme o plano. A coleta continua desativada até confirmar o monitoramento do canal e instalar/testar limpeza automática.
 
-6. **Exportação bloqueada por padrão.** O exportador valida consentimento vigente, qualidade, duplicatas, EXIF e revisão humana, mas termina sem consultar nem baixar fotos enquanto os dados legais não forem publicados. O bucket também não concede INSERT a clientes autenticados. Após habilitação futura, a saída contém classe revisada e identificador anônimo e ficará numa área local ignorada pelo Git.
+6. **Reaceite de contas existentes.** No início de uma sessão autenticada, o app consulta o recibo das versões atuais. Se estiver ausente, apresenta os documentos em telas internas e só libera o caminho conectado após o RPC autenticado registrar a confirmação explícita com timestamp do servidor. O RPC aceita apenas as versões publicadas e não permite alteração ou remoção de recibos. Se a rede falhar, nenhuma confirmação é presumida; o usuário pode continuar com classificação local e o app repete a consulta ao voltar ao primeiro plano.
 
-7. **Documentos legais no app.** O cadastro abre Termos de Uso e Política de Privacidade em telas Compose internas e retorna ao formulário. O fluxo não depende de um site nem abre navegador externo. A leitura ou aceite dos termos gerais permanece separada do consentimento opcional para treinamento.
+7. **Exportação bloqueada por padrão.** O exportador valida consentimento vigente, qualidade, duplicatas, EXIF e revisão humana, mas termina sem consultar nem baixar fotos enquanto os dados legais não forem publicados. O bucket também não concede INSERT a clientes autenticados. Após habilitação futura, a saída contém classe revisada e identificador anônimo e ficará numa área local ignorada pelo Git.
+
+8. **Documentos legais no app.** O cadastro abre Termos de Uso e Política de Privacidade em telas Compose internas e retorna ao formulário. O fluxo não depende de um site nem abre navegador externo. A leitura ou aceite dos termos gerais permanece separada do consentimento opcional para treinamento.
 
 ## Risks / Trade-offs
 
@@ -43,11 +45,11 @@ O Room guarda análises e estados independentes de sincronização; o WorkManage
 
 ## Migration Plan
 
-1. Aplicar migrations aditivas: tabelas/RLS para treinamento e recibo de aceite geral, com versões documentais 1.0/1.1/1.2. O recibo é criado pelo trigger de cadastro; usuários só leem seus próprios registros. A retenção de fotos de treinamento e exportações exige limpeza automática agendada antes de liberar uploads.
-2. Distribuir o APK com Room v4; dados locais antigos migram como não autorizados.
+1. Aplicar migrations aditivas: tabelas/RLS para treinamento e recibo de aceite geral, com versões documentais 1.0/1.1/1.2. Recibos de cadastro vêm do trigger; contas existentes recebem recibo somente via RPC após confirmação in-app. Usuários leem apenas seus próprios registros. A retenção de fotos de treinamento e exportações exige limpeza automática agendada antes de liberar uploads.
+2. Distribuir o APK com Room v4 e fluxo de reaceite; dados locais antigos migram como não autorizados. Falhas de rede não bloqueiam a análise local.
 3. Atualizar o Supabase/Edge Function antes de habilitar exportações. Sem o contrato remoto, consentimentos ficam em retry e nenhuma foto de treinamento sai do aparelho.
 4. Rollback do app mantém as tabelas e bucket; não apagar consentimentos ou fotos automaticamente. Para rollback do backend, bloquear novos uploads e preservar registros de revogação até a limpeza auditada.
 
 ## Open Questions
 
-O projeto declarou a equipe LeafCare, composta por cinco pessoas e sem CNPJ informado, como controladora. O contato de privacidade informado é igorsantunes@outlook.com; o monitoramento da caixa ainda precisa ser confirmado. A retenção está definida, mas falta a rotina automática de expiração. Os documentos são internos ao app; aceite de treinamento, autorização por foto, gravações no Storage e exportação permanecem desativados até essas condições serem resolvidas.
+O projeto declarou a equipe LeafCare, composta por cinco pessoas e sem CNPJ informado, como controladora. O contato de privacidade informado é igorsantunes@outlook.com; monitoramento/MFA e substituto da caixa, além da representação e endereço institucional, ainda precisam ser confirmados pela equipe. A limpeza automática foi instalada e testada. Os documentos são internos ao app; aceite de treinamento, autorização por foto, gravações no Storage e exportação permanecem desativados até as pendências operacionais e jurídicas serem resolvidas.

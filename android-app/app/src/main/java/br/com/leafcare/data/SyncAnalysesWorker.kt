@@ -12,6 +12,7 @@ import androidx.work.WorkerParameters
 import br.com.leafcare.admin.AdminRepository
 import br.com.leafcare.BuildConfig
 import br.com.leafcare.LeafCareApplication
+import br.com.leafcare.auth.LegalAcceptanceRepository
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.storage
@@ -53,6 +54,17 @@ class SyncAnalysesWorker(
         val app = applicationContext as LeafCareApplication
         val auth = app.supabaseClientHolder.auth
         val userId = auth.currentUserOrNull()?.id
+        if (userId != null) {
+            val hasCurrentLegalAcceptance = try {
+                LegalAcceptanceRepository(app.supabaseClientHolder).hasCurrentAcceptance()
+            } catch (_: Exception) {
+                return if (runAttemptCount >= MAX_ATTEMPTS) Result.success() else Result.retry()
+            }
+            if (auth.currentUserOrNull()?.id != userId || !hasCurrentLegalAcceptance) {
+                // Leave local history queued until a current receipt is confirmed.
+                return Result.success()
+            }
+        }
         val dao = app.database.analysisDao()
         val client = app.supabaseClientHolder.client
         val api = PostgrestAnalysisSyncApi(

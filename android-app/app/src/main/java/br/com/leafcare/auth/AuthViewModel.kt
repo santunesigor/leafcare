@@ -26,11 +26,16 @@ import kotlinx.serialization.json.jsonPrimitive
 class AuthViewModel internal constructor(
     application: Application,
     private val authRepository: AuthRepository,
-    store: RecoveryPendingStore? = null
+    store: RecoveryPendingStore? = null,
+    private val legalAcceptanceApi: LegalAcceptanceApi? = null
 ) : AndroidViewModel(application) {
 
     /** Production entry point used by `by viewModels()` in MainActivity. */
-    constructor(application: Application) : this(application, AuthRepository(application))
+    constructor(application: Application) : this(
+        application,
+        AuthRepository(application),
+        legalAcceptanceApi = LegalAcceptanceRepository((application as LeafCareApplication).supabaseClientHolder)
+    )
 
     private val recoveryStore: RecoveryPendingStore =
         store ?: PrefsRecoveryPendingStore(application)
@@ -56,6 +61,11 @@ class AuthViewModel internal constructor(
     )
     internal val bootstrap: StateFlow<AuthBootstrapState> = _bootstrap.asStateFlow()
 
+    private val _legalAcceptance = MutableStateFlow(
+        if (legalAcceptanceApi == null) LegalAcceptanceState.CURRENT else LegalAcceptanceState.CHECKING
+    )
+    internal val legalAcceptance: StateFlow<LegalAcceptanceState> = _legalAcceptance.asStateFlow()
+
     // Password-reset submit gate: CAS-atomic single-flight plus a UI mirror.
     // The atomic gate (not the boolean flow) is the correctness mechanism.
     private val resetGate = AtomicBoolean(false)
@@ -79,6 +89,15 @@ class AuthViewModel internal constructor(
 
     init {
         viewModelScope.launch {
+            authRepository.session.collect { session ->
+                if (session == null) {
+                    _legalAcceptance.value = if (legalAcceptanceApi == null) LegalAcceptanceState.CURRENT else LegalAcceptanceState.NOT_REQUIRED
+                } else if (legalAcceptanceApi != null) {
+                    refreshLegalAcceptance()
+                }
+            }
+        }
+        viewModelScope.launch {
             authRepository.sessionChecked.first { it }
             if (_bootstrap.value == AuthBootstrapState.CHECKING) {
                 _bootstrap.value = AuthBootstrapState.READY
@@ -96,6 +115,47 @@ class AuthViewModel internal constructor(
         }
     }
 
+    /** Rechecks the current receipt when the app resumes; network errors never block local inference. */
+    fun refreshLegalAcceptance() {
+        val api = legalAcceptanceApi ?: return
+        val userId = authRepository.user.value?.id ?: return
+        _legalAcceptance.value = LegalAcceptanceState.CHECKING
+        viewModelScope.launch {
+            _legalAcceptance.value = try {
+                if (api.hasCurrentAcceptance()) LegalAcceptanceState.CURRENT else LegalAcceptanceState.REQUIRED
+            } catch (_: Exception) {
+                // A cached, authenticated app must remain usable offline. No receipt is fabricated.
+                LegalAcceptanceState.UNAVAILABLE
+            }
+            if (authRepository.user.value?.id != userId) {
+                _legalAcceptance.value = LegalAcceptanceState.NOT_REQUIRED
+            }
+        }
+    }
+
+    fun acceptCurrentLegalDocuments() {
+        val api = legalAcceptanceApi ?: return
+        if (_legalAcceptance.value != LegalAcceptanceState.REQUIRED) return
+        viewModelScope.launch {
+            _legalAcceptance.value = LegalAcceptanceState.SUBMITTING
+            try {
+                api.acceptCurrentDocuments()
+            } catch (_: Exception) {
+                _legalAcceptance.value = LegalAcceptanceState.REQUIRED
+                authRepository.setError("Não foi possível registrar seu aceite. Confira a conexão e tente novamente.")
+                return@launch
+            }
+            _legalAcceptance.value = LegalAcceptanceState.CURRENT
+            (getApplication<Application>() as? LeafCareApplication)?.scheduleSync()
+        }
+    }
+
+    fun continueOfflineWithoutAccepting() {
+        if (_legalAcceptance.value == LegalAcceptanceState.REQUIRED ||
+            _legalAcceptance.value == LegalAcceptanceState.UNAVAILABLE
+        ) _legalAcceptance.value = LegalAcceptanceState.UNAVAILABLE
+    }
+
     /**
      * Authenticated user's display name from user metadata, or null when
      * unavailable. Home greeting falls back to a plain greeting in that case.
@@ -105,6 +165,7 @@ class AuthViewModel internal constructor(
     // UI state for different screens
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState
+    private var legalDocumentReturnScreen: AuthScreen = AuthScreen.SignUp
 
     // Navigation events
     private val _navigation = Channel<AuthNavigationEvent>(Channel.BUFFERED)
@@ -118,12 +179,17 @@ class AuthViewModel internal constructor(
      * navigate right after setting a message pass `clearMessages = false`.
      */
     fun setScreen(screen: AuthScreen, clearMessages: Boolean = true) {
+        if (screen == AuthScreen.TermsOfUse || screen == AuthScreen.PrivacyPolicy) {
+            legalDocumentReturnScreen = _uiState.value.currentScreen
+        }
         if (clearMessages) {
             authRepository.clearError()
             authRepository.clearInfo()
         }
         _uiState.value = _uiState.value.copy(currentScreen = screen)
     }
+
+    fun returnFromLegalDocument() = setScreen(legalDocumentReturnScreen)
 
     /** Updates email field */
     fun setEmail(email: String) {
@@ -503,12 +569,15 @@ internal enum class AuthBootstrapState {
     READY
 }
 
+internal enum class LegalAcceptanceState { NOT_REQUIRED, CHECKING, REQUIRED, SUBMITTING, CURRENT, UNAVAILABLE }
+
 /** Auth screen types */
 enum class AuthScreen {
     Login,
     SignUp,
     TermsOfUse,
     PrivacyPolicy,
+    LegalAcceptance,
     VerifyEmail,
     ForgotPassword,
     NewPassword,

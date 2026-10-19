@@ -1,6 +1,7 @@
 package br.com.leafcare
 
 import br.com.leafcare.auth.AuthBootstrapState
+import br.com.leafcare.auth.LegalAcceptanceState
 import io.github.jan.supabase.gotrue.user.UserInfo
 import io.github.jan.supabase.gotrue.user.UserSession
 import kotlinx.datetime.Clock
@@ -66,6 +67,31 @@ class AppGateTest {
         assertEquals(
             AppGate.Main,
             appGateDestination(testSession(), AuthBootstrapState.READY)
+        )
+    }
+
+    @Test fun readyWithOutdatedDocuments_requiresAcceptance() {
+        assertEquals(
+            AppGate.LegalAcceptance,
+            appGateDestination(testSession(), AuthBootstrapState.READY, LegalAcceptanceState.REQUIRED)
+        )
+    }
+
+    @Test fun legalReceiptCheck_waitsBeforeOpeningApp() {
+        assertEquals(
+            AppGate.Loading,
+            appGateDestination(testSession(), AuthBootstrapState.READY, LegalAcceptanceState.CHECKING)
+        )
+        assertEquals(
+            AppGate.Loading,
+            appGateDestination(testSession(), AuthBootstrapState.READY, LegalAcceptanceState.NOT_REQUIRED)
+        )
+    }
+
+    @Test fun unavailableReceiptCheck_keepsOfflineAppAvailable() {
+        assertEquals(
+            AppGate.Main,
+            appGateDestination(testSession(), AuthBootstrapState.READY, LegalAcceptanceState.UNAVAILABLE)
         )
     }
 

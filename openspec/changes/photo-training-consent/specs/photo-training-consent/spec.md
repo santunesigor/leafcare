@@ -92,6 +92,21 @@ O pipeline SHALL incluir somente imagens com consentimento vigente, autorizaçã
 - **THEN** a imagem é excluída da exportação
 - **AND** a classe prevista automaticamente não é tratada como rótulo confirmado
 
+### Requirement: Reaceite de versões materiais por contas existentes
+
+O app SHALL verificar no servidor se a conta autenticada possui recibo das versões atuais dos Termos e da Política. Quando faltar recibo, SHALL apresentar os documentos no próprio app e exigir confirmação explícita antes de liberar funções conectadas. O recibo SHALL ser criado no servidor somente após essa ação, com timestamp do servidor, e SHALL ser imutável. Falha de rede SHALL NOT criar recibo nem impedir classificação local offline.
+
+#### Scenario: Conta existente sem recibo atual
+- **WHEN** uma conta autenticada não tem recibo das versões atuais e há conexão
+- **THEN** os documentos atuais são apresentados dentro do app
+- **AND** o recibo só é criado após confirmação explícita
+
+#### Scenario: Reaceite indisponível sem rede
+- **WHEN** a verificação ou o registro de aceite falha por indisponibilidade de rede
+- **THEN** nenhum recibo é criado pelo app
+- **AND** classificação local continua disponível
+- **AND** o app verifica novamente ao retornar ao primeiro plano
+
 ## MODIFIED Requirements
 
 ### Requirement: Informação transparente e retenção
