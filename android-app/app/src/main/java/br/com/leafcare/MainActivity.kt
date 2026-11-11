@@ -13,7 +13,9 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -203,16 +205,18 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                         onCamera = { nav.navigate("camera") { popUpTo("history") } }) }
             }
             if (state.busy) {
-                AlertDialog(onDismissRequest = {}, confirmButton = {},
-                    title = { Text(stringResource(R.string.analyzing_title)) },
-                    text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        CircularProgressIndicator(Modifier.size(30.dp))
-                        Text(stringResource(R.string.analyzing_message)) } })
+                LeafDialog(title = stringResource(R.string.analyzing_title), onDismiss = {}, dismissible = false) {
+                    Row(Modifier.fillMaxWidth().background(LeafColors.Tint, RoundedCornerShape(14.dp)).padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        CircularProgressIndicator(Modifier.size(26.dp), color = LeafColors.Green, trackColor = LeafColors.Border, strokeWidth = 3.dp)
+                        Text(stringResource(R.string.analyzing_message), style = MaterialTheme.typography.bodyMedium, color = LeafColors.Text)
+                    }
+                }
             }
             state.error?.let { message ->
-                AlertDialog(onDismissRequest = vm::clearError,
-                    title = { Text(stringResource(R.string.error_dialog_title)) }, text = { Text(message) },
-                    confirmButton = { TextButton(onClick = vm::clearError) { Text(stringResource(R.string.error_button)) } }) }
+                LeafDialog(title = stringResource(R.string.error_dialog_title), onDismiss = vm::clearError, message = message,
+                    actions = { LeafButton(stringResource(R.string.error_button), vm::clearError) })
+            }
         }
     }
 }

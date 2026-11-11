@@ -1,5 +1,6 @@
 package br.com.leafcare.ui
 
+import androidx.compose.foundation.selection.toggleable
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -139,37 +140,15 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
         }
     }
     pendingImage?.let { (uri, temporary) ->
-        AlertDialog(
-            onDismissRequest = { temporary?.delete(); pendingImage = null },
-            title = { Text("Analisar fotografia") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (trainingConsentActive) "A análise funciona normalmente. A contribuição para treinamento é opcional e exige sua escolha para esta foto." else "A análise funciona normalmente. Para contribuir com fotos, leia e aceite a política de treinamento no Perfil.")
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = authorizeTraining,
-                            enabled = trainingConsentActive,
-                            onCheckedChange = { authorizeTraining = it },
-                            modifier = Modifier.semantics {
-                                contentDescription = "Autorização individual desta foto para treinamento"
-                                stateDescription = if (!trainingConsentActive) {
-                                    "Não autorizada: ative o consentimento geral no Perfil para escolher esta foto"
-                                } else if (authorizeTraining) {
-                                    "Autorizada"
-                                } else {
-                                    "Não autorizada"
-                                }
-                            },
-                        )
-                        Text("Também autorizo esta foto para treinamento", color = if (trainingConsentActive) LeafColors.Text else LeafColors.Muted)
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = {
+        AnalyzePhotoDialog(
+            trainingConsentActive = trainingConsentActive,
+            authorizeTraining = authorizeTraining,
+            onAuthorizeChange = { authorizeTraining = it },
+            onAnalyze = {
                 vm.analyze(uri, temporary, authorizeTraining && trainingConsentActive)
                 pendingImage = null
-            }) { Text("Analisar", color = LeafColors.Green) } },
-            dismissButton = { TextButton(onClick = { temporary?.delete(); pendingImage = null }) { Text("Cancelar", color = LeafColors.Muted) } }
+            },
+            onCancel = { temporary?.delete(); pendingImage = null },
         )
     }
     if (help) HelpSheet(onDismiss = { help = false })
@@ -228,6 +207,50 @@ fun CameraContent(onBack: () -> Unit, onHelp: () -> Unit, onGallery: () -> Unit,
                 }
             }
             Text(stringResource(R.string.camera_tip), Modifier.fillMaxWidth().padding(bottom = 20.dp), textAlign = TextAlign.Center, fontSize = 13.sp, color = LeafColors.Muted)
+        }
+    }
+}
+
+@Composable
+fun AnalyzePhotoDialog(
+    trainingConsentActive: Boolean,
+    authorizeTraining: Boolean,
+    onAuthorizeChange: (Boolean) -> Unit,
+    onAnalyze: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    LeafDialog(
+        title = "Analisar fotografia",
+        onDismiss = onCancel,
+        message = if (trainingConsentActive) "A análise funciona normalmente. A contribuição para treinamento é opcional e exige sua escolha para esta foto."
+            else "A análise funciona normalmente. Para contribuir com fotos, leia e aceite a política de treinamento no Perfil.",
+        actions = {
+            LeafButton("Analisar", onAnalyze)
+            LeafButton("Cancelar", onCancel, secondary = true)
+        },
+    ) {
+        // The whole block is the touch target; disabled until the general consent is active.
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(LeafColors.Tint)
+                .toggleable(value = authorizeTraining, enabled = trainingConsentActive, role = Role.Checkbox, onValueChange = onAuthorizeChange)
+                .padding(start = 4.dp, end = 14.dp, top = 4.dp, bottom = 4.dp)
+                .semantics {
+                    contentDescription = "Autorização individual desta foto para treinamento"
+                    stateDescription = if (!trainingConsentActive) {
+                        "Não autorizada: ative o consentimento geral no Perfil para escolher esta foto"
+                    } else if (authorizeTraining) "Autorizada" else "Não autorizada"
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(
+                checked = authorizeTraining,
+                onCheckedChange = null,
+                enabled = trainingConsentActive,
+                modifier = Modifier.padding(10.dp),
+                colors = CheckboxDefaults.colors(checkedColor = LeafColors.Green, uncheckedColor = LeafColors.Muted, checkmarkColor = Color.White),
+            )
+            Text("Também autorizo esta foto para treinamento", style = MaterialTheme.typography.bodyMedium,
+                color = if (trainingConsentActive) LeafColors.Text else LeafColors.Muted)
         }
     }
 }

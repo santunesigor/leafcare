@@ -63,7 +63,9 @@ import br.com.leafcare.auth.AuthScreen
 import br.com.leafcare.auth.AuthViewModel
 import br.com.leafcare.auth.LegalAcceptanceState
 import br.com.leafcare.ui.FigmaIcon
+import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
+import br.com.leafcare.ui.LeafDialog
 
 /**
  * Auth flow host. MainActivity is the auth gate (session != null -> app),
@@ -592,20 +594,14 @@ fun NewPasswordScreen(
     }
 
     if (confirmCancelRecovery && showCancelDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissCancelDialog() },
-            confirmButton = {
-                TextButton(onClick = { viewModel.dismissCancelDialog() }) {
-                    Text("Continuar recuperação", color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
-                }
+        LeafDialog(
+            title = "Cancelar recuperação?",
+            onDismiss = { viewModel.dismissCancelDialog() },
+            message = "Se você sair agora, será necessário solicitar um novo link de recuperação por e-mail.",
+            actions = {
+                LeafButton("Continuar recuperação", { viewModel.dismissCancelDialog() })
+                LeafButton("Sair", { viewModel.cancelRecovery() }, secondary = true, danger = true)
             },
-            dismissButton = {
-                TextButton(onClick = { viewModel.cancelRecovery() }) {
-                    Text("Sair", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            title = { Text("Cancelar recuperação?") },
-            text = { Text("Se você sair agora, será necessário solicitar um novo link de recuperação por e-mail.") }
         )
     }
 }

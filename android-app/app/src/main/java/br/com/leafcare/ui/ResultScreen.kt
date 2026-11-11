@@ -33,10 +33,15 @@ fun ResultScreen(id: String, vm: LeafCareViewModel, onBack: () -> Unit, onCamera
         Text(stringResource(R.string.loading_analysis))
         TextButton(onClick = onBack) { Text(stringResource(R.string.button_back)) }
     } else ResultContent(analysis, vm.getDiseaseInfo(analysis.classId), vm.getPhoto(analysis.photoName), onBack, onCamera, { confirmDelete = true })
-    if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text(stringResource(R.string.delete_dialog_title)) },
-        text = { Text(stringResource(R.string.delete_dialog_message)) },
-        confirmButton = { TextButton(onClick = { confirmDelete = false; vm.delete(id, onBack) }) { Text(stringResource(R.string.button_confirm_delete)) } },
-        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.button_cancel)) } })
+    if (confirmDelete) LeafDialog(
+        title = stringResource(R.string.delete_dialog_title),
+        onDismiss = { confirmDelete = false },
+        message = stringResource(R.string.delete_dialog_message),
+        actions = {
+            LeafButton(stringResource(R.string.button_confirm_delete), { confirmDelete = false; vm.delete(id, onBack) }, danger = true)
+            LeafButton(stringResource(R.string.button_cancel), { confirmDelete = false }, secondary = true)
+        },
+    )
 }
 
 @Composable
@@ -46,7 +51,7 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
     var enlarged by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().background(Color.White).verticalScroll(rememberScrollState())) {
         Box(Modifier.fillMaxWidth().height(256.dp).background(Color(0xFF1E3521))) {
-            AsyncImage(photo, stringResource(R.string.cd_photo_analyzed), Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            AsyncImage(rememberAnalysisPhoto(analysis, photo), stringResource(R.string.cd_photo_analyzed), Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(0f to Color(0x61050F06), .38f to Color.Transparent, 1f to Color(0x40050F06))))
             Box(Modifier.padding(start = 16.dp, top = 18.dp)) { RoundIconButton(R.drawable.v3_back_light, stringResource(R.string.camera_back_desc), onBack, dark = true) }
             Text(stringResource(R.string.cd_photo_analyzed), Modifier.align(Alignment.TopEnd).padding(top = 31.dp, end = 22.dp), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -77,7 +82,10 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
                     Text(stringResource(R.string.disclaimer_message), color = Color(0xFF6B5714), fontSize = 13.sp, lineHeight = 19.sp)
                 }
             }
-            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) stringResource(R.string.top3_hide) else stringResource(R.string.top3_show), fontSize = 13.sp) }
+            // No horizontal inset: aligns with the content edge like the rest of the column.
+            TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp)) {
+                Text(if (expanded) stringResource(R.string.top3_hide) else stringResource(R.string.top3_show), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
             if (expanded) {
                 repeat(top3.length()) { index ->
                     val p = top3.getJSONObject(index)
