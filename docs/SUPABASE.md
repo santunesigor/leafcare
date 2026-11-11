@@ -70,6 +70,10 @@ Revoga execução direta de funções internas por perfis públicos e recria pol
 
 Documentos v1.4: o aceite (`accept_current_legal_documents`) e o cadastro com v1.4 (`handle_new_user`) também gravam `training_consents` (`granted`, versão `1.2`). As políticas de consentimento, autorizações por foto e do bucket `training-photos` passam a exigir recibo v1.4 e consentimento 1.2; revogações (`granted=false`, `authorized=false`) são aceitas com qualquer versão. Testes: `supabase/tests/legal-acceptance.sql` e `training-consent.sql`.
 
+### `20261111150000_training_photo_rules.sql`
+
+Revogações apagam de fato as cópias de treinamento: o usuário passa a enxergar a própria pasta de `training-photos` (o Postgres aplica políticas SELECT a um DELETE com WHERE; sem isso, a exclusão removia 0 linhas). Cópias novas exigem análise ativa, conclusiva e conta liberada para envio (`can_send_training_photo`, com pausa, exclusão pendente e corte). Excluir cópias continua permitido com envios pausados; tombstones de análises seguem aguardando a liberação. A função `leafcare-admin` remove `analysis-photos` e `training-photos` antes de excluir a conta. Testes: `supabase/tests/training-consent.sql` e `supabase/functions/leafcare-admin/handler_test.ts`.
+
 ## RLS
 
 `profiles` e `analyses` usam Row Level Security.

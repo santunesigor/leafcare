@@ -1,5 +1,15 @@
 # Changelog — LeafCare
 
+## [1.8.3] - 2026-11-11
+
+- APK 1.8.3 (versionCode 21): revisão completa dos fluxos de conta, produtor, sincronização e admin.
+- Privacidade: revogar o consentimento apaga de fato as cópias de treinamento no servidor (antes a exclusão não removia nada); excluir uma análise remove sua cópia; excluir uma conta pelo painel remove também as cópias de treinamento; fotos inconclusivas não são usadas para treinamento; uma revogação pendente é enviada antes de um novo aceite e ao sair da conta.
+- Sincronização: autorizações que nunca poderiam ser enviadas não travam mais a fila em novas tentativas; revogações e exclusões vão antes da política de envio; atualizações recusadas pelo servidor ficam pendentes em vez de sumirem; a restauração não mistura contas.
+- Conta: link de convite/recuperação não trava mais na tela de aceite; a troca de senha não mostra mensagens antigas; e-mail recusado pelo servidor mostra "E-mail inválido"; o histórico da conta anterior não aparece após trocar de conta.
+- Câmera e resultado: resolução limitada para não estourar o limite de 16 MP; permissão e câmera escolhida sobrevivem à rotação; sem mensagens técnicas em inglês; o resultado volta ao histórico se a análise for apagada; limpeza de arquivos órfãos.
+- Visual: cores de situação de revisão consistentes no admin, botões e campos no padrão do app, áreas de toque de 48dp, ícone de perfil, textos corrigidos.
+- Migration `20261111150000_training_photo_rules` e função `leafcare-admin` publicadas em produção.
+
 ## [1.8.2] - 2026-11-11
 
 - APK 1.8.2 (versionCode 20): a tela de aceite deixa de dizer "Documentos atualizados" para contas que nunca aceitaram os termos (contas convidadas ou criadas pelo servidor); o texto passa a servir para contas novas e antigas.

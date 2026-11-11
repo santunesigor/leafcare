@@ -3,24 +3,18 @@ package br.com.leafcare
 import android.app.Application
 import androidx.room.Room
 import androidx.work.Configuration
-import androidx.work.WorkManager
 import br.com.leafcare.auth.SupabaseClientHolder
 import br.com.leafcare.data.AnalysisRepository
-import br.com.leafcare.data.AnalysisSyncRunner
 import br.com.leafcare.data.AppDatabase
 import br.com.leafcare.data.DiseaseCatalog
 import br.com.leafcare.data.MIGRATION_1_2
 import br.com.leafcare.data.MIGRATION_2_3
 import br.com.leafcare.data.MIGRATION_3_4
-import br.com.leafcare.data.PHOTOS_BUCKET
-import br.com.leafcare.data.PostgrestAnalysisSyncApi
-import br.com.leafcare.data.PostgrestTrainingConsentSyncApi
-import br.com.leafcare.data.TRAINING_PHOTOS_BUCKET
+import br.com.leafcare.data.SyncAnalysesWorker
+import br.com.leafcare.data.pushPendingTrainingRevocation
 import br.com.leafcare.data.shouldWipeForAccountSwitch
 import br.com.leafcare.data.requestAnalysisSync
 import br.com.leafcare.ml.LeafClassifier
-import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.storage.storage
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -70,7 +64,7 @@ class LeafCareApplication : Application(), Configuration.Provider {
 
     /** Drops queued sync passes (sign-out): none may run without the account. */
     fun cancelSync() {
-        WorkManager.getInstance(this).cancelUniqueWork(SYNC_WORK_NAME)
+        SyncAnalysesWorker.cancel(this)
     }
 
     /**
@@ -84,15 +78,7 @@ class LeafCareApplication : Application(), Configuration.Provider {
             val pending = (!consent.granted && consent.syncState == "PENDING") ||
                 consentDao.getPendingPhotos(userId).any { !it.authorized }
             if (!pending) return
-            val client = supabaseClientHolder.client
-            val runner = AnalysisSyncRunner(
-                dao = database.analysisDao(),
-                api = PostgrestAnalysisSyncApi(client.postgrest, client.storage[PHOTOS_BUCKET]),
-                appVersion = BuildConfig.VERSION_NAME,
-                consentDao = consentDao,
-                trainingApi = PostgrestTrainingConsentSyncApi(client.postgrest, client.storage[TRAINING_PHOTOS_BUCKET]),
-            )
-            withTimeoutOrNull(REVOCATION_PUSH_TIMEOUT_MS) { runner.syncTrainingRevocationOnly(userId) }
+            withTimeoutOrNull(REVOCATION_PUSH_TIMEOUT_MS) { pushPendingTrainingRevocation(this@LeafCareApplication) }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -119,8 +105,6 @@ class LeafCareApplication : Application(), Configuration.Provider {
     companion object {
         private const val PREFS_NAME = "leafcare"
         private const val KEY_LAST_USER_ID = "last_account_user_id"
-        // Must match the unique work name used by requestAnalysisSync (SyncAnalysesWorker.kt).
-        private const val SYNC_WORK_NAME = "sync-analyses"
         private const val REVOCATION_PUSH_TIMEOUT_MS = 5_000L
     }
 }

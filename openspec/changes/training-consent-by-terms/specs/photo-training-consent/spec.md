@@ -29,12 +29,16 @@ O uso do app SHALL exigir o aceite dos Termos de Uso e da Política de Privacida
 
 ### Requirement: Autorização automática das análises
 
-Cada análise feita por uma conta com consentimento vigente SHALL ser autorizada para treinamento, sem confirmação adicional por foto. Fotos analisadas antes do aceite vigente SHALL permanecer fora da coleta.
+Cada análise conclusiva feita por uma conta com consentimento vigente SHALL ser autorizada para treinamento, sem confirmação adicional por foto. Fotos analisadas antes do aceite vigente e fotos de resultados inconclusivos SHALL permanecer fora da coleta. O servidor SHALL aceitar uma cópia de treinamento somente para análise ativa e conclusiva de conta liberada para envio (sem pausa, sem exclusão pendente e após o corte).
 
 #### Scenario: Nova análise
 - **WHEN** a pessoa captura ou escolhe uma foto com consentimento vigente
 - **THEN** a análise começa sem modal de confirmação
 - **AND** a foto é autorizada para treinamento e enviada após a confirmação remota
+
+#### Scenario: Resultado inconclusivo
+- **WHEN** a análise termina como inconclusiva
+- **THEN** nenhuma autorização de treinamento é criada e a foto não é copiada
 
 #### Scenario: Fotos anteriores
 - **WHEN** uma foto foi analisada antes do aceite vigente
@@ -62,7 +66,7 @@ O app SHALL verificar no servidor se a conta autenticada possui recibo das vers�
 
 ### Requirement: Revogação e exclusão de cópias
 
-Uma revogação SHALL bloquear novos envios imediatamente no aparelho e SHALL ser sincronizada antes de qualquer upload de treinamento pendente, mesmo sem aceite dos documentos atuais. O servidor SHALL aceitar revogações com qualquer versão de consentimento. Após confirmação remota, o sistema SHALL excluir as cópias de treinamento armazenadas e preservar as fotos de histórico e análises existentes. Depois de revogar, o app SHALL exigir um novo aceite para voltar a ser usado.
+Uma revogação SHALL bloquear novos envios imediatamente no aparelho e SHALL ser sincronizada antes de qualquer upload de treinamento pendente, mesmo sem aceite dos documentos atuais. O servidor SHALL aceitar revogações com qualquer versão de consentimento. Após confirmação remota, o sistema SHALL excluir de fato as cópias de treinamento armazenadas e preservar as fotos de histórico e análises existentes. Uma revogação pendente SHALL ser enviada antes de um novo aceite e SHALL ser tentada ao sair da conta. Excluir uma análise SHALL excluir sua cópia de treinamento, inclusive com envios pausados; excluir a conta SHALL remover as cópias antes da conta. Depois de revogar, o app SHALL exigir um novo aceite para voltar a ser usado.
 
 #### Scenario: Revogação offline
 - **WHEN** a pessoa revoga o consentimento sem conexão
