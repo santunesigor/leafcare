@@ -1,5 +1,12 @@
 # Changelog — LeafCare
 
+## [1.8.0] - 2026-11-11
+
+- APK 1.8.0 (versionCode 18): Termos de Uso e Política de Privacidade v1.4. O uso das fotos analisadas para treinamento passa a ser condição de uso, registrada no servidor junto com o aceite; sem aceite, o app não pode ser usado (offline, só para quem já aceitou no aparelho).
+- O modal "Analisar fotografia" foi removido: capturar ou escolher uma foto inicia a análise, e a foto é autorizada automaticamente.
+- Privacidade e fotos mostra o estado da autorização e permite revogar com confirmação; depois disso, o app pede um novo aceite.
+- Migration `20261111120000_legal_documents_v1_4_training_by_terms`; revogações são aceitas com qualquer versão de consentimento.
+
 ## [1.7.3] - 2026-11-11
 
 - APK 1.7.3 (versionCode 17): fotos do histórico aparecem assim que o download termina, sem precisar abrir a câmera (#36).
