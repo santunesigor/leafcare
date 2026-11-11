@@ -219,7 +219,8 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
 @Composable internal fun Choice(label: String, value: String, options: Map<String, String>, enabled: Boolean = true, onChange: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton(onClick = { expanded = true }, enabled = enabled, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), border = BorderStroke(1.dp, LeafColors.Border), contentPadding = PaddingValues(14.dp)) {
+        OutlinedButton(onClick = { expanded = true }, enabled = enabled, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), border = BorderStroke(1.dp, LeafColors.Border), contentPadding = PaddingValues(14.dp),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White)) {
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                 Text(label, fontSize = 10.sp, color = LeafColors.Muted)
                 Text(options[value] ?: value, color = LeafColors.Text, style = MaterialTheme.typography.bodyMedium, maxLines = 2)

@@ -19,7 +19,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,6 +39,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
 import br.com.leafcare.data.DiseaseCatalog
+import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
 import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
@@ -166,6 +171,7 @@ import org.json.JSONObject
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable internal fun PhotoFilterSheet(state: AdminState, classes: List<String>, catalog: DiseaseCatalog, close: () -> Unit, apply: (JSONObject) -> Unit) {
     val query = remember(state.photoQuery) { JSONObject(state.photoQuery) }
     var status by rememberSaveable(state.photoQuery) { mutableStateOf(state.photoFilterStatus) }
@@ -175,27 +181,88 @@ import org.json.JSONObject
     var from by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("from")) }
     var until by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("until")) }
     var advanced by rememberSaveable(state.photoQuery) { mutableStateOf(model.isNotBlank() || user.isNotBlank()) }
-    AdminSheet("Filtrar fotos", close, footer = {
-        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = close) { Text("Cancelar") }
-            Button(onClick = { close(); apply(JSONObject().put("status", status).put("class_id", classFilter).put("model", model.trim()).put("user_id", user.trim()).put("from", from.trim()).put("until", until.trim())) },
-                enabled = !state.busy && from != "!invalid!" && until != "!invalid!", modifier = Modifier.weight(1f)) { Text("Aplicar filtros") }
+    val invalidDate = from == "!invalid!" || until == "!invalid!"
+    val inverted = !invalidDate && from.isNotBlank() && until.isNotBlank() && from > until
+    AdminSheet("Filtrar fotos", close, heightFraction = .78f, footer = {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LeafButton("Limpar", {
+                status = "pending"; classFilter = ""; model = ""; user = ""; from = ""; until = ""
+            }, secondary = true, modifier = Modifier.weight(1f), enabled = !state.busy)
+            LeafButton("Aplicar filtros", {
+                close(); apply(JSONObject().put("status", status).put("class_id", classFilter).put("model", model.trim()).put("user_id", user.trim()).put("from", from.trim()).put("until", until.trim()))
+            }, modifier = Modifier.weight(1.6f), enabled = !state.busy && !invalidDate && !inverted)
         }
     }) {
-        item { Choice("Situação", status, reviewStatuses) { status = it } }
-        item { Choice("Classe prevista", classFilter, linkedMapOf("" to "Todas") + classes.associateWith { catalog.get(it).name }) { classFilter = it } }
-        item { AdminDateField("De", from) { from = it } }
-        item { AdminDateField("Até", until) { until = it } }
-        item { TextButton(onClick = { advanced = !advanced }) { Text(if (advanced) "Menos filtros" else "Mais filtros") } }
+        item {
+            FilterSection("Situação") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    reviewStatuses.forEach { (key, name) -> StatusChip(name, key == status) { status = key } }
+                }
+            }
+        }
+        item {
+            FilterSection("Classe prevista") {
+                Choice("Classe", classFilter, linkedMapOf("" to "Todas") + classes.associateWith { catalog.get(it).name }) { classFilter = it }
+            }
+        }
+        item {
+            FilterSection("Período") {
+                AdminDateField("De", from) { from = it }
+                AdminDateField("Até", until, error = if (inverted) "A data final é anterior à inicial." else null) { until = it }
+            }
+        }
+        item {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { advanced = !advanced }.padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(if (advanced) "Menos filtros" else "Mais filtros", color = LeafColors.Green, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Icon(if (advanced) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null, tint = LeafColors.Green, modifier = Modifier.size(20.dp))
+            }
+        }
         if (advanced) {
-            item { OutlinedTextField(user, { user = it }, label = { Text("Identificador do usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(model, { model = it }, label = { Text("Identificador do modelo") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(user, { user = it }, label = { Text("Identificador do usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = leafFieldColors())
+                    OutlinedTextField(model, { model = it }, label = { Text("Identificador do modelo") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = leafFieldColors())
+                }
+            }
         }
     }
 }
 
+@Composable private fun FilterSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = LeafColors.Text)
+        content()
+    }
+}
+
+/** Same selection language as the history filter: Pale + green label + check. */
+@Composable private fun StatusChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        Modifier.heightIn(min = 40.dp).clip(shape)
+            .background(if (selected) LeafColors.Tint else Color.White)
+            .border(1.dp, if (selected) LeafColors.Green else LeafColors.Border, shape)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (selected) Icon(Icons.Outlined.Check, null, tint = LeafColors.Green, modifier = Modifier.size(16.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) LeafColors.Green else LeafColors.Text,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+    }
+}
+
+@Composable private fun leafFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = LeafColors.Green, unfocusedBorderColor = LeafColors.Border,
+    focusedLabelColor = LeafColors.Green, unfocusedLabelColor = LeafColors.Muted,
+    unfocusedContainerColor = Color.White, focusedContainerColor = Color.White, cursorColor = LeafColors.Green,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun AdminDateField(label: String, isoDate: String, onDateChange: (String) -> Unit) {
+@Composable private fun AdminDateField(label: String, isoDate: String, error: String? = null, onDateChange: (String) -> Unit) {
     val displayFormat = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT)
     val isoFormat = DateTimeFormatter.ISO_LOCAL_DATE.withResolverStyle(ResolverStyle.STRICT)
     fun parse(value: String): LocalDate? = runCatching { LocalDate.parse(value, isoFormat) }.getOrNull()
@@ -222,8 +289,11 @@ import org.json.JSONObject
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         trailingIcon = { IconButton(onClick = { showPicker = true }) { Icon(Icons.Outlined.CalendarMonth, "Escolher data") } },
+        isError = isoDate == "!invalid!" || error != null,
+        supportingText = (if (isoDate == "!invalid!") "Use o formato DD/MM/AAAA com uma data válida." else error)?.let { message -> { Text(message) } },
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp)
+        shape = RoundedCornerShape(14.dp),
+        colors = leafFieldColors()
     )
     if (showPicker) {
         val pickerState = rememberDatePickerState(initialSelectedDateMillis = selected?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli())

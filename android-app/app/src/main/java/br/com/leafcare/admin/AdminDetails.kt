@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import br.com.leafcare.data.DiseaseCatalog
+import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
 import org.json.JSONArray
 import org.json.JSONObject
@@ -43,7 +44,7 @@ import org.json.JSONObject
     var operation by remember(row) { mutableStateOf<String?>(null) }
     val deleting = row.optBoolean("deletion_pending")
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = { if (!busy) actions.closeDetails() }, sheetState = sheet, containerColor = LeafColors.Pale, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
+    ModalBottomSheet(onDismissRequest = { if (!busy) actions.closeDetails() }, sheetState = sheet, containerColor = LeafColors.Pale, contentColor = LeafColors.Text, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
         val action = operation
         if (action != null) {
             Column(Modifier.fillMaxWidth().fillMaxHeight(.9f).imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -61,12 +62,14 @@ import org.json.JSONObject
                     if (action == "role") Choice("Novo papel", chosenRole, roleChoices(state.role), !busy) { chosenRole = it }
                     if (action == "delete") OutlinedTextField(confirmation, { confirmation = it }, label = { Text("E-mail da conta") }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
                 }
-                Button(enabled = manageable && !busy && (action != "role" || chosenRole != row.optString("role")) && (action != "delete" || confirmation.equals(row.label("email"), true)), onClick = {
-                    actions.action(action, JSONObject().put("id", row.getString("id")).put("enabled", !row.optBoolean("uploads_enabled"))
-                        .put("role", chosenRole).put("confirmation", confirmation)); operation = null
-                }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (action == "delete") MaterialTheme.colorScheme.error else LeafColors.Green)) { Text(if (action == "delete") "Excluir conta" else "Confirmar") }
-                TextButton(onClick = { operation = null }, modifier = Modifier.fillMaxWidth()) { Text("Cancelar") }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    LeafButton(if (action == "delete") "Excluir conta" else "Confirmar", {
+                        actions.action(action, JSONObject().put("id", row.getString("id")).put("enabled", !row.optBoolean("uploads_enabled"))
+                            .put("role", chosenRole).put("confirmation", confirmation)); operation = null
+                    }, danger = action == "delete",
+                        enabled = manageable && !busy && (action != "role" || chosenRole != row.optString("role")) && (action != "delete" || confirmation.equals(row.label("email"), true)))
+                    LeafButton("Cancelar", { operation = null }, secondary = true, enabled = !busy)
+                }
             }
         } else {
             LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(.9f), contentPadding = PaddingValues(20.dp, 0.dp, 20.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {

@@ -212,7 +212,7 @@ import org.json.JSONObject
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = { if (dismissEnabled) onClose() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { dismissEnabled || it != SheetValue.Hidden }),
-        containerColor = LeafColors.Pale, contentWindowInsets = { WindowInsets(0, 0, 0, 0) }, dragHandle = null) {
+        containerColor = LeafColors.Pale, contentColor = LeafColors.Text, contentWindowInsets = { WindowInsets(0, 0, 0, 0) }, dragHandle = null) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(heightFraction).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).navigationBarsPadding().imePadding()) {
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
