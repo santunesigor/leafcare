@@ -37,8 +37,8 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit, onRevoked: 
     val granted = TRAINING_UPLOADS_ENABLED && consent?.granted == true && consent?.termsVersion == TRAINING_TERMS_VERSION
     var confirmRevoke by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(Color.White).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar", tint = LeafColors.Green) }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar", tint = LeafColors.Text) }
             Text("Privacidade e fotos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = LeafColors.Text)
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -46,7 +46,7 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit, onRevoked: 
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(if (granted) "Fotos autorizadas para treinamento" else "Autorização revogada", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = LeafColors.Text)
-                        Text("Concedida ao aceitar os Termos e a Política v$TERMS_OF_USE_VERSION.", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+                        if (granted) Text("Concedida ao aceitar os Termos e a Política v$TERMS_OF_USE_VERSION.", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
                     }
                     Text(if (consent?.syncState == "SYNCED") "Sincronizado" else "Pendente", color = if (consent?.syncState == "SYNCED") LeafColors.Green else LeafColors.Muted,
                         style = MaterialTheme.typography.labelMedium,
@@ -54,7 +54,7 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit, onRevoked: 
                 }
             }
             Text("Como suas fotos são usadas", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
-            Text("Usar o LeafCare inclui autorizar o uso das fotos que você analisa para treinar o modelo de IA. Cada foto analisada é copiada para uma área privada, separada do histórico, e só entra em um conjunto de treinamento após revisão humana e validação de qualidade. Identificadores da conta e metadados EXIF são removidos na exportação.", color = LeafColors.Text)
+            Text("Usar o LeafCare inclui autorizar o uso das fotos que você analisa para treinar o modelo de IA. Cada foto com resultado conclusivo é copiada para uma área privada, separada do histórico, e só entra em um conjunto de treinamento após revisão humana e validação de qualidade. Identificadores da conta e metadados EXIF são removidos na exportação.", color = LeafColors.Text)
             Text("Prazos", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
             Text("Cada cópia é apagada em até 90 dias do envio, ou antes, se você revogar. Exportações locais de treinamento são apagadas em até 30 dias.", color = LeafColors.Text)
             Text("Revogação", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)

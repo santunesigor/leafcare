@@ -9,6 +9,10 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
+import android.util.Size
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.*
@@ -57,16 +61,31 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val cameraErrorOpen = stringResource(R.string.camera_error_open)
-    var permitted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
+    val cameraErrorCapture = stringResource(R.string.camera_error_capture)
+    val cameraErrorStorage = stringResource(R.string.camera_error_storage)
+    // Saveable: a rotation must not reset the lens nor ask for the permission again.
+    var permitted by rememberSaveable { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
+    var asked by rememberSaveable { mutableStateOf(false) }
     var help by remember { mutableStateOf(false) }
     var flash by remember { mutableStateOf(false) }
     var hasFlash by remember { mutableStateOf(false) }
     var canSwitch by remember { mutableStateOf(false) }
-    var lens by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
+    var lens by rememberSaveable { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
+    // False once the screen leaves: a capture interrupted by that is not an error.
+    val active = remember { java.util.concurrent.atomic.AtomicBoolean(true) }
+    DisposableEffect(Unit) { active.set(true); onDispose { active.set(false) } }
     var ready by remember { mutableStateOf(false) }
     var capturing by remember { mutableStateOf(false) }
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER; implementationMode = PreviewView.ImplementationMode.COMPATIBLE } }
-    val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
+    // Capped near 12 MP so a capture never exceeds the 16 MP decoder limit.
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .setResolutionSelector(ResolutionSelector.Builder()
+                .setResolutionStrategy(ResolutionStrategy(Size(4032, 3024), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER))
+                .build())
+            .build()
+    }
     val executor = remember { ContextCompat.getMainExecutor(context) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permitted = it }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { vm.analyze(it) } }
@@ -77,7 +96,7 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
-    LaunchedEffect(Unit) { if (!permitted) permission.launch(Manifest.permission.CAMERA) }
+    LaunchedEffect(Unit) { if (!permitted && !asked) { asked = true; permission.launch(Manifest.permission.CAMERA) } }
     DisposableEffect(permitted, lens, owner) {
         var disposed = false
         var provider: ProcessCameraProvider? = null
@@ -96,7 +115,7 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                         canSwitch = available.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) && available.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
                         if (!hasFlash) flash = false
                         ready = true
-                    } catch (error: Exception) { vm.error(cameraErrorOpen + " ${error.message.orEmpty()}") }
+                    } catch (error: Exception) { vm.error(cameraErrorOpen) }
                 }
             }, executor)
         }
@@ -115,7 +134,7 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                 File.createTempFile("capture-", ".jpg", context.cacheDir)
             } catch (error: java.io.IOException) {
                 capturing = false
-                vm.error("Sem espaço para salvar a foto. Libere armazenamento e tente novamente.")
+                vm.error(cameraErrorStorage)
                 return@capture
             }
             imageCapture.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), executor,
@@ -124,14 +143,17 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                         capturing = false; vm.analyze(Uri.fromFile(file), file)
                     }
                     override fun onError(error: ImageCaptureException) {
-                        capturing = false; file.delete(); vm.error("Falha na captura: ${error.message}")
+                        capturing = false; file.delete()
+                        // Leaving the screen unbinds the camera and fails the pending capture.
+                        if (active.get() && error.imageCaptureError != ImageCapture.ERROR_CAMERA_CLOSED) vm.error(cameraErrorCapture)
                     }
                 })
         }) {
         if (permitted) AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
         else Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(R.string.permission_denied_title), color = Color.White)
-            Button(onClick = { permission.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.permission_allow_button)) }
+            Text(stringResource(R.string.permission_denied_title), color = Color.White, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(16.dp))
+            LeafButton(stringResource(R.string.permission_allow_button), { permission.launch(Manifest.permission.CAMERA) })
             TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) }) { Text(stringResource(R.string.permission_settings_button), color = Color.White) }
         }
     }

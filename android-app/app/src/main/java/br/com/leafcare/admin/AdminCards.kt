@@ -21,7 +21,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.leafcare.data.DiseaseCatalog
+import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
+import br.com.leafcare.ui.percent
 import org.json.JSONObject
 import java.time.Instant
 import java.time.ZoneId
@@ -33,6 +35,17 @@ internal fun adminDate(raw: String): String = runCatching {
 }.getOrDefault(raw)
 internal fun reviewLabel(status: String) = when (status) {
     "confirmed" -> "Confirmada"; "corrected" -> "Corrigida"; "uncertain" -> "Duvidosa"; "rejected" -> "Rejeitada"; else -> "Pendente"
+}
+/** One colour per review status, shared by badges, actions and the triage shortcuts. */
+internal fun reviewColor(status: String) = when (status) {
+    "confirmed" -> LeafColors.Green; "corrected" -> LeafColors.Info; "uncertain" -> LeafColors.Warning; "rejected" -> LeafColors.Danger; else -> LeafColors.Muted
+}
+/** Hero copy for the pending count, shared by the summary and the triage panel. */
+internal fun pendingMessage(total: Int, pending: Int) = when {
+    total == 0 -> "As fotos aparecerão aqui quando chegarem."
+    pending == 0 -> "Tudo em dia. Todas as fotos receberam uma revisão."
+    pending == 1 -> "Uma folha precisa do seu olhar."
+    else -> "Folhas prontas para receber o seu olhar."
 }
 internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw.takeLast(4)}" else raw
 
@@ -59,7 +72,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
 }
 @Composable internal fun AdminEmpty(title: String, subtitle: String, icon: ImageVector) {
     Column(Modifier.fillMaxWidth().padding(vertical = 30.dp, horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Box(Modifier.size(64.dp).background(Color(0xFFEAF2E9), CircleShape), contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(30.dp), tint = LeafColors.Green) }
+        Box(Modifier.size(64.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(30.dp), tint = LeafColors.Green) }
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(subtitle, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
@@ -72,13 +85,13 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
     val statuses = data.optJSONObject("statuses")
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         AdminSectionTitle("Visão geral", "O que precisa de atenção agora")
-        Surface(color = Color(0xFF194C2B), shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+        Surface(color = LeafColors.Forest, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("AGUARDANDO AVALIAÇÃO", color = Color(0xFFCEE4CB), style = MaterialTheme.typography.labelSmall)
+                Text("AGUARDANDO AVALIAÇÃO", color = LeafColors.OnForest, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
                 Text("$pending", color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 54.sp)
-                Text(if (pending == 0) "Todas as fotos recebidas foram avaliadas." else "fotos para a equipe revisar", color = Color.White)
-                Button(onClick = onReview, enabled = !busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF194C2B))) {
+                Text(pendingMessage(total, pending), color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = onReview, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = LeafColors.Forest)) {
                     Text("Abrir painel de triagem", fontWeight = FontWeight.SemiBold)
                 }
             }
@@ -93,7 +106,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     pair.forEach { status ->
                         Surface(onClick = { browse(JSONObject().put("status", status)) }, enabled = !busy,
-                            modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), color = LeafColors.Pale) {
+                            modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), color = LeafColors.Pale, contentColor = LeafColors.Text) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(if (statuses == null) "—" else "${statuses.optInt(status)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                                 Text(reviewStatuses.getValue(status), style = MaterialTheme.typography.bodySmall)
@@ -103,7 +116,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
                 }
             }
             if (statuses == null) Text("Contagens por situação indisponíveis nesta versão do servidor.", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-            OutlinedButton(onClick = { browse(JSONObject().put("status", "")) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Ver todas as fotos") }
+            LeafButton("Ver todas as fotos", { browse(JSONObject().put("status", "")) }, secondary = true, enabled = !busy)
         }
         if (managesAccounts) AdminPanel {
             AdminSectionTitle("Contas e envios")
@@ -153,7 +166,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
     Surface(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(20.dp), color = Color.White, border = BorderStroke(1.dp, LeafColors.Border)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.size(44.dp).background(Color(0xFFEAF2E9), CircleShape), contentAlignment = Alignment.Center) { Text(name.take(1).uppercase(), color = LeafColors.Green, fontWeight = FontWeight.Bold) }
+                Box(Modifier.size(44.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) { Text(name.take(1).uppercase(), color = LeafColors.Green, fontWeight = FontWeight.Bold) }
                 Column(Modifier.weight(1f)) {
                     Text(name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(row.label("email"), color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -162,22 +175,27 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AdminBadge(roleLabel(row.optString("role")))
-                AdminBadge(if (row.optBoolean("deletion_pending")) "Exclusão pendente" else if (row.optBoolean("uploads_enabled")) "Envios ativos" else "Envios pausados",
-                    if (row.optBoolean("uploads_enabled")) LeafColors.Green else Color(0xFF99620A))
+                UploadsBadge(row)
             }
             Text("${row.optInt("analyses")} análises  ·  ${row.optInt("photos")} fotos", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
         }
     }
+}
+/** Same text and colour in the user list and in the user details. */
+@Composable internal fun UploadsBadge(row: JSONObject) = when {
+    row.optBoolean("deletion_pending") -> AdminBadge("Exclusão pendente", LeafColors.Danger)
+    row.optBoolean("uploads_enabled") -> AdminBadge("Envios ativos")
+    else -> AdminBadge("Envios pausados", LeafColors.Warning)
 }
 @Composable internal fun AdminPhotoCard(row: JSONObject, catalog: DiseaseCatalog, enabled: Boolean, onClick: () -> Unit, thumbnail: @Composable () -> Unit) {
     Surface(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(20.dp), color = Color.White, border = BorderStroke(1.dp, LeafColors.Border)) {
         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(84.dp, 104.dp).clip(RoundedCornerShape(14.dp)).background(LeafColors.Pale), contentAlignment = Alignment.Center) { thumbnail() }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                AdminBadge(reviewLabel(row.optString("review_status")), when (row.optString("review_status")) { "rejected" -> Color(0xFFAF3636); "uncertain" -> Color(0xFF99620A); else -> LeafColors.Green })
+                AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
                 Text(catalog.get(row.getString("class_id")).name, fontWeight = FontWeight.SemiBold, maxLines = 2, style = MaterialTheme.typography.bodyMedium)
-                Text("${"%.1f".format(row.optDouble("confidence") * 100)}% de confiança", color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
-                Text(row.label("email"), color = LeafColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 10.sp)
+                Text("${percent(row.optDouble("confidence").toFloat())} de confiança", color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
+                Text(row.label("email"), color = LeafColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
             }
             Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp), tint = LeafColors.Muted)
         }

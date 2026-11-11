@@ -143,6 +143,13 @@ class VisualV3Test {
         compose.onNodeWithText("Ao aceitar, você autoriza esse uso. Ele é condição para usar o LeafCare.").assertIsDisplayed()
         capture("legal-training-card")
     }
+    @Test fun profileUsesSharedScaffoldAndButtons() {
+        val vm = br.com.leafcare.auth.AuthViewModel(compose.activity.application,
+            br.com.leafcare.auth.AuthRepository(br.com.leafcare.auth.FakeBackend()), br.com.leafcare.auth.FakeRecoveryPendingStore())
+        compose.setContent { LeafCareTheme { br.com.leafcare.ui.auth.ProfileScreen(vm, {}) } }
+        compose.onNodeWithText("Sair da conta").assertIsDisplayed()
+        capture("perfil-v3")
+    }
     @Test fun helpExamplesAndDismiss() {
         var dismissed = false
         compose.setContent { LeafCareTheme { Surface { HelpContent { dismissed = true } } } }

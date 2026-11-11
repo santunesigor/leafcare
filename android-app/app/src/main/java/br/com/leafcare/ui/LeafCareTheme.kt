@@ -21,6 +21,13 @@ object LeafColors {
     /** Inner blocks inside white surfaces (HelpSheet tips, dialog options). */
     val Tint = Color(0xFFF3F7F2)
     val Danger = Color(0xFFB3261E)
+    /** Review status "Duvidosa": amber readable on white and on its 9% tint. */
+    val Warning = Color(0xFF99620A)
+    /** Review status "Corrigida". */
+    val Info = Color(0xFF3F6580)
+    /** Admin hero surface and the text/icons on it. */
+    val Forest = Color(0xFF194C2B)
+    val OnForest = Color(0xFFD6E8D4)
 }
 /**
  * Every Material role is defined: an unset role falls back to Material's
@@ -76,10 +83,11 @@ fun LeafButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     danger: Boolean = false,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
 ) {
     val container = when { secondary -> LeafColors.Pale; danger -> LeafColors.Danger; else -> LeafColors.Green }
     val content = when { !secondary -> Color.White; danger -> LeafColors.Danger; else -> LeafColors.Text }
-    Button(onClick, modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = enabled, shape = RoundedCornerShape(14.dp), border = if (secondary) BorderStroke(1.dp,LeafColors.Border) else null,
+    Button(onClick, modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = enabled, shape = RoundedCornerShape(14.dp), contentPadding = contentPadding, border = if (secondary) BorderStroke(1.dp,LeafColors.Border) else null,
         colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = content, disabledContainerColor = LeafColors.Border, disabledContentColor = LeafColors.Muted)) { Text(label, fontWeight = FontWeight.Normal) }
 }
 

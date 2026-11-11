@@ -28,10 +28,19 @@ fun ResultScreen(id: String, vm: LeafCareViewModel, onBack: () -> Unit, onCamera
     val flow = remember(id) { vm.observeAnalysis(id) }
     val row by flow.collectAsStateWithLifecycle(initialValue = null)
     var confirmDelete by remember { mutableStateOf(false) }
-    val analysis = row
-    if (analysis == null) Column(Modifier.padding(24.dp)) {
-        Text(stringResource(R.string.loading_analysis))
-        TextButton(onClick = onBack) { Text(stringResource(R.string.button_back)) }
+    val loaded = row?.takeIf { it.deletedAt == null }
+    // Once shown, an analysis that disappears (deleted here or by sync) returns to the history.
+    var wasLoaded by remember(id) { mutableStateOf(false) }
+    LaunchedEffect(loaded == null) {
+        if (loaded != null) wasLoaded = true
+        else if (wasLoaded) onBack()
+    }
+    val analysis = loaded
+    if (analysis == null) Column(Modifier.fillMaxSize().background(Color.White).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
+        CircularProgressIndicator(color = LeafColors.Green)
+        Text(stringResource(R.string.loading_analysis), style = MaterialTheme.typography.bodyMedium, color = LeafColors.Muted)
+        LeafButton(stringResource(R.string.button_back), onBack, secondary = true)
     } else ResultContent(analysis, vm.getDiseaseInfo(analysis.classId), vm.getPhoto(analysis.photoName), onBack, onCamera, { confirmDelete = true })
     if (confirmDelete) LeafDialog(
         title = stringResource(R.string.delete_dialog_title),
@@ -69,7 +78,7 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
                     Text(percent(analysis.confidence), color = LeafColors.Green, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.confidence_label), fontSize = 12.sp, color = LeafColors.Muted)
                 }
-                Box(Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(99.dp)).background(Color(0xFFE4EBE4))) {
+                Box(Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(99.dp)).background(LeafColors.Border)) {
                     Box(Modifier.fillMaxHeight().fillMaxWidth(analysis.confidence.coerceIn(0f,1f)).background(LeafColors.Green, RoundedCornerShape(99.dp)))
                 }
             }
@@ -111,9 +120,9 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
                 Section(stringResource(R.string.section_symptoms)) {
                     Column(Modifier.fillMaxWidth().border(1.dp, LeafColors.Border, RoundedCornerShape(15.dp))) {
                         Symptom(stringResource(R.string.symptom_appearance), disease.appearance.ifBlank { disease.symptoms.joinToString(" ") })
-                        HorizontalDivider(color = Color(0xFFE8EDE8))
+                        HorizontalDivider(color = LeafColors.Border)
                         Symptom(stringResource(R.string.symptom_region), disease.affectedRegion.ifBlank { stringResource(R.string.symptom_region_fallback) })
-                        HorizontalDivider(color = Color(0xFFE8EDE8))
+                        HorizontalDivider(color = LeafColors.Border)
                         Symptom(stringResource(R.string.symptom_evolution), disease.symptomEvolution.ifBlank { stringResource(R.string.symptom_evolution_fallback) })
                     }
                 }
@@ -135,9 +144,9 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
         }
     }
     enlarged?.let { asset -> Dialog(onDismissRequest = { enlarged = null }) {
-        Surface(shape = RoundedCornerShape(16.dp)) { Column {
-            AsyncImage(asset, stringResource(R.string.cd_enlarged_reference), Modifier.fillMaxWidth().aspectRatio(1f), contentScale = ContentScale.Fit)
-            TextButton(onClick = { enlarged = null }) { Text(stringResource(R.string.button_close)) }
+        Surface(shape = RoundedCornerShape(24.dp), color = Color.White) { Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+            AsyncImage(asset, stringResource(R.string.cd_enlarged_reference), Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Fit)
+            LeafButton(stringResource(R.string.button_close), { enlarged = null }, secondary = true)
         } }
     } }
 }

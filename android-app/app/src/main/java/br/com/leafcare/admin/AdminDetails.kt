@@ -60,7 +60,7 @@ import org.json.JSONObject
                         else -> "As instruções serão enviadas por e-mail para esta conta."
                     }, color = LeafColors.Muted)
                     if (action == "role") Choice("Novo papel", chosenRole, roleChoices(state.role), !busy) { chosenRole = it }
-                    if (action == "delete") OutlinedTextField(confirmation, { confirmation = it }, label = { Text("E-mail da conta") }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
+                    if (action == "delete") OutlinedTextField(confirmation, { confirmation = it }, label = { Text("E-mail da conta") }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), colors = leafFieldColors())
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     LeafButton(if (action == "delete") "Excluir conta" else "Confirmar", {
@@ -75,7 +75,7 @@ import org.json.JSONObject
             LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(.9f), contentPadding = PaddingValues(20.dp, 0.dp, 20.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Box(Modifier.size(54.dp).background(Color(0xFFEAF2E9), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Person, null, tint = LeafColors.Green, modifier = Modifier.size(28.dp)) }
+                        Box(Modifier.size(54.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Person, null, tint = LeafColors.Green, modifier = Modifier.size(28.dp)) }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(row.optString("display_name").takeIf { it.isNotBlank() && it != "null" } ?: "Conta do usuário", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text(row.label("email"), color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
@@ -88,7 +88,7 @@ import org.json.JSONObject
                     AdminPanel {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AdminBadge(roleLabel(row.optString("role")))
-                            AdminBadge(if (deleting) "Exclusão pendente" else if (row.optBoolean("uploads_enabled")) "Envios ativos" else "Envios pausados")
+                            UploadsBadge(row)
                         }
                         DetailLine("Cadastro", adminDate(row.label("created_at")))
                         DetailLine("Último acesso", adminDate(row.label("last_sign_in_at")))

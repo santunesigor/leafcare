@@ -173,6 +173,7 @@ class AdminVisualTest {
         compose.onNodeWithText("Tentar novamente").assertIsDisplayed()
         compose.onNodeWithText("0").assertDoesNotExist()
         compose.onNodeWithText("Nenhuma pendência").assertDoesNotExist()
+        capture("admin-painel-indisponivel")
     }
     @Test fun queueReturnsToTriagePanel() {
         var section = ""

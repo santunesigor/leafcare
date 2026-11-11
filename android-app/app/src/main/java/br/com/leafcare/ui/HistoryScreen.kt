@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.AdminPanelSettings
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -114,7 +115,7 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: ()
                     Surface(onClick = onProfile, shape = CircleShape, color = LeafColors.Pale,
                         border = BorderStroke(1.dp, LeafColors.Border), modifier = Modifier.size(48.dp)) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            FigmaIcon(R.drawable.v3_logo, "Abrir perfil", 26)
+                            Icon(Icons.Outlined.Person, "Abrir perfil", tint = LeafColors.Green, modifier = Modifier.size(24.dp))
                         }
                     }
                 }
@@ -122,7 +123,7 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: ()
             }
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Row(Modifier.weight(1f).heightIn(min = 46.dp).background(LeafColors.Pale, RoundedCornerShape(14.dp)).border(1.dp, LeafColors.Border, RoundedCornerShape(14.dp)).padding(13.dp),
+                    Row(Modifier.weight(1f).heightIn(min = 48.dp).background(LeafColors.Pale, RoundedCornerShape(14.dp)).border(1.dp, LeafColors.Border, RoundedCornerShape(14.dp)).padding(13.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                         FigmaIcon(R.drawable.v3_search, null, 19)
                         BasicTextField(value = query, onValueChange = { query = it }, singleLine = true, modifier = Modifier.weight(1f),
@@ -133,7 +134,7 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: ()
                     }
                     Spacer(Modifier.width(10.dp))
                     Box {
-                        IconButton(onClick = { showFilter = true }, modifier = Modifier.size(46.dp).border(1.dp, LeafColors.Border, RoundedCornerShape(14.dp))) { FigmaIcon(R.drawable.v3_filter, stringResource(R.string.filter_button_desc), 20) }
+                        IconButton(onClick = { showFilter = true }, modifier = Modifier.size(48.dp).border(1.dp, LeafColors.Border, RoundedCornerShape(14.dp))) { FigmaIcon(R.drawable.v3_filter, stringResource(R.string.filter_button_desc), 20) }
                         if (showFilter) {
                             // Compact menu anchored below the filter button, right-aligned,
                             // sized to its content. Explicit position provider: the default
@@ -167,7 +168,7 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: ()
                                         listOf(stringResource(R.string.filter_all), stringResource(R.string.filter_identified), stringResource(R.string.filter_inconclusive)).forEach { option ->
                                             val selected = filter == option
                                             Row(
-                                                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { filter = option; showFilter = false }
+                                                Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).clickable { filter = option; showFilter = false }
                                                     .background(if (selected) LeafColors.Pale else Color.Transparent).padding(horizontal = 12.dp, vertical = 10.dp),
                                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
                                             ) {
@@ -214,7 +215,8 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: ()
             }
             modelError?.let { message ->
                 item {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = LeafColors.Tint,
+                        contentColor = LeafColors.Text, border = BorderStroke(1.dp, LeafColors.Border)) {
                         Column(Modifier.padding(16.dp)) {
                             Text(stringResource(R.string.model_error_title), style = MaterialTheme.typography.titleMedium)
                             Text(message, style = MaterialTheme.typography.bodyMedium)

@@ -35,7 +35,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import br.com.leafcare.data.DiseaseCatalog
+import br.com.leafcare.R
+import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
+import br.com.leafcare.ui.RoundIconButton
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -104,9 +107,7 @@ internal fun AdminContent(
     }
     Column(Modifier.fillMaxSize().background(LeafColors.Pale), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 24.dp, top = 16.dp, bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = actions.back, modifier = Modifier.size(44.dp).background(Color.White, CircleShape).border(1.dp, LeafColors.Border, CircleShape)) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar", tint = LeafColors.Text)
-            }
+            RoundIconButton(R.drawable.v3_back, "Voltar", actions.back)
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
                 Text("LEAFCARE", color = LeafColors.Green, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
                 Text("Administração", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -116,7 +117,7 @@ internal fun AdminContent(
         }
         if (!state.allowed) {
             AdminEmpty("Acesso restrito", state.error ?: "Conecte-se para verificar sua permissão de administrador.", Icons.Outlined.AdminPanelSettings)
-            Button(onClick = actions.checkAccess, modifier = Modifier.align(Alignment.CenterHorizontally), shape = RoundedCornerShape(14.dp)) { Text("Verificar acesso") }
+            LeafButton("Verificar acesso", actions.checkAccess, modifier = Modifier.padding(horizontal = 24.dp))
             return@Column
         }
         Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -139,8 +140,10 @@ internal fun AdminContent(
             state.message?.let { item { AdminNotice(it) } }
             if (state.section in listOf("dashboard", "triage")) {
                 if (!state.dashboard.has("photos")) item {
-                    AdminEmpty(if (state.busy) "Carregando painel…" else "Painel indisponível", if (state.busy) "Buscando os totais de fotos e revisões." else "Confira sua conexão e atualize para tentar novamente.", Icons.Outlined.CloudSync)
-                    if (!state.busy) OutlinedButton(onClick = actions.refresh, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Tentar novamente") }
+                    Column {
+                        AdminEmpty(if (state.busy) "Carregando painel…" else "Painel indisponível", if (state.busy) "Buscando os totais de fotos e revisões." else "Confira sua conexão e atualize para tentar novamente.", Icons.Outlined.CloudSync)
+                        if (!state.busy) LeafButton("Tentar novamente", actions.refresh, secondary = true)
+                    }
                 } else if (state.section == "triage") {
                     triageDashboard(state.dashboard, catalog, state.busy,
                         evaluate = { actions.load("photos", JSONObject().put("status", "pending")) }, open = openGallery)
@@ -151,7 +154,7 @@ internal fun AdminContent(
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             AdminSectionTitle("Usuários", "Gerencie acessos e envios")
                             OutlinedTextField(search, { search = it }, placeholder = { Text("Buscar nome ou e-mail") }, singleLine = true,
-                                leadingIcon = { Icon(Icons.Outlined.Search, null) }, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
+                                leadingIcon = { Icon(Icons.Outlined.Search, null) }, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), colors = leafFieldColors(),
                                 trailingIcon = { IconButton(onClick = { actions.load("users", JSONObject().put("search", search)) }, enabled = !state.busy) { Icon(Icons.AutoMirrored.Outlined.ArrowForward, "Buscar usuários") } })
                             OutlinedButton(onClick = { invite = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, LeafColors.Border)) {
                                 Icon(Icons.Outlined.PersonAdd, null, Modifier.size(19.dp)); Spacer(Modifier.width(8.dp)); Text("Convidar usuário")
@@ -186,17 +189,17 @@ internal fun AdminContent(
         }
         item {
             OutlinedTextField(inviteEmail, { inviteEmail = it }, label = { Text("E-mail da pessoa") }, singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), colors = leafFieldColors())
         }
         item {
             Button(onClick = { actions.action("invite_link", JSONObject().put("email", inviteEmail.trim())); invite = false },
-                enabled = validInviteEmail && !state.busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                enabled = validInviteEmail && !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp)) {
                 Icon(Icons.Outlined.Share, null, Modifier.size(19.dp)); Spacer(Modifier.width(8.dp)); Text("Compartilhar convite")
             }
         }
         item {
             OutlinedButton(onClick = { actions.action("invite", JSONObject().put("email", inviteEmail.trim())); invite = false },
-                enabled = validInviteEmail && !state.busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                enabled = validInviteEmail && !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp)) {
                 Icon(Icons.Outlined.MailOutline, null, Modifier.size(19.dp)); Spacer(Modifier.width(8.dp)); Text("Enviar por e-mail")
             }
         }

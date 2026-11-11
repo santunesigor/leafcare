@@ -90,7 +90,7 @@ internal fun LegalDocumentScreen(document: LegalDocument, onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar ao cadastro", tint = LeafColors.Text)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = LeafColors.Text)
             }
             Column(Modifier.weight(1f)) {
                 Text(document.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = LeafColors.Text)
@@ -137,7 +137,7 @@ internal fun LegalDocumentScreen(document: LegalDocument, onBack: () -> Unit) {
         }
         Surface(color = Color.White, shadowElevation = 4.dp) {
             TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
-                Text("Voltar ao cadastro", color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
+                Text("Voltar", color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
             }
         }
     }

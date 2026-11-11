@@ -27,7 +27,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.leafcare.data.DiseaseCatalog
+import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
+import br.com.leafcare.ui.percent
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -52,7 +54,7 @@ import org.json.JSONObject
                 AdminEmpty(if (state.busy) "Carregando fila…" else if (state.reviewedCount > 0) "Fila concluída!" else "Sem fotos nesta seleção",
                     if (state.busy) "Buscando fotos para revisar." else state.message ?: "Altere os filtros ou volte mais tarde.", Icons.Outlined.TaskAlt)
                 if (!state.busy) {
-                    Button(onClick = back, modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp)) { Text("Voltar ao painel") }
+                    LeafButton("Voltar ao painel", back, modifier = Modifier.padding(horizontal = 20.dp))
                     TextButton(onClick = actions.refresh) { Text("Atualizar fila") }
                 }
             }
@@ -108,11 +110,11 @@ import org.json.JSONObject
             Column(Modifier.fillMaxWidth().heightIn(max = 138.dp).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("PREVISÃO ORIGINAL", color = LeafColors.Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    AdminBadge(reviewLabel(row.optString("review_status")))
+                    AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
                 }
                 Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${"%.1f".format(row.optDouble("confidence") * 100)}% de confiança", Modifier.weight(1f), color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
+                    Text("${percent(row.optDouble("confidence").toFloat())} de confiança", Modifier.weight(1f), color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
                     IconButton(onClick = { reviewStatus = "confirmed"; edit = true }, enabled = ready) { Icon(Icons.Outlined.EditNote, "Adicionar observação", tint = LeafColors.Green) }
                     TextButton(onClick = { details = true }, contentPadding = PaddingValues(horizontal = 8.dp)) { Icon(Icons.Outlined.Info, null, Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Detalhes", style = MaterialTheme.typography.labelMedium) }
                 }
@@ -128,8 +130,8 @@ import org.json.JSONObject
                     ReviewActionButton("Corrigir", Icons.Outlined.Edit, LeafColors.Green, ready, Modifier.weight(1f)) { reviewStatus = "corrected"; edit = true }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ReviewActionButton("Duvidosa", Icons.AutoMirrored.Outlined.HelpOutline, Color(0xFF99620A), ready, Modifier.weight(1f)) { reviewStatus = "uncertain"; edit = true }
-                    ReviewActionButton("Rejeitar", Icons.Outlined.HideImage, Color(0xFFAF3636), ready, Modifier.weight(1f)) { reviewStatus = "rejected"; edit = true }
+                    ReviewActionButton("Duvidosa", Icons.AutoMirrored.Outlined.HelpOutline, reviewColor("uncertain"), ready, Modifier.weight(1f)) { reviewStatus = "uncertain"; edit = true }
+                    ReviewActionButton("Rejeitar", Icons.Outlined.HideImage, reviewColor("rejected"), ready, Modifier.weight(1f)) { reviewStatus = "rejected"; edit = true }
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onClick = { actions.movePhoto(index - 1) }, enabled = index > 0 && !state.busy, contentPadding = PaddingValues(horizontal = 4.dp)) {
@@ -143,16 +145,18 @@ import org.json.JSONObject
         }
     }
     if (edit) AdminSheet("Sua avaliação", cancelEdit, dismissEnabled = !state.busy, footer = {
-        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = cancelEdit, enabled = !state.busy) { Text("Cancelar") }
-            Button(onClick = { submit(reviewStatus) }, enabled = ready, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) { Text("Salvar e próxima") }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Narrower inner padding keeps both labels on one line at 320dp.
+            val compact = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            LeafButton("Cancelar", cancelEdit, secondary = true, modifier = Modifier.weight(1f), enabled = !state.busy, contentPadding = compact)
+            LeafButton("Salvar e próxima", { submit(reviewStatus) }, modifier = Modifier.weight(1.6f), enabled = ready, contentPadding = compact)
         }
     }) {
         item { Text(when (reviewStatus) { "corrected" -> "Corrigir a classe prevista"; "uncertain" -> "Marcar como duvidosa"; "rejected" -> "Rejeitar esta foto"; else -> "Confirmar a previsão" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text("A previsão original será preservada.", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall) }
         state.error?.let { item { AdminNotice(it, error = true); TextButton(onClick = actions.retryPhoto, enabled = !state.busy) { Text(if (state.reviewConflict) "Recarregar revisão" else "Tentar novamente") } } }
         if (reviewStatus == "corrected") item { Choice("Classe revisada", selectedClass, classes.associateWith { catalog.get(it).name }, !state.busy) { selectedClass = it } }
-        item { OutlinedTextField(note, { if (it.length <= 2000) note = it }, label = { Text("Observação (opcional)") }, enabled = !state.busy, minLines = 2, maxLines = 5, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) }
+        item { OutlinedTextField(note, { if (it.length <= 2000) note = it }, label = { Text("Observação (opcional)") }, enabled = !state.busy, minLines = 2, maxLines = 5, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = leafFieldColors()) }
     }
     if (details) AdminSheet("Dados da foto", { details = false }) {
         item { AdminBadge("PREVISÃO ORIGINAL"); Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
@@ -160,7 +164,7 @@ import org.json.JSONObject
             val top3 = row.optJSONArray("top3") ?: JSONArray()
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 repeat(top3.length()) { i -> val p = top3.getJSONObject(i)
-                    Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${"%.1f".format(p.optDouble("confidence") * 100)}%", style = MaterialTheme.typography.bodyMedium)
+                    Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${percent(p.optDouble("confidence").toFloat())}", style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }

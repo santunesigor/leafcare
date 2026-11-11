@@ -69,6 +69,8 @@
     <string name="capture_button_desc">Fotografar</string>
     <string name="camera_tip">Use boa iluminação e evite sombras</string>
     <string name="camera_error_open">Não foi possível abrir a câmera. Você pode escolher uma foto da galeria.</string>
+    <string name="camera_error_capture">Não foi possível tirar a foto. Tente novamente ou escolha uma foto da galeria.</string>
+    <string name="camera_error_storage">Sem espaço para salvar a foto. Libere armazenamento e tente novamente.</string>
     <string name="permission_denied_title">Autorize a câmera para fotografar.</string>
     <string name="permission_allow_button">Permitir câmera</string>
     <string name="permission_settings_button">Abrir permissões</string>
@@ -92,11 +94,11 @@
     <string name="error_button">Entendi</string>
 
     <!-- Loading -->
-    <string name="loading_analysis">Carregando análise. Se ela foi excluída, retorne ao histórico.</string>
+    <string name="loading_analysis">Carregando análise…</string>
 
     <!-- Analysis Dialog -->
-    <string name="analyzing_title">Analisando no celular</string>
-    <string name="analyzing_message">Aguarde. A foto permanece neste aparelho.</string>
+    <string name="analyzing_title">Analisando no aparelho</string>
+    <string name="analyzing_message">Aguarde. A análise é feita neste aparelho.</string>
 
     <!-- Result Screen - Symptom fallbacks -->
     <string name="symptom_region_fallback">Observe as áreas alteradas da folha e compare com outras plantas.</string>

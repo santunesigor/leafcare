@@ -31,7 +31,7 @@ fun HelpContent(onDismiss: () -> Unit) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(R.string.help_title), fontSize = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.46).sp)
         Text(stringResource(R.string.help_subtitle), fontSize = 14.sp, lineHeight = 21.sp, color = LeafColors.Muted)
-        Column(Modifier.fillMaxWidth().background(Color(0xFFF3F7F2), RoundedCornerShape(14.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Column(Modifier.fillMaxWidth().background(LeafColors.Tint, RoundedCornerShape(14.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             listOf(
                 stringResource(R.string.help_tip_1),
                 stringResource(R.string.help_tip_2),

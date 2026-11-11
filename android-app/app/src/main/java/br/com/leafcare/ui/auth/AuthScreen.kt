@@ -108,7 +108,7 @@ private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
     val error by viewModel.error.collectAsStateWithLifecycle()
     AuthScaffold(onBack = { viewModel.signOut() }) {
         // Shown to accounts created outside the app (invites) and to accounts that accepted an older version.
-        AuthHeader(logoSize = 56, title = "Termos de uso", subtitle = "Aceite para usar o LeafCare")
+        AuthHeader(logoSize = 56, title = "Termos de Uso", subtitle = "Aceite para usar o LeafCare")
         Spacer(Modifier.height(12.dp))
         Text(
             "Leia e aceite os Termos de Uso e a Política de Privacidade (versão 1.4, publicada em 11/11/2026).",
@@ -305,7 +305,7 @@ private fun AuthButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = LeafColors.Green,
             contentColor = Color.White,
-            disabledContainerColor = LeafColors.Pale,
+            disabledContainerColor = LeafColors.Border,
             disabledContentColor = LeafColors.Muted
         )
     ) {
@@ -576,7 +576,7 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
 
         AuthButton(
             label = when {
-                sending -> "Enviando..."
+                sending -> "Enviando…"
                 cooldownSeconds > 0 -> "Enviar novamente em ${cooldownSeconds}s"
                 recoveryRequestSent -> "Enviar novamente"
                 else -> "Enviar e-mail"
@@ -663,17 +663,7 @@ fun ProfileScreen(
     val email = viewModel.getEmail()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .statusBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        AuthTopBar(onBack)
-        Spacer(Modifier.weight(1f))
-
+    AuthScaffold(onBack = onBack) {
         FigmaIcon(R.drawable.v3_logo, "LeafCare", 64)
         Spacer(Modifier.height(16.dp))
         Text(
@@ -701,52 +691,10 @@ fun ProfileScreen(
         )
         Spacer(Modifier.height(32.dp))
 
-        Button(
-            onClick = onTrainingPrivacy,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, LeafColors.Border),
-            colors = ButtonDefaults.buttonColors(containerColor = LeafColors.Pale, contentColor = LeafColors.Text)
-        ) { Text("Privacidade e uso de fotos", fontWeight = FontWeight.SemiBold) }
+        LeafButton("Privacidade e uso de fotos", onTrainingPrivacy, secondary = true)
         Spacer(Modifier.height(12.dp))
-
-        Button(
-            onClick = onChangePassword,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, LeafColors.Border),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = LeafColors.Pale,
-                contentColor = LeafColors.Text
-            )
-        ) {
-            Text("Alterar senha", fontWeight = FontWeight.SemiBold)
-        }
+        LeafButton("Alterar senha", onChangePassword, secondary = true)
         Spacer(Modifier.height(12.dp))
-
-        Button(
-            onClick = { viewModel.signOut() },
-            enabled = !isLoading,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, LeafColors.Border),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = LeafColors.Pale,
-                contentColor = MaterialTheme.colorScheme.error,
-                disabledContainerColor = LeafColors.Pale,
-                disabledContentColor = LeafColors.Muted
-            )
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp)
-            } else {
-                Text("Sair da conta", fontWeight = FontWeight.SemiBold)
-            }
-        }
-        Spacer(Modifier.weight(1f))
+        LeafButton(if (isLoading) "Saindo…" else "Sair da conta", { viewModel.signOut() }, secondary = true, danger = true, enabled = !isLoading)
     }
 }

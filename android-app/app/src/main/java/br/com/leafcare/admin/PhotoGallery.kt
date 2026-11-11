@@ -41,6 +41,7 @@ import java.time.format.ResolverStyle
 import br.com.leafcare.data.DiseaseCatalog
 import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
+import br.com.leafcare.ui.percent
 import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
@@ -57,8 +58,8 @@ import org.json.JSONObject
                 Text("Consultar fotos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(reviewStatuses[state.photoFilterStatus] ?: "Todas", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
             }
-            IconButton(onClick = { filtersOpen = true }, enabled = !state.busy) { Icon(Icons.Outlined.Tune, "Filtrar fotos") }
-            IconButton(onClick = actions.refresh, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "Atualizar galeria") }
+            IconButton(onClick = { filtersOpen = true }, enabled = !state.busy) { Icon(Icons.Outlined.Tune, "Filtrar fotos", tint = LeafColors.Green) }
+            IconButton(onClick = actions.refresh, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "Atualizar galeria", tint = LeafColors.Green) }
         }
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         key(state.page, state.photoQuery) {
@@ -112,12 +113,12 @@ import org.json.JSONObject
                 val image = bitmap
                 if (image != null) Image(image.asImageBitmap(), "Foto: ${catalog.get(row.getString("class_id")).name}", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 else if (loading) CircularProgressIndicator(Modifier.size(26.dp), strokeWidth = 2.dp)
-                else TextButton(onClick = { attempt++ }, enabled = enabled) { Icon(Icons.Outlined.Refresh, null, Modifier.size(16.dp)); Text("Tentar foto", style = MaterialTheme.typography.labelSmall) }
+                else TextButton(onClick = { attempt++ }, enabled = enabled) { Icon(Icons.Outlined.Refresh, null, Modifier.size(16.dp)); Text("Recarregar", style = MaterialTheme.typography.labelSmall) }
             }
             Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                AdminBadge(reviewLabel(row.optString("review_status")))
+                AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
                 Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text("${"%.1f".format(row.optDouble("confidence") * 100)}% · previsão original", style = MaterialTheme.typography.labelSmall, color = LeafColors.Muted)
+                Text("${percent(row.optDouble("confidence").toFloat())} · previsão original", style = MaterialTheme.typography.labelSmall, color = LeafColors.Muted)
                 if (!row.isNull("reviewed_class")) Text("Revisão: ${catalog.get(row.getString("reviewed_class")).name}", style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, color = LeafColors.Green)
             }
         }
@@ -150,17 +151,17 @@ import org.json.JSONObject
             AdminPanel {
                 AdminSectionTitle("Previsão original")
                 Text(catalog.get(row.getString("class_id")).name, fontWeight = FontWeight.SemiBold)
-                Text("${"%.1f".format(row.optDouble("confidence") * 100)}% de confiança")
+                Text("${percent(row.optDouble("confidence").toFloat())} de confiança")
                 val top3 = row.optJSONArray("top3") ?: JSONArray()
                 repeat(top3.length()) { i -> val p = top3.getJSONObject(i)
-                    Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${"%.1f".format(p.optDouble("confidence") * 100)}%", style = MaterialTheme.typography.bodySmall)
+                    Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${percent(p.optDouble("confidence").toFloat())}", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
         item {
             AdminPanel {
                 AdminSectionTitle("Avaliação humana")
-                AdminBadge(reviewLabel(row.optString("review_status")))
+                AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
                 if (!row.isNull("reviewed_class")) Text(catalog.get(row.getString("reviewed_class")).name)
                 if (!row.isNull("reviewed_at")) Text(adminDate(row.getString("reviewed_at")), style = MaterialTheme.typography.bodySmall)
                 if (!row.isNull("reviewer_id")) Text("Revisor: ${shortId(row.getString("reviewer_id"))}", style = MaterialTheme.typography.bodySmall)
@@ -255,7 +256,7 @@ import org.json.JSONObject
     }
 }
 
-@Composable private fun leafFieldColors() = OutlinedTextFieldDefaults.colors(
+@Composable internal fun leafFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = LeafColors.Green, unfocusedBorderColor = LeafColors.Border,
     focusedLabelColor = LeafColors.Green, unfocusedLabelColor = LeafColors.Muted,
     unfocusedContainerColor = Color.White, focusedContainerColor = Color.White, cursorColor = LeafColors.Green,
