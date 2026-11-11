@@ -46,6 +46,40 @@ END $$;
 UPDATE public.training_consents SET granted=false, terms_version='1.1' WHERE user_id=auth.uid();
 UPDATE public.training_photo_authorizations SET authorized=false, terms_version='1.1' WHERE user_id=auth.uid();
 DELETE FROM storage.objects WHERE bucket_id='training-photos' AND name='90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000003.jpg';
-SELECT pg_temp.assert_true((SELECT count(*)=0 FROM storage.objects WHERE bucket_id='training-photos'),'revoked user can delete own training object');
 RESET ROLE;
+-- Counted outside RLS: as the user, a filtered count would always read 0.
+SELECT pg_temp.assert_true((SELECT count(*)=0 FROM storage.objects WHERE bucket_id='training-photos'),'revoked training copy is really deleted');
+
+-- Training copies only for active, conclusive analyses of accounts allowed to send.
+INSERT INTO public.analyses(id,user_id,class_id,display_name,scientific_name,confidence,top3,inconclusive,threshold,inference_ms,model_sha256,app_version)
+ VALUES
+ ('90000000-0000-0000-0000-000000000005','90000000-0000-0000-0000-000000000001','frog_eye','Olho-de-rã','Cercospora',0.8,'[]',false,0.5,3,'test-model','test'),
+ ('90000000-0000-0000-0000-000000000006','90000000-0000-0000-0000-000000000001','frog_eye','Olho-de-rã','Cercospora',0.3,'[]',true,0.5,3,'test-model','test'),
+ ('90000000-0000-0000-0000-000000000007','90000000-0000-0000-0000-000000000001','frog_eye','Olho-de-rã','Cercospora',0.8,'[]',false,0.5,3,'test-model','test'),
+ ('90000000-0000-0000-0000-000000000008','90000000-0000-0000-0000-000000000001','frog_eye','Olho-de-rã','Cercospora',0.8,'[]',false,0.5,3,'test-model','test');
+INSERT INTO storage.objects(bucket_id,name) VALUES('analysis-photos','90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000005.jpg');
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','90000000-0000-0000-0000-000000000001',true);
+SELECT public.accept_current_legal_documents('1.4','1.4');
+INSERT INTO public.training_photo_authorizations(user_id,analysis_id,terms_version,authorized)
+ SELECT auth.uid(), id, '1.2', true FROM public.analyses
+ WHERE id IN ('90000000-0000-0000-0000-000000000005','90000000-0000-0000-0000-000000000006','90000000-0000-0000-0000-000000000007','90000000-0000-0000-0000-000000000008');
+UPDATE public.analyses SET deleted_at=now() WHERE id='90000000-0000-0000-0000-000000000007';
+DO $$ BEGIN
+ BEGIN INSERT INTO storage.objects(bucket_id,name) VALUES('training-photos','90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000006.jpg'); RAISE EXCEPTION 'inconclusive training upload accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN INSERT INTO storage.objects(bucket_id,name) VALUES('training-photos','90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000007.jpg'); RAISE EXCEPTION 'deleted analysis training upload accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+INSERT INTO storage.objects(bucket_id,name) VALUES('training-photos','90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000005.jpg');
+RESET ROLE;
+UPDATE public.account_controls SET uploads_enabled=false WHERE user_id='90000000-0000-0000-0000-000000000001';
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','90000000-0000-0000-0000-000000000001',true);
+DO $$ BEGIN
+ BEGIN INSERT INTO storage.objects(bucket_id,name) VALUES('training-photos','90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000008.jpg'); RAISE EXCEPTION 'paused training upload accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN UPDATE public.analyses SET deleted_at=now() WHERE id='90000000-0000-0000-0000-000000000008'; IF FOUND THEN RAISE EXCEPTION 'paused tombstone accepted'; END IF; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+-- Paused accounts can still remove training copies (revocation).
+DELETE FROM storage.objects WHERE bucket_id='training-photos' AND name='90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000005.jpg';
+RESET ROLE;
+SELECT pg_temp.assert_true((SELECT count(*)=0 FROM storage.objects WHERE bucket_id='training-photos'),'paused account can delete its training copies');
 ROLLBACK;
