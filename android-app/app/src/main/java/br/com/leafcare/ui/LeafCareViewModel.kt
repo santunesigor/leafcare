@@ -25,7 +25,8 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
     private val repository = app.repository
     private val catalog = app.catalog
 
-    val analyses = repository.all.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    // No replay once stopped: after logout the next account must never see the previous list.
+    val analyses = repository.all.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000, replayExpirationMillis = 0), emptyList())
     private val consentDao = app.database.trainingConsentDao()
     private val _trainingConsent = MutableStateFlow<br.com.leafcare.data.TrainingConsentEntity?>(null)
     val trainingConsent = _trainingConsent.asStateFlow()
@@ -80,7 +81,7 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
             try {
                 val id = repository.analyze(uri)
                 val consent = trainingConsent.value
-                if (TRAINING_UPLOADS_ENABLED && consent?.userId == consentUserId && consent?.granted == true && consent.termsVersion == TRAINING_TERMS_VERSION) {
+                if (TRAINING_UPLOADS_ENABLED && isTrainingEligible(app.database.analysisDao().get(id)) && consent?.userId == consentUserId && consent?.granted == true && consent.termsVersion == TRAINING_TERMS_VERSION) {
                     val userId = requireNotNull(consentUserId)
                     consentDao.savePhoto(TrainingPhotoAuthorizationEntity(userId, id, TRAINING_TERMS_VERSION, true, System.currentTimeMillis()))
                 }
@@ -113,3 +114,7 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
     fun observeAnalysis(id: String) = repository.observe(id)
     fun getDiseaseInfo(classId: String): DiseaseInfo = catalog.get(classId)
 }
+
+/** Inconclusive photos stay local: only a conclusive analysis is authorized for training. */
+internal fun isTrainingEligible(analysis: AnalysisEntity?): Boolean =
+    analysis != null && !analysis.inconclusive && analysis.confidence >= analysis.threshold

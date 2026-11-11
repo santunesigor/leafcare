@@ -233,6 +233,17 @@ class AuthErrorSanitizerTest {
         )
     }
 
+    @Test fun samePassword_mapsToDifferentPasswordMessage() {
+        val raw = Exception(
+            "New password should be different from the old password. (same_password)\n" +
+                "URL: https://nhkqfanjfcivcbndivav.supabase.co/auth/v1/user"
+        )
+
+        val message = AuthRepository.sanitizeError(AuthOperation.UPDATE_PASSWORD, raw)
+
+        assertEquals("A nova senha deve ser diferente da atual.", message)
+    }
+
     @Test fun classifyRateLimit_otherAndNull() {
         assertNull(AuthRepository.classifyRateLimit(IllegalStateException("boom")))
         assertNull(AuthRepository.classifyRateLimit(null))

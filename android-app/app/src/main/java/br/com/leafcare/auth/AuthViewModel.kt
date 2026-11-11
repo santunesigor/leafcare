@@ -152,6 +152,9 @@ class AuthViewModel internal constructor(
         // itself; otherwise a fresh login could skip this check and stay on Loading.
         val userId = currentUserId() ?: return
         val state = _legalAcceptance.value
+        // The acceptance in flight decides: a check read before the RPC commits
+        // would overwrite CURRENT with REQUIRED.
+        if (state == LegalAcceptanceState.SUBMITTING) return
         val silent = !force && legalCheckedUserId == userId &&
             (state == LegalAcceptanceState.CURRENT || state == LegalAcceptanceState.UNAVAILABLE)
         if (silent && legalCheck?.isActive == true) return
@@ -179,8 +182,9 @@ class AuthViewModel internal constructor(
     fun acceptCurrentLegalDocuments() {
         val api = legalAcceptanceApi ?: return
         if (_legalAcceptance.value != LegalAcceptanceState.REQUIRED) return
+        legalCheck?.cancel()
+        _legalAcceptance.value = LegalAcceptanceState.SUBMITTING
         viewModelScope.launch {
-            _legalAcceptance.value = LegalAcceptanceState.SUBMITTING
             try {
                 api.acceptCurrentDocuments()
             } catch (e: Exception) {
@@ -191,9 +195,25 @@ class AuthViewModel internal constructor(
                 )
                 return@launch
             }
+            legalCheckedUserId = currentUserId()
             _legalAcceptance.value = LegalAcceptanceState.CURRENT
             (getApplication<Application>() as? LeafCareApplication)?.scheduleSync()
         }
+    }
+
+    /**
+     * Keeps the auth screen in step with the acceptance requirement (called by
+     * the gate whenever the acceptance or bootstrap state changes). During a
+     * recovery/invite the new password comes first; once accepted, the user
+     * always leaves the acceptance screen.
+     */
+    fun syncLegalAcceptanceScreen() {
+        val target = legalAcceptanceScreenFor(
+            _uiState.value.currentScreen,
+            _legalAcceptance.value,
+            _bootstrap.value
+        ) ?: return
+        setScreen(target)
     }
 
 
@@ -294,12 +314,12 @@ class AuthViewModel internal constructor(
                 setScreen(AuthScreen.VerifyEmail)
                 return@launch
             }
+            onAuthenticated(result)
             val destination = navigationForAuthResult(result.isSuccess)
             if (destination != null) {
                 clearForms()
                 _navigation.send(destination)
             }
-            onAuthenticated(result)
         }
     }
 
@@ -311,12 +331,14 @@ class AuthViewModel internal constructor(
                 email = state.email.trim(),
                 password = state.password
             )
+            // Isolate before navigating: the app must never open over the
+            // previous account's local data.
+            onAuthenticated(result)
             val destination = navigationForAuthResult(result.isSuccess)
             if (destination != null) {
                 clearForms()
                 _navigation.send(destination)
             }
-            onAuthenticated(result)
         }
     }
 
@@ -337,6 +359,12 @@ class AuthViewModel internal constructor(
     /** Sign out action: always back to the initial Auth screen. */
     fun signOut() {
         viewModelScope.launch {
+            (getApplication<Application>() as? LeafCareApplication)?.let { app ->
+                // A withdrawal saved offline gets one short chance to reach the
+                // server while the session still exists; the queue then stops.
+                currentUserId()?.let { app.pushPendingTrainingRevocation(it) }
+                app.cancelSync()
+            }
             authRepository.signOut()
             clearForms()
             clearRecoveryPending()
@@ -741,6 +769,29 @@ internal fun navigationForAuthResult(authenticated: Boolean): AuthNavigationEven
 /** After startup restore: existing session goes to App, otherwise to Auth. */
 internal fun navigationForSessionRestore(hasSession: Boolean): AuthNavigationEvent =
     if (hasSession) AuthNavigationEvent.NavigateToApp else AuthNavigationEvent.NavigateToAuth()
+
+/**
+ * Auth screen the acceptance requirement asks for, or null to stay. Recovery
+ * keeps the new-password form (the acceptance follows it); REQUIRED opens the
+ * acceptance unless it or one of its documents is open; an acceptance that is
+ * no longer required never keeps the user on that screen.
+ */
+internal fun legalAcceptanceScreenFor(
+    current: AuthScreen,
+    acceptance: LegalAcceptanceState,
+    bootstrap: AuthBootstrapState
+): AuthScreen? = when {
+    bootstrap == AuthBootstrapState.RECOVERY_PENDING ->
+        if (current == AuthScreen.LegalAcceptance) AuthScreen.NewPassword else null
+    bootstrap != AuthBootstrapState.READY -> null
+    acceptance == LegalAcceptanceState.REQUIRED ->
+        if (current == AuthScreen.LegalAcceptance || current == AuthScreen.TermsOfUse ||
+            current == AuthScreen.PrivacyPolicy
+        ) null else AuthScreen.LegalAcceptance
+    (acceptance == LegalAcceptanceState.CURRENT || acceptance == LegalAcceptanceState.UNAVAILABLE) &&
+        current == AuthScreen.LegalAcceptance -> AuthScreen.Login
+    else -> null
+}
 
 /** After sign-out: always back to Auth. */
 internal fun navigationAfterSignOut(): AuthNavigationEvent =

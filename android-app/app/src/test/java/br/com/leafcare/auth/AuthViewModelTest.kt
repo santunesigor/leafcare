@@ -273,6 +273,96 @@ class AuthViewModelTest {
         assertNotNull(vm.infoMessage.value)
     }
 
+    @Test fun inviteLinkSetsPasswordFirstThenAcceptanceThenApp() = runTest(dispatcher) {
+        var accepted = false
+        val legalApi = object : LegalAcceptanceApi {
+            override suspend fun hasCurrentAcceptance(): Boolean = accepted
+            override suspend fun acceptCurrentDocuments() { accepted = true }
+        }
+        val vm = AuthViewModel(Application(), AuthRepository(backend), recoveryStore, legalApi)
+        advanceUntilIdle()
+        backend.session = testSession()
+        fun gate() = br.com.leafcare.appGateDestination(vm.session.value, vm.bootstrap.value, vm.legalAcceptance.value)
+
+        vm.handleAuthDeeplink("leafcare://auth/reset-password#access_token=at&refresh_token=rt&type=invite")
+        advanceUntilIdle()
+        vm.syncLegalAcceptanceScreen() // gate effect
+        assertEquals(LegalAcceptanceState.REQUIRED, vm.legalAcceptance.value)
+        assertEquals(br.com.leafcare.AppGate.Recovery, gate())
+        assertEquals(AuthScreen.NewPassword, vm.uiState.value.currentScreen)
+        // Even if the acceptance was opened earlier, recovery returns to the password form.
+        vm.setScreen(AuthScreen.LegalAcceptance)
+        vm.syncLegalAcceptanceScreen()
+        assertEquals(AuthScreen.NewPassword, vm.uiState.value.currentScreen)
+
+        vm.setNewPassword("nova-senha-123"); vm.setConfirmNewPassword("nova-senha-123")
+        vm.updatePassword()
+        advanceUntilIdle()
+        vm.syncLegalAcceptanceScreen()
+        assertEquals(br.com.leafcare.AppGate.LegalAcceptance, gate())
+        assertEquals(AuthScreen.LegalAcceptance, vm.uiState.value.currentScreen)
+
+        vm.acceptCurrentLegalDocuments()
+        advanceUntilIdle()
+        vm.syncLegalAcceptanceScreen()
+        assertEquals(LegalAcceptanceState.CURRENT, vm.legalAcceptance.value)
+        assertEquals(br.com.leafcare.AppGate.Main, gate())
+        assertNotEquals(AuthScreen.LegalAcceptance, vm.uiState.value.currentScreen)
+    }
+
+    @Test fun acceptanceScreenFollowsRecoveryAndAcceptanceState() {
+        val ready = AuthBootstrapState.READY
+        val recovering = AuthBootstrapState.RECOVERY_PENDING
+        assertNull(legalAcceptanceScreenFor(AuthScreen.NewPassword, LegalAcceptanceState.REQUIRED, recovering))
+        assertEquals(AuthScreen.NewPassword, legalAcceptanceScreenFor(AuthScreen.LegalAcceptance, LegalAcceptanceState.REQUIRED, recovering))
+        assertEquals(AuthScreen.LegalAcceptance, legalAcceptanceScreenFor(AuthScreen.NewPassword, LegalAcceptanceState.REQUIRED, ready))
+        assertNull(legalAcceptanceScreenFor(AuthScreen.TermsOfUse, LegalAcceptanceState.REQUIRED, ready))
+        assertNull(legalAcceptanceScreenFor(AuthScreen.LegalAcceptance, LegalAcceptanceState.SUBMITTING, ready))
+        assertEquals(AuthScreen.Login, legalAcceptanceScreenFor(AuthScreen.LegalAcceptance, LegalAcceptanceState.CURRENT, ready))
+        assertNull(legalAcceptanceScreenFor(AuthScreen.Login, LegalAcceptanceState.REQUIRED, AuthBootstrapState.PROCESSING_DEEPLINK))
+    }
+
+    @Test fun recheckDuringSubmissionNeverOverwritesTheAcceptance() = runTest(dispatcher) {
+        val submit = CompletableDeferred<Unit>()
+        val staleRead = CompletableDeferred<Boolean>()
+        var checks = 0
+        val legalApi = object : LegalAcceptanceApi {
+            override suspend fun hasCurrentAcceptance(): Boolean { checks++; return if (checks == 1) false else staleRead.await() }
+            override suspend fun acceptCurrentDocuments() { submit.await() }
+        }
+        val vm = AuthViewModel(Application(), AuthRepository(backend), recoveryStore, legalApi)
+        advanceUntilIdle(); signInWith(vm)
+        assertEquals(LegalAcceptanceState.REQUIRED, vm.legalAcceptance.value)
+
+        vm.acceptCurrentLegalDocuments()
+        runCurrent()
+        vm.refreshLegalAcceptance() // resume or token refresh while the RPC runs
+        runCurrent()
+        assertEquals(LegalAcceptanceState.SUBMITTING, vm.legalAcceptance.value)
+        submit.complete(Unit)
+        staleRead.complete(false)
+        advanceUntilIdle()
+
+        assertEquals(LegalAcceptanceState.CURRENT, vm.legalAcceptance.value)
+    }
+
+    @Test fun signInClearsRecoveryStateBeforeNavigating() = runTest(dispatcher) {
+        backend.session = testSession()
+        recoveryStore.isPending = true
+        var pendingWhenNavigating: Boolean? = null
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.navigation.collect { pendingWhenNavigating = recoveryStore.isPending }
+        }
+        viewModel.setEmail("a@b.com"); viewModel.setPassword("senha123")
+
+        viewModel.signIn()
+        advanceUntilIdle()
+
+        // The post-login hook (recovery cleanup, account isolation) runs first.
+        assertEquals(false, pendingWhenNavigating)
+        job.cancel()
+    }
+
     @Test fun recoveryAfterProcessDeathReopensNewPassword() = runTest(dispatcher) {
         val restored = FakeBackend(testSession(), io.github.jan.supabase.gotrue.SessionStatus.LoadingFromStorage)
         val repository = AuthRepository(restored)

@@ -79,17 +79,10 @@ fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         authViewModel.onSessionRestored()
     }
-    LaunchedEffect(legalAcceptance) {
-        // Not when already there or reading the documents: that would wipe a
-        // failed-submit error or pull the user out of the text.
-        val current = authViewModel.uiState.value.currentScreen
-        if (legalAcceptance == br.com.leafcare.auth.LegalAcceptanceState.REQUIRED &&
-            current != br.com.leafcare.auth.AuthScreen.LegalAcceptance &&
-            current != br.com.leafcare.auth.AuthScreen.TermsOfUse &&
-            current != br.com.leafcare.auth.AuthScreen.PrivacyPolicy
-        ) {
-            authViewModel.setScreen(br.com.leafcare.auth.AuthScreen.LegalAcceptance)
-        }
+    // Keyed on bootstrap too: the acceptance must open when a recovery/invite
+    // ends with the new password, and be left once it is no longer required.
+    LaunchedEffect(legalAcceptance, bootstrap) {
+        authViewModel.syncLegalAcceptanceScreen()
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -125,7 +118,7 @@ fun LoadingScreen() {
         ) {
             CircularProgressIndicator(Modifier.size(48.dp))
             Spacer(Modifier.height(16.dp))
-            Text("Carregando...", style = MaterialTheme.typography.bodyLarge)
+            Text("Carregando…", style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
@@ -174,7 +167,7 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                 popExitTransition = { leafExitTransition }
             ) {
                 composable("history") {
-                    HistoryScreen(vm, { nav.navigate("camera") }, { nav.navigate("result/$it") }, { nav.navigate("profile") }, displayNameOf(user),
+                    HistoryScreen(vm, { nav.navigate("camera") { launchSingleTop = true } }, { nav.navigate("result/$it") { launchSingleTop = true } }, { nav.navigate("profile") }, displayNameOf(user),
                         onAdmin = if (adminState.allowed) ({ nav.navigate("admin") }) else null)
                 }
                 composable("profile") {
@@ -184,7 +177,12 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                     ProfileScreen(
                         authViewModel,
                         onBack = { nav.popBackStack() },
-                        onChangePassword = { nav.navigate("change-password") },
+                        onChangePassword = {
+                            // Messages from an earlier attempt must not greet a new change.
+                            authViewModel.clearError()
+                            authViewModel.clearInfo()
+                            nav.navigate("change-password") { launchSingleTop = true }
+                        },
                         onTrainingPrivacy = { nav.navigate("training-privacy") }
                     )
                 }
@@ -205,7 +203,7 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                 composable("result/{id}") { entry ->
                     ResultScreen(requireNotNull(entry.arguments?.getString("id")), vm,
                         onBack = { nav.popBackStack("history", false) },
-                        onCamera = { nav.navigate("camera") { popUpTo("history") } }) }
+                        onCamera = { nav.navigate("camera") { popUpTo("history"); launchSingleTop = true } }) }
             }
             if (state.busy) {
                 LeafDialog(title = stringResource(R.string.analyzing_title), onDismiss = {}, dismissible = false) {

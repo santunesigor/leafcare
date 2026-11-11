@@ -440,6 +440,10 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             val raw = original.lowercase().replace('_', ' ')
             if (raw.contains("already registered")) return "Este e-mail já está cadastrado"
             if (raw.contains("weak password")) return "Senha muito fraca. Use pelo menos 6 caracteres."
+            // GoTrue: "same_password" / "New password should be different from the old password."
+            if (raw.contains("same password") || raw.contains("different from the old password")) {
+                return "A nova senha deve ser diferente da atual."
+            }
             // GoTrue: "email_address_invalid" / Email address "x" is invalid (rejected domain or format).
             if (raw.contains("invalid email") || raw.contains("email address invalid") ||
                 Regex("email address .* is invalid").containsMatchIn(raw)
