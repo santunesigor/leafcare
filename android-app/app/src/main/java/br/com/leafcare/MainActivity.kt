@@ -44,7 +44,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        handleRecoveryIntent(intent)
+        // Recreation (rotation, process restore) re-delivers the original link:
+        // reprocessing it would revoke a recovery already in progress.
+        if (savedInstanceState == null) handleRecoveryIntent(intent)
         setContent {
             LeafCareTheme { LeafCareApp() }
         }
@@ -76,7 +78,14 @@ fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
         authViewModel.onSessionRestored()
     }
     LaunchedEffect(legalAcceptance) {
-        if (legalAcceptance == br.com.leafcare.auth.LegalAcceptanceState.REQUIRED) {
+        // Not when already there or reading the documents: that would wipe a
+        // failed-submit error or pull the user out of the text.
+        val current = authViewModel.uiState.value.currentScreen
+        if (legalAcceptance == br.com.leafcare.auth.LegalAcceptanceState.REQUIRED &&
+            current != br.com.leafcare.auth.AuthScreen.LegalAcceptance &&
+            current != br.com.leafcare.auth.AuthScreen.TermsOfUse &&
+            current != br.com.leafcare.auth.AuthScreen.PrivacyPolicy
+        ) {
             authViewModel.setScreen(br.com.leafcare.auth.AuthScreen.LegalAcceptance)
         }
     }
@@ -129,11 +138,16 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
     val admin: AdminViewModel = viewModel()
     val adminState by admin.state.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
     LaunchedEffect(user?.id) { admin.bind(user?.id); vm.bindTrainingConsent(user?.id) }
     DisposableEffect(lifecycleOwner, user?.id) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) admin.bind(user?.id) }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); admin.clear() }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            // Rotation keeps the AdminViewModel: only a real exit/account change clears it.
+            if (activity?.isChangingConfigurations != true) admin.clear()
+        }
     }
     LaunchedEffect(vm) { vm.results.collect { id ->
         nav.navigate("result/$id") { popUpTo("history"); launchSingleTop = true } } }

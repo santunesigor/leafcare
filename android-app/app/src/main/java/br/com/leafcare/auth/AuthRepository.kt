@@ -86,17 +86,18 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         // Load session from storage (does not require network)
         ioScope.launch {
             try {
-                val hasSession = backend.loadFromStorage()
-                if (hasSession) {
-                    val session = backend.loadSession()
-                    if (session != null) {
-                        _session.value = session
-                        _user.value = session.user
-                    }
+                // Reads storage only: an expired token must not block startup
+                // (offline, GoTrue's refresh below retries indefinitely).
+                val session = backend.loadSession()
+                if (session != null) {
+                    _session.value = session
+                    _user.value = session.user
                 }
             } finally {
                 _sessionChecked.value = true
             }
+            // Imports and refreshes in the background; results arrive via sessionStatus.
+            runCatching { backend.loadFromStorage() }
         }
 
         // Observe session status changes
@@ -217,7 +218,13 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         _infoMessage.value = null
 
         return try {
-            backend.signOut()
+            try {
+                backend.signOut()
+            } catch (e: Exception) {
+                // GoTrue skips its local cleanup when /logout fails (offline):
+                // the user still asked to leave, so sign out locally.
+                backend.clearLocalSession()
+            }
             _session.value = null
             _user.value = null
             Result.success(Unit)
@@ -687,6 +694,8 @@ internal interface AuthBackend {
     )
     suspend fun signInWithEmail(email: String, password: String)
     suspend fun signOut()
+    /** Clears the local session without contacting the server. */
+    suspend fun clearLocalSession()
     suspend fun requestPasswordRecovery(email: String, redirectUrl: String)
     suspend fun exchangeLinkCode(code: String)
     suspend fun importLinkTokens(accessToken: String, refreshToken: String)
@@ -731,6 +740,10 @@ internal class SupabaseAuthBackend(private val auth: Auth) : AuthBackend {
 
     override suspend fun signOut() {
         auth.signOut(SignOutScope.GLOBAL)
+    }
+
+    override suspend fun clearLocalSession() {
+        auth.clearSession()
     }
 
     override suspend fun requestPasswordRecovery(email: String, redirectUrl: String) {

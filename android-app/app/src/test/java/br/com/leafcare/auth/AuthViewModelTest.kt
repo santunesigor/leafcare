@@ -9,6 +9,7 @@ import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -161,6 +162,60 @@ class AuthViewModelTest {
 
         assertEquals(1, legalApi.checks)
         assertEquals(LegalAcceptanceState.CURRENT, vm.legalAcceptance.value)
+    }
+
+    @Test fun resumeRecheckKeepsResolvedStateWithoutLoading() = runTest(dispatcher) {
+        backend.session = testSession()
+        val gate = CompletableDeferred<Boolean>()
+        var checks = 0
+        val legalApi = object : LegalAcceptanceApi {
+            override suspend fun hasCurrentAcceptance(): Boolean { checks++; return if (checks == 1) true else gate.await() }
+            override suspend fun acceptCurrentDocuments() = Unit
+        }
+        val vm = AuthViewModel(Application(), AuthRepository(backend), recoveryStore, legalApi)
+        advanceUntilIdle()
+        vm.setEmail("a@b.com")
+        vm.setPassword("senha123")
+        vm.signIn()
+        advanceUntilIdle()
+        assertEquals(LegalAcceptanceState.CURRENT, vm.legalAcceptance.value)
+
+        vm.refreshLegalAcceptance() // ON_RESUME
+        runCurrent()
+        // Loading here would tear down the open screen (navigation, picked photo).
+        assertEquals(LegalAcceptanceState.CURRENT, vm.legalAcceptance.value)
+        gate.complete(false)
+        advanceUntilIdle()
+        assertEquals(LegalAcceptanceState.REQUIRED, vm.legalAcceptance.value)
+    }
+
+    @Test fun resumeRecheckOfflineKeepsAppUsable() = runTest(dispatcher) {
+        backend.session = testSession()
+        var offline = false
+        val legalApi = object : LegalAcceptanceApi {
+            override suspend fun hasCurrentAcceptance(): Boolean { if (offline) throw java.io.IOException("offline"); return true }
+            override suspend fun acceptCurrentDocuments() = Unit
+        }
+        val vm = AuthViewModel(Application(), AuthRepository(backend), recoveryStore, legalApi)
+        advanceUntilIdle()
+        vm.setEmail("a@b.com")
+        vm.setPassword("senha123")
+        vm.signIn()
+        advanceUntilIdle()
+        offline = true
+        vm.refreshLegalAcceptance()
+        advanceUntilIdle()
+        assertEquals(LegalAcceptanceState.CURRENT, vm.legalAcceptance.value)
+    }
+
+    @Test fun recoveryAfterProcessDeathReopensNewPassword() = runTest(dispatcher) {
+        val restored = FakeBackend(testSession(), io.github.jan.supabase.gotrue.SessionStatus.LoadingFromStorage)
+        val repository = AuthRepository(restored)
+        val vm = AuthViewModel(Application(), repository, FakeRecoveryPendingStore(initial = true))
+        repository.sessionChecked.first { it } // restore runs on the IO dispatcher
+        advanceUntilIdle()
+        assertEquals(AuthBootstrapState.RECOVERY_PENDING, vm.bootstrap.value)
+        assertEquals(AuthScreen.NewPassword, vm.uiState.value.currentScreen)
     }
 
     @Test fun signupWithoutSession_goesToVerifyEmailWithoutAppNavigation() = runTest(dispatcher) {

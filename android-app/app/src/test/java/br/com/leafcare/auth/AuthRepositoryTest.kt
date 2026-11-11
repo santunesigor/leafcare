@@ -3,7 +3,10 @@ package br.com.leafcare.auth
 import io.github.jan.supabase.gotrue.SessionStatus
 import io.github.jan.supabase.gotrue.user.UserInfo
 import io.github.jan.supabase.gotrue.user.UserSession
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,10 +22,12 @@ import org.junit.Before
 import org.junit.Test
 
 /** In-memory [AuthBackend] for tests. No network is touched. */
-internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
+internal class FakeBackend(
+    var session: UserSession? = null,
+    initialStatus: SessionStatus = SessionStatus.NotAuthenticated,
+) : AuthBackend {
 
-    override val sessionStatus: StateFlow<SessionStatus> =
-        MutableStateFlow(SessionStatus.NotAuthenticated)
+    override val sessionStatus: StateFlow<SessionStatus> = MutableStateFlow(initialStatus)
 
     var signUpCalls = 0
     var lastSignUp: Triple<String, String, String>? = null
@@ -43,7 +48,13 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
     var failResend: Exception? = null
     var resendGate: (suspend () -> Unit)? = null
 
-    override suspend fun loadFromStorage(): Boolean = session != null
+    /** Suspends like GoTrue's offline refresh retry loop when set. */
+    var loadFromStorageGate: CompletableDeferred<Unit>? = null
+
+    override suspend fun loadFromStorage(): Boolean {
+        loadFromStorageGate?.await()
+        return session != null
+    }
 
     override suspend fun loadSession(): UserSession? = session
 
@@ -65,8 +76,17 @@ internal class FakeBackend(var session: UserSession? = null) : AuthBackend {
         signInCalls++
     }
 
+    var failSignOut: Exception? = null
+    var clearLocalSessionCalls = 0
+
     override suspend fun signOut() {
         signOutCalls++
+        failSignOut?.let { throw it }
+        session = null
+    }
+
+    override suspend fun clearLocalSession() {
+        clearLocalSessionCalls++
         session = null
     }
 
@@ -223,6 +243,30 @@ class AuthRepositoryTest {
         assertNull(repository.session.value)
         assertNull(repository.user.value)
         assertFalse(repository.hasPersistedSession())
+    }
+
+    @Test fun restore_publishesStoredSessionWhileRefreshIsStuckOffline(): Unit = runBlocking {
+        backend.loadFromStorageGate = CompletableDeferred()
+        val session = testSession()
+        val repository = repositoryWithSession(session)
+
+        withTimeout(5_000) { repository.sessionChecked.first { it } }
+
+        assertEquals(session, repository.session.value)
+        assertEquals("user-id", repository.user.value?.id)
+        backend.loadFromStorageGate?.complete(Unit)
+    }
+
+    @Test fun signOut_offlineStillSignsOutLocally() = runTest(testDispatcher) {
+        val repository = repositoryWithSession(testSession())
+        backend.failSignOut = IllegalStateException("Unable to resolve host")
+
+        val result = repository.signOut()
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, backend.clearLocalSessionCalls)
+        assertNull(repository.session.value)
+        assertNull(repository.user.value)
     }
 
     @Test fun requestPasswordReset_sendsLinkRedirect() = runTest(testDispatcher) {

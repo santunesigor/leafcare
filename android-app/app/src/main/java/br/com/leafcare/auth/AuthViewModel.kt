@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import br.com.leafcare.LeafCareApplication
 import io.github.jan.supabase.gotrue.user.UserSession
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -87,10 +89,20 @@ class AuthViewModel internal constructor(
     private val _showCancelDialog = MutableStateFlow(false)
     val showCancelDialog: StateFlow<Boolean> = _showCancelDialog.asStateFlow()
 
+    private var legalCheck: Job? = null
+    private var legalCheckedUserId: String? = null
+
+    // UI state for different screens
+    private val _uiState = MutableStateFlow(AuthUiState())
+    val uiState: StateFlow<AuthUiState> = _uiState
+    private var legalDocumentReturnScreen: AuthScreen = AuthScreen.SignUp
+
     init {
         viewModelScope.launch {
             authRepository.session.collect { session ->
                 if (session == null) {
+                    legalCheck?.cancel()
+                    legalCheckedUserId = null
                     _legalAcceptance.value = if (legalAcceptanceApi == null) LegalAcceptanceState.CURRENT else LegalAcceptanceState.NOT_REQUIRED
                 } else if (legalAcceptanceApi != null) {
                     refreshLegalAcceptance()
@@ -101,6 +113,11 @@ class AuthViewModel internal constructor(
             authRepository.sessionChecked.first { it }
             if (_bootstrap.value == AuthBootstrapState.CHECKING) {
                 _bootstrap.value = AuthBootstrapState.READY
+            } else if (_bootstrap.value == AuthBootstrapState.RECOVERY_PENDING &&
+                authRepository.session.value != null
+            ) {
+                // Process death mid-recovery: resume on the new-password screen.
+                setScreen(AuthScreen.NewPassword, clearMessages = false)
             } else if (_bootstrap.value == AuthBootstrapState.RECOVERY_PENDING &&
                 authRepository.session.value == null
             ) {
@@ -115,28 +132,39 @@ class AuthViewModel internal constructor(
         }
     }
 
-    /** Rechecks the current receipt when the app resumes; network errors never block local inference. */
+    /**
+     * Rechecks the current receipt when the app resumes or the session refreshes;
+     * network errors never block local inference. A decision already made for
+     * this account is rechecked silently: showing Loading would tear down the
+     * open screen (navigation, a picked photo) on every resume.
+     */
     fun refreshLegalAcceptance() {
         val api = legalAcceptanceApi ?: return
         // The session is published before `user`, so read the id from the session
         // itself; otherwise a fresh login could skip this check and stay on Loading.
         val userId = currentUserId() ?: return
-        _legalAcceptance.value = LegalAcceptanceState.CHECKING
-        viewModelScope.launch {
-            _legalAcceptance.value = try {
+        val state = _legalAcceptance.value
+        val silent = legalCheckedUserId == userId &&
+            (state == LegalAcceptanceState.CURRENT || state == LegalAcceptanceState.UNAVAILABLE)
+        if (silent && legalCheck?.isActive == true) return
+        legalCheck?.cancel()
+        if (!silent) _legalAcceptance.value = LegalAcceptanceState.CHECKING
+        legalCheck = viewModelScope.launch {
+            val result = try {
                 if (api.hasCurrentAcceptance()) LegalAcceptanceState.CURRENT else LegalAcceptanceState.REQUIRED
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 // A cached, authenticated app must remain usable offline. No receipt is fabricated.
+                if (silent) return@launch
                 LegalAcceptanceState.UNAVAILABLE
             }
-            if (currentUserId() != userId) {
-                _legalAcceptance.value = LegalAcceptanceState.NOT_REQUIRED
-            }
+            // Another account signed in meanwhile: its own check decides.
+            if (currentUserId() != userId) return@launch
+            legalCheckedUserId = userId
+            _legalAcceptance.value = result
         }
     }
-
-    private fun currentUserId(): String? =
-        authRepository.session.value?.user?.id ?: authRepository.user.value?.id
 
     fun acceptCurrentLegalDocuments() {
         val api = legalAcceptanceApi ?: return
@@ -167,10 +195,8 @@ class AuthViewModel internal constructor(
      */
     fun getAuthDisplayName(): String? = displayNameOf(user.value)
 
-    // UI state for different screens
-    private val _uiState = MutableStateFlow(AuthUiState())
-    val uiState: StateFlow<AuthUiState> = _uiState
-    private var legalDocumentReturnScreen: AuthScreen = AuthScreen.SignUp
+    private fun currentUserId(): String? =
+        authRepository.session.value?.user?.id ?: authRepository.user.value?.id
 
     // Navigation events
     private val _navigation = Channel<AuthNavigationEvent>(Channel.BUFFERED)
