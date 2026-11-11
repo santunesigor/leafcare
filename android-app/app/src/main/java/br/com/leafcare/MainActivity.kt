@@ -188,7 +188,10 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                         onTrainingPrivacy = { nav.navigate("training-privacy") }
                     )
                 }
-                composable("training-privacy") { TrainingConsentScreen(vm, onBack = { nav.popBackStack() }) }
+                composable("training-privacy") {
+                    // Revoking leaves the app: the gate asks for the documents again.
+                    TrainingConsentScreen(vm, onBack = { nav.popBackStack() }, onRevoked = { authViewModel.refreshLegalAcceptance(force = true) })
+                }
                 composable("admin") { AdminScreen(admin, onBack = { nav.popBackStack() }) }
                 composable("change-password") {
                     NewPasswordScreen(

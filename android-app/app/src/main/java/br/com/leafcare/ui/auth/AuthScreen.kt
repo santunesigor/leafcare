@@ -1,5 +1,6 @@
 package br.com.leafcare.ui.auth
 
+import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.BorderStroke
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -101,16 +102,28 @@ fun AuthNavHost(viewModel: AuthViewModel) {
 private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
     val state by viewModel.legalAcceptance.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
-    AuthScaffold(onBack = { viewModel.continueOfflineWithoutAccepting() }) {
-        AuthHeader(logoSize = 56, title = "Documentos atualizados", subtitle = "Leia e escolha se deseja continuar")
+    AuthScaffold(onBack = { viewModel.signOut() }) {
+        AuthHeader(logoSize = 56, title = "Documentos atualizados", subtitle = "Aceite para continuar usando o LeafCare")
         Spacer(Modifier.height(12.dp))
         Text(
-            "Atualizamos os Termos de Uso e a Política de Privacidade. Leia as versões 1.3, publicadas em 19/10/2026, e confirme para continuar usando os recursos conectados.",
+            "Os Termos de Uso e a Política de Privacidade foram atualizados (versão 1.4, publicada em 11/11/2026).",
             style = MaterialTheme.typography.bodyMedium,
             color = LeafColors.Text,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(12.dp))
+        // LGPD art. 9º, §3º: the condition of use is shown prominently, not only inside the documents.
+        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = LeafColors.Pale, border = BorderStroke(1.dp, LeafColors.Border)) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Uso das fotos no treinamento", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = LeafColors.Text)
+                Text(
+                    "Para usar o app, você autoriza o uso das fotos que analisar para treinar o modelo de IA. As cópias ficam em área privada, passam por revisão humana e são apagadas em até 90 dias. Você pode revogar em Perfil → Privacidade e fotos; depois disso, o app só volta a funcionar com um novo aceite.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LeafColors.Muted
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
         AuthLinkButton("Ler Termos de Uso") { viewModel.setScreen(AuthScreen.TermsOfUse) }
         AuthLinkButton("Ler Política de Privacidade") { viewModel.setScreen(AuthScreen.PrivacyPolicy) }
         if (error != null) AuthMessages(error, null)
@@ -121,14 +134,11 @@ private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
             onClick = viewModel::acceptCurrentLegalDocuments
         )
         Spacer(Modifier.height(8.dp))
-        TextButton(
-            onClick = viewModel::continueOfflineWithoutAccepting,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Continuar offline sem aceitar", color = LeafColors.Green)
+        TextButton(onClick = { viewModel.signOut() }, modifier = Modifier.fillMaxWidth()) {
+            Text("Sair da conta", color = LeafColors.Muted)
         }
         Text(
-            "Sem aceite confirmado, os recursos que dependem de conexão podem ficar indisponíveis. A análise local continua disponível; o app perguntará novamente quando voltar a ficar online.",
+            "Sem o aceite, o LeafCare não pode ser usado. O aceite precisa de conexão.",
             style = MaterialTheme.typography.bodySmall,
             color = LeafColors.Muted,
             textAlign = TextAlign.Center
@@ -438,6 +448,11 @@ fun SignUpScreen(viewModel: AuthViewModel) {
                         styles = TextLinkStyles(SpanStyle(color = LeafColors.Green, textDecoration = TextDecoration.Underline))
                     ) { viewModel.setScreen(AuthScreen.PrivacyPolicy) }) {
                         append("Política de Privacidade")
+                    }
+                    append(", ")
+                    // LGPD art. 9º, §3º: training is a condition of use, so it is stated prominently.
+                    withStyle(SpanStyle(color = LeafColors.Text, fontWeight = FontWeight.SemiBold)) {
+                        append("incluindo o uso das fotos analisadas para treinar o modelo de IA")
                     }
                     append(".")
                 },

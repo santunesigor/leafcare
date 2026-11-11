@@ -12,10 +12,11 @@ Guia operacional para mudanças neste repositório. Código, testes, migrations 
 
 ## Treinamento de fotos e privacidade
 
-- A contribuição para treinamento está habilitada como opt-in. Exige documentos atuais aceitos, consentimento geral afirmativo e autorização individual por foto; a opção é desmarcada por padrão.
-- Recusar ou revogar mantém a classificação e o histórico normais. Revogações devem ser sincronizadas antes de qualquer upload pendente; estados positivos antigos nunca autorizam upload.
+- Desde a versão 1.8.0, o uso das fotos analisadas para treinamento é condição de uso. Aceitar os Termos e a Política v1.4 registra no servidor o recibo e o consentimento de treinamento (versão 1.2). Sem esse aceite, o app não pode ser usado; offline, só funciona a conta que já aceitou no aparelho.
+- Não há modal de autorização por foto: cada análise de conta com consentimento vigente é autorizada automaticamente. Fotos analisadas antes do aceite não entram na coleta.
+- Revogar, em Perfil → Privacidade e fotos, bloqueia novos envios, é sincronizado antes de qualquer upload (mesmo sem aceite atual) e faz o app voltar para a tela de aceite. O servidor aceita revogações com qualquer versão.
 - Fotos de treinamento e exportações locais são separadas do histórico. A retenção máxima é de 90 dias para cópias remotas e 30 dias para exportações locais; backups manuais do banco no Google Drive têm acesso restrito e retenção máxima de 30 dias.
-- O e-mail de privacidade é `igorsantunes@outlook.com`. Os Termos e a Política v1.3, publicados em 19/10/2026, abrem dentro do app; o servidor registra a versão e o horário de aceite. O aceite legal não substitui o consentimento de treinamento.
+- O e-mail de privacidade é `igorsantunes@outlook.com`. Os Termos e a Política v1.4, publicados em 11/11/2026, abrem dentro do app; o servidor registra a versão e o horário de aceite.
 - URLs de confirmação e recuperação devem retornar ao app pelos deep links `leafcare://auth/confirm-email` e `leafcare://auth/reset-password`; não há site do produto.
 
 ## Arquitetura e dados

@@ -54,27 +54,33 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
     fun error(message: String) { _ui.update { it.copy(error = message) } }
     fun clearError() { _ui.update { it.copy(error = null) } }
 
-    fun setTrainingConsent(granted: Boolean) {
-        if (granted && !TRAINING_UPLOADS_ENABLED) return
+    /**
+     * Withdraws the training consent. The app then requires accepting the
+     * documents again; [onSaved] runs once the local revocation is stored.
+     */
+    fun revokeTrainingConsent(onSaved: () -> Unit) {
         val userId = consentUserId ?: return
         localConsentDecision = true
-        val decision = TrainingConsentEntity(userId = userId, termsVersion = TRAINING_TERMS_VERSION, granted = granted, decidedAt = System.currentTimeMillis())
+        val decision = TrainingConsentEntity(userId = userId, termsVersion = TRAINING_TERMS_VERSION, granted = false, decidedAt = System.currentTimeMillis())
         _trainingConsent.value = decision
         viewModelScope.launch {
             consentDao.save(decision)
             localConsentDecision = false
-            if (!granted) consentDao.revokeAllPhotos(userId)
+            consentDao.revokeAllPhotos(userId)
             app.scheduleSync()
+            onSaved()
         }
     }
 
-    fun analyze(uri: Uri, temporary: File? = null, authorizeTraining: Boolean = false) {
+    /** Accepting the current documents is the training consent: every analysis of a consenting account is authorized. */
+    fun analyze(uri: Uri, temporary: File? = null) {
         if (_ui.value.busy) { temporary?.delete(); return }
         _ui.value = UiState(busy = true)
         viewModelScope.launch {
             try {
                 val id = repository.analyze(uri)
-                if (TRAINING_UPLOADS_ENABLED && authorizeTraining && trainingConsent.value?.userId == consentUserId && trainingConsent.value?.granted == true) {
+                val consent = trainingConsent.value
+                if (TRAINING_UPLOADS_ENABLED && consent?.userId == consentUserId && consent?.granted == true && consent.termsVersion == TRAINING_TERMS_VERSION) {
                     val userId = requireNotNull(consentUserId)
                     consentDao.savePhoto(TrainingPhotoAuthorizationEntity(userId, id, TRAINING_TERMS_VERSION, true, System.currentTimeMillis()))
                 }

@@ -208,6 +208,43 @@ class AuthViewModelTest {
         assertEquals(LegalAcceptanceState.CURRENT, vm.legalAcceptance.value)
     }
 
+    private fun gatedVm(online: () -> Boolean, current: () -> Boolean, local: () -> Boolean): AuthViewModel {
+        val legalApi = object : LegalAcceptanceApi {
+            override suspend fun hasCurrentAcceptance(): Boolean { if (!online()) throw java.io.IOException("offline"); return current() }
+            override suspend fun acceptCurrentDocuments() = Unit
+            override suspend fun hasLocalConsent(): Boolean = local()
+        }
+        return AuthViewModel(Application(), AuthRepository(backend), recoveryStore, legalApi)
+    }
+
+    private suspend fun kotlinx.coroutines.test.TestScope.signInWith(vm: AuthViewModel) {
+        backend.session = testSession()
+        vm.setEmail("a@b.com"); vm.setPassword("senha123"); vm.signIn(); advanceUntilIdle()
+    }
+
+    @Test fun offlineWithoutLocalConsentCannotUseApp() = runTest(dispatcher) {
+        val vm = gatedVm(online = { false }, current = { true }, local = { false })
+        advanceUntilIdle(); signInWith(vm)
+        assertEquals(LegalAcceptanceState.REQUIRED, vm.legalAcceptance.value)
+    }
+
+    @Test fun offlineWithLocalConsentKeepsAppUsable() = runTest(dispatcher) {
+        val vm = gatedVm(online = { false }, current = { true }, local = { true })
+        advanceUntilIdle(); signInWith(vm)
+        assertEquals(LegalAcceptanceState.UNAVAILABLE, vm.legalAcceptance.value)
+    }
+
+    @Test fun revokingReturnsToTheAcceptanceScreen() = runTest(dispatcher) {
+        var accepted = true
+        val vm = gatedVm(online = { true }, current = { accepted }, local = { accepted })
+        advanceUntilIdle(); signInWith(vm)
+        assertEquals(LegalAcceptanceState.CURRENT, vm.legalAcceptance.value)
+        accepted = false
+        vm.refreshLegalAcceptance(force = true)
+        advanceUntilIdle()
+        assertEquals(LegalAcceptanceState.REQUIRED, vm.legalAcceptance.value)
+    }
+
     @Test fun recoveryAfterProcessDeathReopensNewPassword() = runTest(dispatcher) {
         val restored = FakeBackend(testSession(), io.github.jan.supabase.gotrue.SessionStatus.LoadingFromStorage)
         val repository = AuthRepository(restored)

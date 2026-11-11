@@ -59,7 +59,7 @@ class SyncAnalysesWorker(
         var hasCurrentLegalAcceptance = true
         if (userId != null) {
             hasCurrentLegalAcceptance = try {
-                LegalAcceptanceRepository(app.supabaseClientHolder).hasCurrentAcceptance()
+                LegalAcceptanceRepository(app.supabaseClientHolder, app.database.trainingConsentDao()).hasCurrentAcceptance()
             } catch (_: Exception) {
                 return if (runAttemptCount >= MAX_ATTEMPTS) Result.success() else Result.retry()
             }

@@ -124,7 +124,8 @@ interface TrainingConsentDao {
     @Query("SELECT EXISTS(SELECT 1 FROM training_consent)") suspend fun hasConsentRows(): Boolean
 }
 
-const val TRAINING_TERMS_VERSION = "1.1"
+/** Training consent given by accepting the legal documents v1.4. */
+const val TRAINING_TERMS_VERSION = "1.2"
 /** Disabled until a monitored privacy channel and automated retention cleanup are configured. */
 const val TRAINING_UPLOADS_ENABLED = true
 

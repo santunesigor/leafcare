@@ -36,7 +36,9 @@ class AuthViewModel internal constructor(
     constructor(application: Application) : this(
         application,
         AuthRepository(application),
-        legalAcceptanceApi = LegalAcceptanceRepository((application as LeafCareApplication).supabaseClientHolder)
+        legalAcceptanceApi = (application as LeafCareApplication).let {
+            LegalAcceptanceRepository(it.supabaseClientHolder, it.database.trainingConsentDao())
+        }
     )
 
     private val recoveryStore: RecoveryPendingStore =
@@ -138,13 +140,13 @@ class AuthViewModel internal constructor(
      * this account is rechecked silently: showing Loading would tear down the
      * open screen (navigation, a picked photo) on every resume.
      */
-    fun refreshLegalAcceptance() {
+    fun refreshLegalAcceptance(force: Boolean = false) {
         val api = legalAcceptanceApi ?: return
         // The session is published before `user`, so read the id from the session
         // itself; otherwise a fresh login could skip this check and stay on Loading.
         val userId = currentUserId() ?: return
         val state = _legalAcceptance.value
-        val silent = legalCheckedUserId == userId &&
+        val silent = !force && legalCheckedUserId == userId &&
             (state == LegalAcceptanceState.CURRENT || state == LegalAcceptanceState.UNAVAILABLE)
         if (silent && legalCheck?.isActive == true) return
         legalCheck?.cancel()
@@ -155,9 +157,11 @@ class AuthViewModel internal constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                // A cached, authenticated app must remain usable offline. No receipt is fabricated.
                 if (silent) return@launch
-                LegalAcceptanceState.UNAVAILABLE
+                // Offline: an account that accepted on this device keeps working
+                // locally; without that, the app cannot be used until accepting.
+                if (runCatching { api.hasLocalConsent() }.getOrDefault(false)) LegalAcceptanceState.UNAVAILABLE
+                else LegalAcceptanceState.REQUIRED
             }
             // Another account signed in meanwhile: its own check decides.
             if (currentUserId() != userId) return@launch
@@ -183,11 +187,6 @@ class AuthViewModel internal constructor(
         }
     }
 
-    fun continueOfflineWithoutAccepting() {
-        if (_legalAcceptance.value == LegalAcceptanceState.REQUIRED ||
-            _legalAcceptance.value == LegalAcceptanceState.UNAVAILABLE
-        ) _legalAcceptance.value = LegalAcceptanceState.UNAVAILABLE
-    }
 
     /**
      * Authenticated user's display name from user metadata, or null when

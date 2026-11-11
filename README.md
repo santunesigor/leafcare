@@ -9,7 +9,7 @@ O resultado apresenta até três hipóteses e pode ser marcado como inconclusivo
 - Captura uma foto ou importa uma imagem da galeria e classifica a folha localmente.
 - Mantém análises e histórico no aparelho; após o primeiro acesso autenticado, essas funções ficam disponíveis offline.
 - Sincroniza com a conta as análises e as fotos elegíveis quando há conexão. Fotos de previsões inconclusivas permanecem no aparelho.
-- Oferece contribuição de fotos para treinamento como opção separada: é necessário ativar o consentimento geral e autorizar cada foto. Recusar ou revogar mantém a classificação e o histórico disponíveis.
+- Usa as fotos analisadas para treinar o modelo, como condição de uso aceita junto com os Termos e a Política (v1.4). A revogação fica em Perfil → Privacidade e fotos; depois dela, o app pede um novo aceite.
 - Abre os Termos de Uso e a Política de Privacidade dentro do app. O LeafCare não tem site; confirmações e recuperações de acesso retornam ao aplicativo por deep link.
 
 ## Baixar e instalar
