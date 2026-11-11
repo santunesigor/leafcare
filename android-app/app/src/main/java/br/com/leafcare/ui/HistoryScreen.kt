@@ -268,8 +268,8 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: ()
                         .clickable { onResult(row.id) }, shape = RoundedCornerShape(16.dp), colors = CardDefaults.outlinedCardColors(containerColor = Color.White)) {
                         Row(Modifier.padding(10.dp).heightIn(min = 66.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            // Stable model across recompositions (same cache key); Pale shows while loading.
-                            val imageModel = remember(row.photoName) { photo(row.photoName) }
+                            // Stable across recompositions; reloads when the photo state changes. Pale shows while loading.
+                            val imageModel = rememberAnalysisPhoto(row, remember(row.photoName) { photo(row.photoName) })
                             AsyncImage(model = imageModel, contentDescription = stringResource(R.string.cd_photo_history),
                                 modifier = Modifier.size(72.dp, 66.dp).clip(RoundedCornerShape(11.dp)).background(LeafColors.Pale), contentScale = ContentScale.Crop)
                             Column(Modifier.weight(1f)) {
