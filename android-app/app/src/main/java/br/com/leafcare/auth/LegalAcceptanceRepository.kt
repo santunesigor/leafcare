@@ -20,6 +20,9 @@ internal interface LegalAcceptanceApi {
     suspend fun hasLocalConsent(): Boolean = true
 }
 
+/** The server rejected the app's document version (it was not updated yet). */
+internal class LegalVersionUnsupportedException : IllegalStateException("unsupported legal document version")
+
 /** Server-confirmed, append-only legal acceptance for accounts predating the current documents. */
 internal class LegalAcceptanceRepository(
     private val holder: SupabaseClientHolder,
@@ -87,7 +90,12 @@ internal class LegalAcceptanceRepository(
                 connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             }
             val status = connection.responseCode
-            if (status !in 200..299) error("Não foi possível confirmar o aceite (${status})")
+            if (status !in 200..299) {
+                val detail = runCatching { connection.errorStream?.use { String(it.readBytes(), Charsets.UTF_8) } }.getOrNull().orEmpty()
+                // The server still runs an older document version: the 1.4 migration is missing.
+                if ("unsupported legal document version" in detail) throw LegalVersionUnsupportedException()
+                error("Não foi possível confirmar o aceite (${status})")
+            }
             connection.inputStream.use { it.readBytes() }
         } finally {
             connection.disconnect()

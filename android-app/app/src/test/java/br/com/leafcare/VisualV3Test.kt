@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import br.com.leafcare.ui.*
@@ -133,6 +134,14 @@ class VisualV3Test {
         val file = File("build/reports/screenshots/$name.png"); file.parentFile!!.mkdirs()
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         assertTrue(bitmap.width >= 300)
+    }
+    @Test fun trainingConditionCardIsReadable() {
+        compose.setContent {
+            LeafCareTheme { Surface { Box(Modifier.fillMaxSize().padding(24.dp)) { br.com.leafcare.ui.auth.TrainingConditionCard() } } }
+        }
+        compose.onNodeWithText("Suas fotos ajudam a treinar o modelo").assertIsDisplayed()
+        compose.onNodeWithText("Ao aceitar, você autoriza esse uso. Ele é condição para usar o LeafCare.").assertIsDisplayed()
+        capture("legal-training-card")
     }
     @Test fun helpExamplesAndDismiss() {
         var dismissed = false

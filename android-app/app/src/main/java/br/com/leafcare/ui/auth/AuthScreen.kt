@@ -6,7 +6,11 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -112,17 +116,8 @@ private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(12.dp))
-        // LGPD art. 9º, §3º: the condition of use is shown prominently, not only inside the documents.
-        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = LeafColors.Pale, border = BorderStroke(1.dp, LeafColors.Border)) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Uso das fotos no treinamento", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = LeafColors.Text)
-                Text(
-                    "Para usar o app, você autoriza o uso das fotos que analisar para treinar o modelo de IA. As cópias ficam em área privada, passam por revisão humana e são apagadas em até 90 dias. Você pode revogar em Perfil → Privacidade e fotos; depois disso, o app só volta a funcionar com um novo aceite.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = LeafColors.Muted
-                )
-            }
-        }
+        // LGPD art. 8º §1º and 9º §3º: a condition of use must be highlighted, not only written inside the documents.
+        TrainingConditionCard()
         Spacer(Modifier.height(4.dp))
         AuthLinkButton("Ler Termos de Uso") { viewModel.setScreen(AuthScreen.TermsOfUse) }
         AuthLinkButton("Ler Política de Privacidade") { viewModel.setScreen(AuthScreen.PrivacyPolicy) }
@@ -138,11 +133,46 @@ private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
             Text("Sair da conta", color = LeafColors.Muted)
         }
         Text(
-            "Sem o aceite, o LeafCare não pode ser usado. O aceite precisa de conexão.",
+            "O aceite precisa de conexão.",
             style = MaterialTheme.typography.bodySmall,
             color = LeafColors.Muted,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+@Composable
+internal fun TrainingConditionCard() {
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = LeafColors.Tint,
+        border = BorderStroke(1.dp, LeafColors.Green.copy(alpha = 0.3f))
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                Box(Modifier.size(36.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.PhotoLibrary, null, tint = LeafColors.Green, modifier = Modifier.size(20.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Suas fotos ajudam a treinar o modelo", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = LeafColors.Text)
+                    Text("Ao aceitar, você autoriza esse uso. Ele é condição para usar o LeafCare.", style = MaterialTheme.typography.bodySmall, color = LeafColors.Text)
+                }
+            }
+            Column(Modifier.padding(start = 48.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                TrainingPoint("Ficam em área privada e passam por revisão humana")
+                TrainingPoint("São apagadas em até 90 dias")
+                TrainingPoint("Revogue quando quiser em Perfil → Privacidade e fotos")
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrainingPoint(text: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+        Icon(Icons.Outlined.Check, null, tint = LeafColors.Green, modifier = Modifier.padding(top = 1.dp).size(16.dp))
+        Text(text, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
     }
 }
 

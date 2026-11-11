@@ -222,6 +222,22 @@ class AuthViewModelTest {
         vm.setEmail("a@b.com"); vm.setPassword("senha123"); vm.signIn(); advanceUntilIdle()
     }
 
+    @Test fun outdatedServerExplainsWhyAcceptanceFails() = runTest(dispatcher) {
+        val legalApi = object : LegalAcceptanceApi {
+            override suspend fun hasCurrentAcceptance(): Boolean = false
+            override suspend fun acceptCurrentDocuments() { throw LegalVersionUnsupportedException() }
+        }
+        val vm = AuthViewModel(Application(), AuthRepository(backend), recoveryStore, legalApi)
+        advanceUntilIdle(); signInWith(vm)
+        assertEquals(LegalAcceptanceState.REQUIRED, vm.legalAcceptance.value)
+
+        vm.acceptCurrentLegalDocuments()
+        advanceUntilIdle()
+
+        assertEquals(LegalAcceptanceState.REQUIRED, vm.legalAcceptance.value)
+        assertEquals(true, vm.error.value?.contains("servidor ainda não foi atualizado"))
+    }
+
     @Test fun offlineWithoutLocalConsentCannotUseApp() = runTest(dispatcher) {
         val vm = gatedVm(online = { false }, current = { true }, local = { false })
         advanceUntilIdle(); signInWith(vm)

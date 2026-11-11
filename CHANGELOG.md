@@ -1,5 +1,10 @@
 # Changelog — LeafCare
 
+## [1.8.1] - 2026-11-11
+
+- APK 1.8.1 (versionCode 19): a tela de aceite explica quando o servidor ainda não foi atualizado para os documentos v1.4, em vez de pedir para conferir a conexão.
+- Card do uso das fotos no treinamento mais curto e legível: ícone, frase principal e três pontos.
+
 ## [1.8.0] - 2026-11-11
 
 - APK 1.8.0 (versionCode 18): Termos de Uso e Política de Privacidade v1.4. O uso das fotos analisadas para treinamento passa a ser condição de uso, registrada no servidor junto com o aceite; sem aceite, o app não pode ser usado (offline, só para quem já aceitou no aparelho).

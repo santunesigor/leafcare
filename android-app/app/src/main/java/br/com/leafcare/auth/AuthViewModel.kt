@@ -183,9 +183,12 @@ class AuthViewModel internal constructor(
             _legalAcceptance.value = LegalAcceptanceState.SUBMITTING
             try {
                 api.acceptCurrentDocuments()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 _legalAcceptance.value = LegalAcceptanceState.REQUIRED
-                authRepository.setError("Não foi possível registrar seu aceite. Confira a conexão e tente novamente.")
+                authRepository.setError(
+                    if (e is LegalVersionUnsupportedException) "O servidor ainda não foi atualizado para esta versão dos termos. Tente novamente mais tarde."
+                    else "Não foi possível registrar seu aceite. Confira a conexão e tente novamente."
+                )
                 return@launch
             }
             _legalAcceptance.value = LegalAcceptanceState.CURRENT
