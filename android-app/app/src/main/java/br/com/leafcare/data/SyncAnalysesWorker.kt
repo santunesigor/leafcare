@@ -37,7 +37,7 @@ fun requestAnalysisSync(context: Context) {
         .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
         .build()
     WorkManager.getInstance(context)
-        .enqueueUniqueWork(SYNC_WORK_NAME, ExistingWorkPolicy.APPEND, request)
+        .enqueueUniqueWork(SYNC_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
 }
 
 /**
@@ -53,17 +53,17 @@ class SyncAnalysesWorker(
     override suspend fun doWork(): Result {
         val app = applicationContext as LeafCareApplication
         val auth = app.supabaseClientHolder.auth
+        // In a fresh worker process GoTrue restores the session asynchronously.
+        auth.awaitInitialization()
         val userId = auth.currentUserOrNull()?.id
+        var hasCurrentLegalAcceptance = true
         if (userId != null) {
-            val hasCurrentLegalAcceptance = try {
+            hasCurrentLegalAcceptance = try {
                 LegalAcceptanceRepository(app.supabaseClientHolder).hasCurrentAcceptance()
             } catch (_: Exception) {
                 return if (runAttemptCount >= MAX_ATTEMPTS) Result.success() else Result.retry()
             }
-            if (auth.currentUserOrNull()?.id != userId || !hasCurrentLegalAcceptance) {
-                // Leave local history queued until a current receipt is confirmed.
-                return Result.success()
-            }
+            if (auth.currentUserOrNull()?.id != userId) return Result.success()
         }
         val dao = app.database.analysisDao()
         val client = app.supabaseClientHolder.client
@@ -95,6 +95,13 @@ class SyncAnalysesWorker(
             consentDao = app.database.trainingConsentDao(),
             trainingApi = PostgrestTrainingConsentSyncApi(client.postgrest, client.storage[TRAINING_PHOTOS_BUCKET]),
         )
+        if (!hasCurrentLegalAcceptance) {
+            // Leave local history queued until a current receipt is confirmed,
+            // but a training withdrawal must still reach the server.
+            val revocation = runner.syncTrainingRevocationOnly(userId) as? SyncRunResult.Completed
+            val failed = (revocation?.failures ?: 0) > 0
+            return if (!failed || runAttemptCount >= MAX_ATTEMPTS) Result.success() else Result.retry()
+        }
         val pushFailures = when (val push = runner.syncOnce(userId)) {
             is SyncRunResult.SkippedNoAuth -> return Result.success()
             is SyncRunResult.Completed -> push.failures

@@ -221,6 +221,22 @@ class AnalysisSyncDaoTest {
         }
     }
 
+    @Test fun deleteDuringUploadKeepsTombstone() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries().build()
+        try {
+            val dao = db.analysisDao()
+            dao.insert(entity())
+            dao.markDeleted("a-1", deletedAt = 99)
+            dao.markSynced("a-1") // upsert started before the delete returns now
+            val row = dao.get("a-1")
+            assertEquals(SyncState.PENDING_DELETE, row?.syncStatus)
+            assertEquals("a-1", dao.getPendingDeletes().single().id)
+        } finally {
+            db.close()
+        }
+    }
+
     @Test fun trainingConsentAndRevocationAreIsolatedPerAccount() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries().build()

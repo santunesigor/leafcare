@@ -57,7 +57,7 @@ internal class FakeAnalysisDao(initial: List<AnalysisEntity> = emptyList()) : An
         }
 
     override suspend fun markSynced(id: String) {
-        update(id) { it.copy(syncStatus = SyncState.SYNCED) }
+        update(id) { if (it.deletedAt != null) it else it.copy(syncStatus = SyncState.SYNCED) }
     }
 
     override suspend fun markError(id: String) {

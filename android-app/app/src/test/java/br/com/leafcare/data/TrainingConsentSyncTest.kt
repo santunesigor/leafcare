@@ -25,11 +25,18 @@ private class ConsentDaoFake(var consent: TrainingConsentEntity?, rows: List<Tra
     override suspend fun hasConsentRows() = consent != null
 }
 
-private class ConsentApiFake(private val events: MutableList<String>, private val failConsent: Boolean = false) : TrainingConsentSyncApi {
+private class ConsentApiFake(
+    private val events: MutableList<String>,
+    private val failConsent: Boolean = false,
+    private val failAuthorizationFor: String? = null,
+) : TrainingConsentSyncApi {
     override suspend fun saveConsent(userId: String, consent: TrainingConsentEntity) { events += "consent:${consent.granted}"; if (failConsent) throw IOException("offline") }
-    override suspend fun saveAuthorization(userId: String, authorization: TrainingPhotoAuthorizationEntity) { events += "photo-auth:${authorization.authorized}" }
+    override suspend fun saveAuthorization(userId: String, authorization: TrainingPhotoAuthorizationEntity) {
+        events += "photo-auth:${authorization.authorized}"
+        if (authorization.analysisId == failAuthorizationFor) throw IOException("rls")
+    }
     override suspend fun upload(path: String, bytes: ByteArray) { events += "upload" }
-    override suspend fun delete(paths: List<String>) { events += "delete" }
+    override suspend fun delete(paths: List<String>) { events += "delete:${paths.joinToString()}" }
 }
 
 class TrainingConsentSyncTest {
@@ -45,7 +52,7 @@ class TrainingConsentSyncTest {
             trainingApi = ConsentApiFake(events),
         )
         runner.syncOnce("user-1")
-        assertEquals(listOf("consent:false", "photo-auth:false", "delete"), events)
+        assertEquals(listOf("consent:false", "photo-auth:false", "delete:${trainingPhotoPath("user-1", "a-1")}"), events)
         assertFalse(consent.getAllPhotos("user-1").single().authorized)
     }
 
@@ -103,6 +110,78 @@ class TrainingConsentSyncTest {
             assertEquals(SyncRunResult.Completed(1), result)
             assertEquals(listOf("consent:true"), events)
             assertEquals("PENDING", localConsent.getPendingPhotos("user-1").single().syncState)
+        } finally { image.delete() }
+    }
+
+    @Test fun oneFailedRevocationDoesNotKeepOtherTrainingCopies() = runTest {
+        val events = mutableListOf<String>()
+        val consent = ConsentDaoFake(
+            TrainingConsentEntity("user-1", granted = false, decidedAt = 10),
+            listOf(
+                TrainingPhotoAuthorizationEntity("user-1", "gone", TRAINING_TERMS_VERSION, true, 5),
+                TrainingPhotoAuthorizationEntity("user-1", "kept", TRAINING_TERMS_VERSION, true, 6),
+            ),
+        )
+        val result = AnalysisSyncRunner(
+            FakeAnalysisDao(), FakeAnalysisSyncApi(), "test", consentDao = consent,
+            trainingApi = ConsentApiFake(events, failAuthorizationFor = "gone"),
+        ).syncOnce("user-1")
+        assertEquals(SyncRunResult.Completed(1), result)
+        assertTrue(events.contains("delete:${trainingPhotoPath("user-1", "gone")}"))
+        assertTrue(events.contains("delete:${trainingPhotoPath("user-1", "kept")}"))
+        assertEquals(listOf("gone"), consent.getPendingPhotos("user-1").map { it.analysisId })
+    }
+
+    @Test fun syncedGrantIsNotResentOverRemoteRevocation() = runTest {
+        val events = mutableListOf<String>()
+        val runner = AnalysisSyncRunner(
+            FakeAnalysisDao(), FakeAnalysisSyncApi(), "test",
+            consentDao = ConsentDaoFake(TrainingConsentEntity("user-1", granted = true, decidedAt = 10, syncState = "SYNCED"), emptyList()),
+            trainingApi = ConsentApiFake(events),
+        )
+        runner.syncOnce("user-1")
+        assertFalse(events.any { it.startsWith("consent:") })
+    }
+
+    @Test fun revocationOnlySyncsWithdrawalWithoutHistory() = runTest {
+        val events = mutableListOf<String>()
+        val row = AnalysisEntity("history-1", "history-1.img", 10, "x", "x", "x", .9f, "[]", false, .5f, 1.0, "hash")
+        val dao = FakeAnalysisDao(listOf(row))
+        val historyApi = FakeAnalysisSyncApi()
+        val runner = AnalysisSyncRunner(
+            dao, historyApi, "test",
+            consentDao = ConsentDaoFake(
+                TrainingConsentEntity("user-1", granted = false, decidedAt = 10),
+                listOf(TrainingPhotoAuthorizationEntity("user-1", "a-1", TRAINING_TERMS_VERSION, true, 5)),
+            ),
+            trainingApi = ConsentApiFake(events),
+        )
+        assertEquals(SyncRunResult.Completed(0), runner.syncTrainingRevocationOnly("user-1"))
+        assertEquals("consent:false", events.first())
+        assertTrue(events.any { it.startsWith("delete:") })
+        assertFalse(historyApi.remote.containsKey("history-1"))
+    }
+
+    @Test fun authorizedPhotoUploadsAfterItsAnalysisInTheSamePass() = runTest {
+        val events = mutableListOf<String>()
+        val image = Files.createTempFile("training-order", ".jpg").toFile().apply { writeBytes(byteArrayOf(1)) }
+        try {
+            val row = AnalysisEntity("a-1", "a-1.img", 10, "x", "x", "x", .9f, "[]", false, .5f, 1.0, "hash")
+            val historyApi = FakeAnalysisSyncApi()
+            val api = object : AnalysisSyncApi by historyApi {
+                override suspend fun upsertAnalysis(row: kotlinx.serialization.json.JsonObject) {
+                    events += "history"; historyApi.upsertAnalysis(row)
+                }
+            }
+            AnalysisSyncRunner(
+                FakeAnalysisDao(listOf(row)), api, "test", photoFile = { image },
+                consentDao = ConsentDaoFake(
+                    TrainingConsentEntity("user-1", granted = true, decidedAt = 10),
+                    listOf(TrainingPhotoAuthorizationEntity("user-1", "a-1", TRAINING_TERMS_VERSION, true, 11)),
+                ),
+                trainingApi = ConsentApiFake(events),
+            ).syncOnce("user-1")
+            assertTrue(events.indexOf("history") < events.indexOf("upload"))
         } finally { image.delete() }
     }
 }

@@ -49,7 +49,8 @@ interface AnalysisDao {
     @Query("SELECT * FROM analyses WHERE syncStatus = 'PENDING_DELETE' OR (syncStatus = 'ERROR' AND deletedAt IS NOT NULL)")
     suspend fun getPendingDeletes(): List<AnalysisEntity>
 
-    @Query("UPDATE analyses SET syncStatus = 'SYNCED' WHERE id = :id")
+    // A delete during the upload keeps its tombstone (PENDING_DELETE).
+    @Query("UPDATE analyses SET syncStatus = 'SYNCED' WHERE id = :id AND deletedAt IS NULL")
     suspend fun markSynced(id: String)
 
     @Query("UPDATE analyses SET syncStatus = 'ERROR' WHERE id = :id")

@@ -49,40 +49,8 @@ internal class AnalysisSyncRunner(
         var failures = 0
 
         // Consent/revocation is a hard gate, processed before history and all photo queues.
-        val localConsent = consentDao?.get(userId)
-        val photoAuthorizations = consentDao?.getAllPhotos(userId).orEmpty()
-        val consentApi = trainingApi
-        var trainingAllowed = false
-        val consentActive = TRAINING_UPLOADS_ENABLED && localConsent?.granted == true && localConsent.termsVersion == TRAINING_TERMS_VERSION
-        if (localConsent != null && consentApi != null) {
-            try {
-                consentApi.saveConsent(userId, localConsent.copy(granted = consentActive))
-                    consentDao.markConsentSynced(userId)
-                trainingAllowed = policy.enabled && consentActive
-                if (!consentActive) {
-                    consentDao.revokeAllPhotos(userId)
-                    photoAuthorizations.forEach { authorization ->
-                        consentApi.saveAuthorization(userId, authorization.copy(authorized = false))
-                        consentApi.delete(listOf(trainingPhotoPath(userId, authorization.analysisId)))
-                        consentDao.markPhotoSynced(userId, authorization.analysisId)
-                    }
-                }
-            } catch (e: CancellationException) { throw e }
-            catch (_: Exception) { failures++ }
-        }
-
-        if (trainingAllowed && consentApi != null && consentDao != null) {
-            consentDao.getPendingPhotos(userId).filter { it.authorized && it.userId == userId && it.termsVersion == localConsent?.termsVersion }.forEach { authorization ->
-                try {
-                    consentApi.saveAuthorization(userId, authorization)
-                    val analysis = dao.get(authorization.analysisId)
-                    requireNotNull(analysis) { "analysis missing" }
-                    consentApi.upload(trainingPhotoPath(userId, authorization.analysisId), photoFile(analysis.photoName).readBytes())
-                    consentDao.markPhotoSynced(userId, authorization.analysisId)
-                } catch (e: CancellationException) { throw e }
-                catch (_: Exception) { failures++ }
-            }
-        }
+        val consent = syncConsent(userId, policy.enabled)
+        failures += consent.failures
 
         if (!policy.enabled) return SyncRunResult.Completed(failures)
 
@@ -101,6 +69,10 @@ internal class AnalysisSyncRunner(
                 failures++
             }
         }
+
+        // After the history upserts: the server only accepts training copies
+        // of analyses that already exist remotely.
+        if (consent.trainingAllowed) failures += uploadTrainingPhotos(userId, consent.termsVersion)
 
         dao.getPendingPhotoUploads().forEach { entity ->
             if (!policy.includes(entity.createdAt)) {
@@ -163,6 +135,75 @@ internal class AnalysisSyncRunner(
      * - remote tombstone + local pending/tombstone -> kept as is.
      * Malformed remote rows are skipped without failing the restore.
      */
+    private data class ConsentPass(val failures: Int, val trainingAllowed: Boolean, val termsVersion: String?)
+
+    /**
+     * Revocation only: used while the legal documents await re-acceptance, so
+     * a withdrawal still reaches the server and training copies are deleted.
+     */
+    suspend fun syncTrainingRevocationOnly(userId: String?): SyncRunResult {
+        if (userId == null) return SyncRunResult.SkippedNoAuth
+        val local = consentDao?.get(userId) ?: return SyncRunResult.Completed(0)
+        if (isConsentActive(local)) return SyncRunResult.Completed(0)
+        return SyncRunResult.Completed(syncConsent(userId, policyEnabled = false).failures)
+    }
+
+    private fun isConsentActive(consent: TrainingConsentEntity?): Boolean =
+        TRAINING_UPLOADS_ENABLED && consent?.granted == true && consent.termsVersion == TRAINING_TERMS_VERSION
+
+    private suspend fun syncConsent(userId: String, policyEnabled: Boolean): ConsentPass {
+        val consentDao = consentDao ?: return ConsentPass(0, false, null)
+        val consentApi = trainingApi ?: return ConsentPass(0, false, null)
+        val localConsent = consentDao.get(userId) ?: return ConsentPass(0, false, null)
+        val photoAuthorizations = consentDao.getAllPhotos(userId)
+        val consentActive = isConsentActive(localConsent)
+        var failures = 0
+        try {
+            // A granted decision already synced is never re-sent: an old device
+            // must not overwrite a revocation made elsewhere. Revocations always are.
+            if (localConsent.syncState == "PENDING" || !consentActive) {
+                consentApi.saveConsent(userId, localConsent.copy(granted = consentActive))
+                consentDao.markConsentSynced(userId)
+            }
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { return ConsentPass(1, false, null) }
+
+        if (!consentActive) {
+            consentDao.revokeAllPhotos(userId)
+            // Each photo on its own: one failure must not keep other copies on the server.
+            photoAuthorizations.forEach { authorization ->
+                var ok = true
+                try {
+                    consentApi.saveAuthorization(userId, authorization.copy(authorized = false))
+                } catch (e: CancellationException) { throw e }
+                catch (_: Exception) { ok = false }
+                try {
+                    consentApi.delete(listOf(trainingPhotoPath(userId, authorization.analysisId)))
+                } catch (e: CancellationException) { throw e }
+                catch (_: Exception) { ok = false }
+                if (ok) consentDao.markPhotoSynced(userId, authorization.analysisId) else failures++
+            }
+        }
+        return ConsentPass(failures, policyEnabled && consentActive, localConsent.termsVersion)
+    }
+
+    private suspend fun uploadTrainingPhotos(userId: String, termsVersion: String?): Int {
+        val consentDao = consentDao ?: return 0
+        val consentApi = trainingApi ?: return 0
+        var failures = 0
+        consentDao.getPendingPhotos(userId).filter { it.authorized && it.userId == userId && it.termsVersion == termsVersion }.forEach { authorization ->
+            try {
+                consentApi.saveAuthorization(userId, authorization)
+                val analysis = dao.get(authorization.analysisId)
+                requireNotNull(analysis) { "analysis missing" }
+                consentApi.upload(trainingPhotoPath(userId, authorization.analysisId), photoFile(analysis.photoName).readBytes())
+                consentDao.markPhotoSynced(userId, authorization.analysisId)
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { failures++ }
+        }
+        return failures
+    }
+
     suspend fun restoreOnce(userId: String?): SyncRunResult {
         if (userId == null) return SyncRunResult.SkippedNoAuth
 
