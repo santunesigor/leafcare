@@ -2,6 +2,9 @@ package br.com.leafcare.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,27 +45,36 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
             Text("A classe prevista pelo aplicativo não é um diagnóstico validado. Uma foto autorizada só poderá entrar em um conjunto de treinamento após revisão humana e validação de qualidade. Identificadores da conta e metadados EXIF serão removidos na exportação.", color = LeafColors.Text)
             Text("A análise local e o histórico continuam disponíveis offline após autenticação. Futuras cópias de treinamento poderão ser revogadas e excluídas, mas isso não reverte automaticamente pesos de modelos já treinados.", color = LeafColors.Text)
             PrivacyContactCard()
-            Surface(shape = RoundedCornerShape(16.dp), color = LeafColors.Pale, border = BorderStroke(1.dp, LeafColors.Border)) {
-                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = granted,
-                        enabled = TRAINING_UPLOADS_ENABLED,
-                        onCheckedChange = { vm.setTrainingConsent(it) },
-                        modifier = Modifier.semantics {
+            Surface(shape = RoundedCornerShape(16.dp), color = LeafColors.Pale, border = BorderStroke(1.dp, if (granted) LeafColors.Green else LeafColors.Border)) {
+                // The whole block toggles; the label reads as an active choice, not as disabled text.
+                Row(
+                    Modifier.fillMaxWidth()
+                        .toggleable(value = granted, enabled = TRAINING_UPLOADS_ENABLED, role = Role.Checkbox, onValueChange = { vm.setTrainingConsent(it) })
+                        .padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp)
+                        .semantics {
                             contentDescription = "Consentimento global opcional para uso de fotos no treinamento"
                             stateDescription = if (TRAINING_UPLOADS_ENABLED) {
                                 if (granted) "Autorizado" else "Não autorizado"
                             } else "Não autorizado"
                         },
-                        colors = CheckboxDefaults.colors(checkedColor = LeafColors.Green),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = granted,
+                        enabled = TRAINING_UPLOADS_ENABLED,
+                        onCheckedChange = null,
+                        modifier = Modifier.padding(10.dp),
+                        colors = CheckboxDefaults.colors(checkedColor = LeafColors.Green, uncheckedColor = LeafColors.Muted, checkmarkColor = Color.White),
                     )
-                    Text("Autorizo o uso opcional das fotos", modifier = Modifier.weight(1f), color = LeafColors.Muted)
-                    Text(if (consent?.syncState == "SYNCED") "Sincronizado" else "Pendente", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
+                    Text("Autorizo o uso opcional das fotos", modifier = Modifier.weight(1f), color = LeafColors.Text, style = MaterialTheme.typography.bodyMedium)
+                    Text(if (consent?.syncState == "SYNCED") "Sincronizado" else "Pendente", color = if (consent?.syncState == "SYNCED") LeafColors.Green else LeafColors.Muted,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.background(Color.White, RoundedCornerShape(8.dp)).border(1.dp, LeafColors.Border, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 3.dp))
                 }
             }
         }
-        TextButton(onClick = { vm.setTrainingConsent(false) }, enabled = consentRecorded, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
-            Text("Revogar consentimento", color = MaterialTheme.colorScheme.error)
+        Box(Modifier.navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp)) {
+            LeafButton("Revogar consentimento", { vm.setTrainingConsent(false) }, secondary = true, danger = true, enabled = consentRecorded)
         }
     }
 }
