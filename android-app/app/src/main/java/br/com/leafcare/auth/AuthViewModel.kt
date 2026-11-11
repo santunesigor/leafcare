@@ -105,6 +105,12 @@ class AuthViewModel internal constructor(
                 if (session == null) {
                     legalCheck?.cancel()
                     legalCheckedUserId = null
+                    // Session ended under the acceptance screen (e.g. refresh token
+                    // revoked): accepting needs a session, so go back to Login.
+                    if (_uiState.value.currentScreen == AuthScreen.LegalAcceptance) {
+                        setScreen(AuthScreen.Login)
+                        authRepository.setInfo("Sua sessão expirou. Entre novamente para continuar.")
+                    }
                     _legalAcceptance.value = if (legalAcceptanceApi == null) LegalAcceptanceState.CURRENT else LegalAcceptanceState.NOT_REQUIRED
                 } else if (legalAcceptanceApi != null) {
                     refreshLegalAcceptance()

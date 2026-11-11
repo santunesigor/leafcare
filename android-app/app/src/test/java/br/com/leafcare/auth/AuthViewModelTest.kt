@@ -245,6 +245,18 @@ class AuthViewModelTest {
         assertEquals(LegalAcceptanceState.REQUIRED, vm.legalAcceptance.value)
     }
 
+    @Test fun sessionEndingOnAcceptanceScreenReturnsToLogin() = runTest(dispatcher) {
+        backend = FakeBackend(initialStatus = io.github.jan.supabase.gotrue.SessionStatus.LoadingFromStorage)
+        val vm = gatedVm(online = { true }, current = { false }, local = { false })
+        advanceUntilIdle(); signInWith(vm)
+        vm.setScreen(AuthScreen.LegalAcceptance)
+        // GoTrue clears the session when the refresh token is revoked.
+        (backend.sessionStatus as kotlinx.coroutines.flow.MutableStateFlow).value = io.github.jan.supabase.gotrue.SessionStatus.NotAuthenticated
+        advanceUntilIdle()
+        assertEquals(AuthScreen.Login, vm.uiState.value.currentScreen)
+        assertNotNull(vm.infoMessage.value)
+    }
+
     @Test fun recoveryAfterProcessDeathReopensNewPassword() = runTest(dispatcher) {
         val restored = FakeBackend(testSession(), io.github.jan.supabase.gotrue.SessionStatus.LoadingFromStorage)
         val repository = AuthRepository(restored)
