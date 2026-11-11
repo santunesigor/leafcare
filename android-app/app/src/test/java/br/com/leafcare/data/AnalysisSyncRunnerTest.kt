@@ -69,6 +69,7 @@ internal class FakeAnalysisDao(initial: List<AnalysisEntity> = emptyList()) : An
     }
 
     override suspend fun count(): Int = rows.size
+    override suspend fun countUnsynced(): Int = rows.values.count { it.deletedAt == null && it.syncStatus != SyncState.SYNCED }
 
     override suspend fun deleteAll() {
         rows.clear()

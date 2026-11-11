@@ -87,6 +87,9 @@ interface AnalysisDao {
     @Query("SELECT COUNT(*) FROM analyses")
     suspend fun count(): Int
 
+    @Query("SELECT COUNT(*) FROM analyses WHERE deletedAt IS NULL AND syncStatus <> 'SYNCED'")
+    suspend fun countUnsynced(): Int
+
     @Query("DELETE FROM analyses")
     suspend fun deleteAll()
 }

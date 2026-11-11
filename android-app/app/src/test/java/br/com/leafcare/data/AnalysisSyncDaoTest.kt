@@ -221,6 +221,21 @@ class AnalysisSyncDaoTest {
         }
     }
 
+    @Test fun countUnsyncedOnlyCountsActiveRowsMissingFromTheServer() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
+        try {
+            val dao = db.analysisDao()
+            dao.insert(entity()) // PENDING_UPLOAD
+            dao.insert(entity().copy(id = "a-2", syncStatus = SyncState.LOCAL_ONLY))
+            dao.insert(entity().copy(id = "a-3", syncStatus = SyncState.ERROR))
+            dao.insert(entity().copy(id = "a-4", syncStatus = SyncState.SYNCED))
+            dao.insert(entity().copy(id = "a-5", syncStatus = SyncState.PENDING_DELETE, deletedAt = 1L))
+            assertEquals(3, dao.countUnsynced())
+        } finally {
+            db.close()
+        }
+    }
+
     @Test fun deleteDuringUploadKeepsTombstone() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries().build()

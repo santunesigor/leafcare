@@ -609,6 +609,10 @@ class AuthViewModel internal constructor(
     fun getEmail(): String? {
         return user.value?.email
     }
+
+    /** Analyses that exist only on this device (pending upload, failed or kept local by a pause). */
+    suspend fun unsyncedAnalysesCount(): Int =
+        (getApplication<Application>() as? LeafCareApplication)?.database?.analysisDao()?.countUnsynced() ?: 0
 }
 
 /**

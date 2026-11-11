@@ -7,6 +7,7 @@
 - Sincronização: autorizações que nunca poderiam ser enviadas não travam mais a fila em novas tentativas; revogações e exclusões vão antes da política de envio; atualizações recusadas pelo servidor ficam pendentes em vez de sumirem; a restauração não mistura contas.
 - Conta: link de convite/recuperação não trava mais na tela de aceite; a troca de senha não mostra mensagens antigas; e-mail recusado pelo servidor mostra "E-mail inválido"; o histórico da conta anterior não aparece após trocar de conta.
 - Câmera e resultado: resolução limitada para não estourar o limite de 16 MP; permissão e câmera escolhida sobrevivem à rotação; sem mensagens técnicas em inglês; o resultado volta ao histórico se a análise for apagada; limpeza de arquivos órfãos.
+- Sair da conta avisa quando há análises ainda não enviadas, que seriam apagadas se outra conta entrar no aparelho; o diálogo de exclusão diz que a análise sai também da conta.
 - Visual: cores de situação de revisão consistentes no admin, botões e campos no padrão do app, áreas de toque de 48dp, ícone de perfil, textos corrigidos.
 - Migration `20261111150000_training_photo_rules` e função `leafcare-admin` publicadas em produção.
 

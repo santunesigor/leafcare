@@ -44,7 +44,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -662,6 +667,8 @@ fun ProfileScreen(
     val displayName = viewModel.getDisplayName()
     val email = viewModel.getEmail()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var pendingSignOut by remember { mutableStateOf<Int?>(null) }
 
     AuthScaffold(onBack = onBack) {
         FigmaIcon(R.drawable.v3_logo, "LeafCare", 64)
@@ -695,6 +702,26 @@ fun ProfileScreen(
         Spacer(Modifier.height(12.dp))
         LeafButton("Alterar senha", onChangePassword, secondary = true)
         Spacer(Modifier.height(12.dp))
-        LeafButton(if (isLoading) "Saindo…" else "Sair da conta", { viewModel.signOut() }, secondary = true, danger = true, enabled = !isLoading)
+        LeafButton(if (isLoading) "Saindo…" else "Sair da conta", {
+            scope.launch {
+                val unsynced = viewModel.unsyncedAnalysesCount()
+                if (unsynced > 0) pendingSignOut = unsynced else viewModel.signOut()
+            }
+        }, secondary = true, danger = true, enabled = !isLoading)
+    }
+    pendingSignOut?.let { count ->
+        LeafDialog(
+            title = "Sair com análises não enviadas?",
+            onDismiss = { pendingSignOut = null },
+            message = unsyncedSignOutMessage(count),
+            actions = {
+                LeafButton("Sair mesmo assim", { pendingSignOut = null; viewModel.signOut() }, danger = true)
+                LeafButton("Cancelar", { pendingSignOut = null }, secondary = true)
+            },
+        )
     }
 }
+
+internal fun unsyncedSignOutMessage(count: Int): String =
+    if (count == 1) "1 análise ainda não foi enviada para sua conta. Ela continua neste aparelho, mas será apagada se outra conta entrar aqui."
+    else "$count análises ainda não foram enviadas para sua conta. Elas continuam neste aparelho, mas serão apagadas se outra conta entrar aqui."
