@@ -41,6 +41,19 @@ class AuthErrorSanitizerTest {
         assertFalse(message.contains("http"))
     }
 
+    @Test fun rejectedEmailAddress_mapsToInvalidEmail() {
+        // Real GoTrue 400 for a rejected domain, as logged in production.
+        val raw = Exception(
+            "Email address \"produtor@example.com\" is invalid (email_address_invalid)\n" +
+                "URL: https://nhkqfanjfcivcbndivav.supabase.co/auth/v1/signup"
+        )
+
+        val message = AuthRepository.sanitizeError(AuthOperation.SIGN_UP, raw)
+
+        assertEquals("E-mail inválido. Confira o endereço digitado.", message)
+        assertFalse(message.contains("http"))
+    }
+
     @Test fun signupResendRateLimit_mapsToFriendlyMessageWithoutCountdown() {
         val message = AuthRepository.sanitizeError(
             AuthOperation.SIGNUP_RESEND,
