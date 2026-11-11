@@ -1,5 +1,14 @@
 # Changelog — LeafCare
 
+## [1.7.2] - 2026-11-11
+
+- APK 1.7.2 (versionCode 16): correções de estabilidade sem alteração de modelo, dataset ou schema.
+- Login não fica mais carregando indefinidamente (#18); abertura offline com token expirado não trava (#19); voltar ao app não reinicia a navegação nem perde a foto da galeria (#20).
+- Recuperação de senha resiste a rotação e ao encerramento do processo (#21, #24); sair sem internet desconecta localmente (#22); erro ao aceitar os termos permanece visível (#23).
+- Sincronização: worker aguarda a sessão (#25), exclusões durante upload não se perdem (#26), fila não fica bloqueada (#31) e fotos de treinamento seguem o histórico (#30).
+- Privacidade: revogações apagam todas as cópias possíveis (#27), não são sobrescritas por consentimento antigo (#28) e sincronizam mesmo aguardando novo aceite (#29).
+- Admin: rotação mantém o painel (#32) e datas digitadas no filtro funcionam (#33). Captura sem espaço e falta de memória mostram erro em vez de fechar o app (#34).
+
 ## [1.7.1] - 2026-10-19
 
 - APK 1.7.1 (versionCode 15): contato de privacidade apresentado como texto padronizado no final dos Termos de Uso e da Política de Privacidade. O usuário testou os fluxos no aparelho e confirmou que estão funcionando.
