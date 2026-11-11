@@ -123,6 +123,7 @@ internal class FakeAnalysisSyncApi(
     var failFetch: Boolean = false,
     var fetchRows: List<JsonObject> = emptyList(),
     var failDownload: Boolean = false,
+    var refuseUpdates: Boolean = false,
 ) : AnalysisSyncApi {
 
     val remote = mutableMapOf<String, JsonObject>()
@@ -143,11 +144,15 @@ internal class FakeAnalysisSyncApi(
         remote[id] = row
     }
 
-    override suspend fun markRemoteDeleted(id: String, deletedAtIso: String) {
+    override suspend fun markRemoteDeleted(id: String, deletedAtIso: String): Boolean {
         if (failDelete) throw IOException("offline")
         deleteCalls += id
-        remote.remove(id)
+        // RLS filtering every row: PATCH succeeds with 0 rows.
+        if (refuseUpdates) return false
+        return remote.remove(id) != null
     }
+
+    override suspend fun isRemoteActive(id: String): Boolean = remote.containsKey(id)
 
     override suspend fun uploadPhoto(path: String, bytes: ByteArray) {
         if (failUpload) throw IOException("offline")
@@ -155,8 +160,9 @@ internal class FakeAnalysisSyncApi(
         remotePhotos[path] = bytes
     }
 
-    override suspend fun updatePhotoPath(id: String, photoPath: String) {
+    override suspend fun updatePhotoPath(id: String, photoPath: String): Boolean {
         photoPathUpdates += id to photoPath
+        return !refuseUpdates
     }
 
     override suspend fun deleteRemotePhotos(paths: List<String>) {
@@ -811,6 +817,62 @@ class AnalysisSyncRunnerTest {
         // Path is always derived from the session user id, never stored data.
         assertEquals(listOf("user-9/r-1.jpg"), api.downloadCalls)
         assertTrue(File(photosDir, "r-1.img").exists())
+    }
+
+    @Test fun tombstoneRefusedByServerStaysPending() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(entity(syncStatus = SyncState.PENDING_DELETE, deletedAt = 1_728_000_100_000)))
+        val api = FakeAnalysisSyncApi(refuseUpdates = true).apply { remote["a-1"] = JsonObject(emptyMap()) }
+        val deletedPhotos = mutableListOf<String>()
+
+        assertEquals(SyncRunResult.Completed(1), runner(dao, api, deletedPhotos).syncOnce("user-1"))
+        assertEquals(SyncState.ERROR, dao.get("a-1")?.syncStatus)
+        assertEquals(1_728_000_100_000, dao.get("a-1")?.deletedAt)
+        assertTrue(deletedPhotos.isEmpty())
+    }
+
+    @Test fun photoPathRefusedByServerStaysRetryable() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao(listOf(entity(syncStatus = SyncState.SYNCED)))
+        val api = FakeAnalysisSyncApi(refuseUpdates = true)
+        localPhoto("a-1.img")
+
+        assertEquals(SyncRunResult.Completed(1), runner(dao, api).syncOnce("user-1"))
+        assertEquals(PhotoSyncState.ERROR, dao.get("a-1")?.photoSyncStatus)
+    }
+
+    @Test fun conclusivePhotoIsDeletedRemotelyWhateverItsLocalState() = runTest(dispatcher) {
+        val states = listOf(PhotoSyncState.ERROR, PhotoSyncState.PENDING_UPLOAD, PhotoSyncState.LOCAL_ONLY)
+        val dao = FakeAnalysisDao(states.map {
+            entity(id = it.name, syncStatus = SyncState.PENDING_DELETE, deletedAt = 10, photoSyncStatus = it)
+        })
+        val api = FakeAnalysisSyncApi()
+
+        assertEquals(SyncRunResult.Completed(0), runner(dao, api).syncOnce("user-1"))
+        assertEquals(states.map { "user-1/${it.name}.jpg" }.toSet(), api.photoDeleteCalls.toSet())
+        assertEquals(0, dao.count())
+    }
+
+    @Test fun restoreStopsWhenAccountChangesAfterFetch() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao()
+        val api = FakeAnalysisSyncApi(fetchRows = listOf(remoteRow()))
+        var session: String? = "user-1"
+        val engine = AnalysisSyncRunner(dao, api, "test", sessionUserId = { session })
+        session = "user-2"
+
+        engine.restoreOnce("user-1")
+
+        assertNull(dao.get("r-1"))
+        session = "user-1"
+        engine.restoreOnce("user-1")
+        assertNotNull(dao.get("r-1"))
+    }
+
+    @Test fun restoreSkipsRowsOfAnotherAccount() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao()
+        val api = FakeAnalysisSyncApi(fetchRows = listOf(remoteRow()))
+
+        runner(dao, api).restoreOnce("user-2")
+
+        assertNull(dao.get("r-1"))
     }
 
     @Test fun zeroLengthCacheIsReplacedWithoutPartialRemnants() = runTest(dispatcher) {

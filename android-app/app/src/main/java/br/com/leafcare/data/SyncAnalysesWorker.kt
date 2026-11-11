@@ -16,6 +16,7 @@ import br.com.leafcare.auth.LegalAcceptanceRepository
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.storage
+import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -41,6 +42,60 @@ fun requestAnalysisSync(context: Context) {
 }
 
 /**
+ * Best-effort push of pending training withdrawals (consent, photo
+ * authorizations, training copies) for the signed-in user, e.g. right before
+ * logout. Never uploads. Returns true when nothing is left pending; never throws
+ * for backend failures.
+ */
+suspend fun pushPendingTrainingRevocation(context: Context): Boolean {
+    val app = context.applicationContext as LeafCareApplication
+    val userId = app.supabaseClientHolder.auth.currentUserOrNull()?.id ?: return false
+    return try {
+        val result = syncRunner(app, userId).syncTrainingRevocationOnly(userId)
+        result == SyncRunResult.Completed(0)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        false
+    }
+}
+
+internal fun syncRunner(app: LeafCareApplication, userId: String): AnalysisSyncRunner {
+    val auth = app.supabaseClientHolder.auth
+    val client = app.supabaseClientHolder.client
+    val photosDir = File(app.filesDir, "photos")
+    return AnalysisSyncRunner(
+        dao = app.database.analysisDao(),
+        api = PostgrestAnalysisSyncApi(
+            postgrest = client.postgrest,
+            bucket = client.storage[PHOTOS_BUCKET]
+        ),
+        appVersion = BuildConfig.VERSION_NAME,
+        uploadPolicy = {
+            // my_account_policy is SQL null while the account deletion is pending:
+            // JSONObject("null") throws and the runner fails closed.
+            val policy = AdminRepository(app.supabaseClientHolder).policy()
+            check(auth.currentUserOrNull()?.id == userId) { "Account changed" }
+            UploadPolicy(
+                enabled = policy.getBoolean("uploads_enabled"),
+                cutoffMs = if (policy.isNull("cutoff_ms")) null else policy.getLong("cutoff_ms"),
+            )
+        },
+        photoDeleter = { name ->
+            require(File(name).name == name)
+            File(photosDir, name).delete()
+        },
+        photoFile = { name ->
+            require(File(name).name == name)
+            File(photosDir, name)
+        },
+        consentDao = app.database.trainingConsentDao(),
+        trainingApi = PostgrestTrainingConsentSyncApi(client.postgrest, client.storage[TRAINING_PHOTOS_BUCKET]),
+        sessionUserId = { auth.currentUserOrNull()?.id },
+    )
+}
+
+/**
  * Background sync worker. Survives app close/restart (WorkManager persists the
  * queue); retries with backoff up to [MAX_ATTEMPTS], afterwards rows stay in
  * ERROR state until the next trigger.
@@ -55,46 +110,16 @@ class SyncAnalysesWorker(
         val auth = app.supabaseClientHolder.auth
         // In a fresh worker process GoTrue restores the session asynchronously.
         auth.awaitInitialization()
-        val userId = auth.currentUserOrNull()?.id
-        var hasCurrentLegalAcceptance = true
-        if (userId != null) {
-            hasCurrentLegalAcceptance = try {
-                LegalAcceptanceRepository(app.supabaseClientHolder, app.database.trainingConsentDao()).hasCurrentAcceptance()
-            } catch (_: Exception) {
-                return if (runAttemptCount >= MAX_ATTEMPTS) Result.success() else Result.retry()
-            }
-            if (auth.currentUserOrNull()?.id != userId) return Result.success()
+        val userId = auth.currentUserOrNull()?.id ?: return Result.success()
+        val hasCurrentLegalAcceptance = try {
+            LegalAcceptanceRepository(app.supabaseClientHolder, app.database.trainingConsentDao()).hasCurrentAcceptance()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return if (runAttemptCount >= MAX_ATTEMPTS) Result.success() else Result.retry()
         }
-        val dao = app.database.analysisDao()
-        val client = app.supabaseClientHolder.client
-        val api = PostgrestAnalysisSyncApi(
-            postgrest = client.postgrest,
-            bucket = client.storage[PHOTOS_BUCKET]
-        )
-        val photosDir = File(applicationContext.filesDir, "photos")
-        val runner = AnalysisSyncRunner(
-            dao = dao,
-            api = api,
-            appVersion = BuildConfig.VERSION_NAME,
-            uploadPolicy = {
-                val policy = AdminRepository(app.supabaseClientHolder).policy()
-                check(auth.currentUserOrNull()?.id == userId) { "Account changed" }
-                UploadPolicy(
-                    enabled = policy.getBoolean("uploads_enabled"),
-                    cutoffMs = if (policy.isNull("cutoff_ms")) null else policy.getLong("cutoff_ms"),
-                )
-            },
-            photoDeleter = { name ->
-                require(File(name).name == name)
-                File(photosDir, name).delete()
-            },
-            photoFile = { name ->
-                require(File(name).name == name)
-                File(photosDir, name)
-            },
-            consentDao = app.database.trainingConsentDao(),
-            trainingApi = PostgrestTrainingConsentSyncApi(client.postgrest, client.storage[TRAINING_PHOTOS_BUCKET]),
-        )
+        if (auth.currentUserOrNull()?.id != userId) return Result.success()
+        val runner = syncRunner(app, userId)
         if (!hasCurrentLegalAcceptance) {
             // Leave local history queued until a current receipt is confirmed,
             // but a training withdrawal must still reach the server.
@@ -121,6 +146,13 @@ class SyncAnalysesWorker(
             Result.success()
         } else {
             Result.retry()
+        }
+    }
+
+    companion object {
+        /** Cancels queued and running sync passes (call on sign-out). */
+        fun cancel(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(SYNC_WORK_NAME)
         }
     }
 }

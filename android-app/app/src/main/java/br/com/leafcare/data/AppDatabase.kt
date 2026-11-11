@@ -119,6 +119,11 @@ interface TrainingConsentDao {
     @Query("SELECT * FROM training_photo_authorizations WHERE userId = :userId") suspend fun getAllPhotos(userId: String): List<TrainingPhotoAuthorizationEntity>
     @Query("UPDATE training_photo_authorizations SET authorized = 0, syncState = 'PENDING' WHERE userId = :userId AND authorized = 1") suspend fun revokeAllPhotos(userId: String)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun savePhoto(authorization: TrainingPhotoAuthorizationEntity)
+    // Revocations are synced regardless of the current consent: a re-acceptance never drops them.
+    @Query("SELECT * FROM training_photo_authorizations WHERE userId = :userId AND syncState = 'PENDING' AND authorized = 0") suspend fun getPendingRevocations(userId: String): List<TrainingPhotoAuthorizationEntity>
+    @Query("SELECT * FROM training_photo_authorizations WHERE userId = :userId AND analysisId = :id") suspend fun getPhoto(userId: String, id: String): TrainingPhotoAuthorizationEntity?
+    @Query("UPDATE training_photo_authorizations SET authorized = 0, syncState = 'PENDING' WHERE userId = :userId AND analysisId = :id AND authorized = 1") suspend fun revokePhoto(userId: String, id: String)
+    @Query("DELETE FROM training_photo_authorizations WHERE userId = :userId AND analysisId = :id") suspend fun deletePhoto(userId: String, id: String)
     @Query("UPDATE training_consent SET syncState = 'SYNCED' WHERE userId = :userId") suspend fun markConsentSynced(userId: String)
     @Query("UPDATE training_photo_authorizations SET syncState = 'SYNCED' WHERE userId = :userId AND analysisId = :id") suspend fun markPhotoSynced(userId: String, id: String)
     @Query("SELECT EXISTS(SELECT 1 FROM training_consent)") suspend fun hasConsentRows(): Boolean

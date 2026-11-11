@@ -3,8 +3,10 @@ package br.com.leafcare.data
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -23,6 +25,10 @@ private class ConsentDaoFake(var consent: TrainingConsentEntity?, rows: List<Tra
     override suspend fun markConsentSynced(userId: String) { if (consent?.userId == userId) consent = consent?.copy(syncState = "SYNCED") }
     override suspend fun markPhotoSynced(userId: String, id: String) { photos[userId to id]?.let { photos[userId to id] = it.copy(syncState = "SYNCED") } }
     override suspend fun hasConsentRows() = consent != null
+    override suspend fun getPendingRevocations(userId: String) = photos.values.filter { it.userId == userId && it.syncState == "PENDING" && !it.authorized }
+    override suspend fun getPhoto(userId: String, id: String) = photos[userId to id]
+    override suspend fun revokePhoto(userId: String, id: String) { photos[userId to id]?.takeIf { it.authorized }?.let { photos[userId to id] = it.copy(authorized = false, syncState = "PENDING") } }
+    override suspend fun deletePhoto(userId: String, id: String) { photos.remove(userId to id) }
 }
 
 private class ConsentApiFake(
@@ -122,8 +128,12 @@ class TrainingConsentSyncTest {
                 TrainingPhotoAuthorizationEntity("user-1", "kept", TRAINING_TERMS_VERSION, true, 6),
             ),
         )
+        // Both analyses are active remotely, so the rejected revocation must be retried.
+        val historyApi = FakeAnalysisSyncApi().apply {
+            remote["gone"] = JsonObject(emptyMap()); remote["kept"] = JsonObject(emptyMap())
+        }
         val result = AnalysisSyncRunner(
-            FakeAnalysisDao(), FakeAnalysisSyncApi(), "test", consentDao = consent,
+            FakeAnalysisDao(), historyApi, "test", consentDao = consent,
             trainingApi = ConsentApiFake(events, failAuthorizationFor = "gone"),
         ).syncOnce("user-1")
         assertEquals(SyncRunResult.Completed(1), result)
@@ -183,5 +193,170 @@ class TrainingConsentSyncTest {
             ).syncOnce("user-1")
             assertTrue(events.indexOf("history") < events.indexOf("upload"))
         } finally { image.delete() }
+    }
+
+    private fun analysis(
+        id: String,
+        syncStatus: SyncState = SyncState.SYNCED,
+        deletedAt: Long? = null,
+        inconclusive: Boolean = false,
+        createdAt: Long = 10,
+    ) = AnalysisEntity(id, "$id.img", createdAt, "x", "x", "x", .9f, "[]", inconclusive, .5f, 1.0, "hash", syncStatus, deletedAt, PhotoSyncState.LOCAL_ONLY)
+
+    private fun grantedConsent(vararg rows: TrainingPhotoAuthorizationEntity) = ConsentDaoFake(
+        TrainingConsentEntity("user-1", granted = true, decidedAt = 10, syncState = "SYNCED"), rows.toList(),
+    )
+
+    private fun authorized(id: String, syncState: String = "PENDING") =
+        TrainingPhotoAuthorizationEntity("user-1", id, TRAINING_TERMS_VERSION, true, 11, syncState)
+
+    private fun remoteWith(vararg ids: String) = FakeAnalysisSyncApi().apply { ids.forEach { remote[it] = JsonObject(emptyMap()) } }
+
+    @Test fun deletedAnalysisNeverUploadsTrainingCopyAndRevokesIt() = runTest {
+        val events = mutableListOf<String>()
+        val consent = grantedConsent(authorized("a-1"))
+        val api = remoteWith("a-1")
+        val dao = FakeAnalysisDao(listOf(analysis("a-1", SyncState.PENDING_DELETE, deletedAt = 20)))
+        val result = AnalysisSyncRunner(
+            dao, api, "test", photoFile = { error("training photo must not be read") },
+            consentDao = consent, trainingApi = ConsentApiFake(events),
+        ).syncOnce("user-1")
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertEquals(listOf("photo-auth:false", "delete:${trainingPhotoPath("user-1", "a-1")}"), events)
+        assertEquals(listOf("a-1"), api.deleteCalls)
+        assertNull(dao.get("a-1"))
+        val row = consent.getPhoto("user-1", "a-1")!!
+        assertFalse(row.authorized)
+        assertEquals("SYNCED", row.syncState)
+    }
+
+    @Test fun syncedCopyOfDeletedAnalysisIsRevokedAndRemoved() = runTest {
+        val events = mutableListOf<String>()
+        val consent = grantedConsent(authorized("a-1", syncState = "SYNCED"))
+        val dao = FakeAnalysisDao(listOf(analysis("a-1", SyncState.PENDING_DELETE, deletedAt = 20)))
+        AnalysisSyncRunner(dao, remoteWith("a-1"), "test", consentDao = consent, trainingApi = ConsentApiFake(events)).syncOnce("user-1")
+        assertEquals(listOf("photo-auth:false", "delete:${trainingPhotoPath("user-1", "a-1")}"), events)
+        assertNull(dao.get("a-1"))
+    }
+
+    @Test fun deletedAnalysisWithoutLocalAuthorizationStillDeletesTrainingCopy() = runTest {
+        val events = mutableListOf<String>()
+        val dao = FakeAnalysisDao(listOf(analysis("a-1", SyncState.PENDING_DELETE, deletedAt = 20)))
+        AnalysisSyncRunner(dao, remoteWith("a-1"), "test", consentDao = grantedConsent(), trainingApi = ConsentApiFake(events)).syncOnce("user-1")
+        assertEquals(listOf("delete:${trainingPhotoPath("user-1", "a-1")}"), events)
+        assertNull(dao.get("a-1"))
+    }
+
+    @Test fun pausedAccountRevokesTrainingCopyButKeepsTombstonePending() = runTest {
+        val events = mutableListOf<String>()
+        val consent = grantedConsent(authorized("a-1", syncState = "SYNCED"))
+        val api = remoteWith("a-1")
+        val dao = FakeAnalysisDao(listOf(analysis("a-1", SyncState.PENDING_DELETE, deletedAt = 20)))
+        val result = AnalysisSyncRunner(
+            dao, api, "test", uploadPolicy = { UploadPolicy(enabled = false) },
+            consentDao = consent, trainingApi = ConsentApiFake(events),
+        ).syncOnce("user-1")
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertEquals(listOf("photo-auth:false", "delete:${trainingPhotoPath("user-1", "a-1")}"), events)
+        assertTrue(api.deleteCalls.isEmpty())
+        assertTrue(api.photoDeleteCalls.isEmpty())
+        assertEquals(SyncState.PENDING_DELETE, dao.get("a-1")?.syncStatus)
+    }
+
+    @Test fun unknownPolicyStillPushesRevocations() = runTest {
+        val events = mutableListOf<String>()
+        val consent = ConsentDaoFake(TrainingConsentEntity("user-1", granted = false, decidedAt = 10), listOf(authorized("a-1")))
+        val result = AnalysisSyncRunner(
+            FakeAnalysisDao(listOf(analysis("a-1"))), remoteWith("a-1"), "test",
+            uploadPolicy = { error("my_account_policy returned null") },
+            consentDao = consent, trainingApi = ConsentApiFake(events),
+        ).syncOnce("user-1")
+        assertEquals(SyncRunResult.Completed(1), result)
+        assertEquals(listOf("consent:false", "photo-auth:false", "delete:${trainingPhotoPath("user-1", "a-1")}"), events)
+    }
+
+    @Test fun inconclusiveAnalysisIsNeverUploadedForTraining() = runTest {
+        val events = mutableListOf<String>()
+        val consent = grantedConsent(authorized("a-1"))
+        AnalysisSyncRunner(
+            FakeAnalysisDao(listOf(analysis("a-1", inconclusive = true))), remoteWith("a-1"), "test",
+            photoFile = { error("training photo must not be read") },
+            consentDao = consent, trainingApi = ConsentApiFake(events),
+        ).syncOnce("user-1")
+        assertFalse(events.contains("upload"))
+        assertFalse(events.contains("photo-auth:true"))
+        assertFalse(consent.getPhoto("user-1", "a-1")!!.authorized)
+    }
+
+    @Test fun authorizationOfAnalysisThatNeverReachedServerIsDroppedWithoutRetries() = runTest {
+        val events = mutableListOf<String>()
+        val consent = grantedConsent(authorized("missing"), authorized("local"))
+        // "missing" was removed locally without ever being uploaded: the server rejects it.
+        val result = AnalysisSyncRunner(
+            FakeAnalysisDao(listOf(analysis("local", SyncState.LOCAL_ONLY))), FakeAnalysisSyncApi(), "test",
+            consentDao = consent, trainingApi = ConsentApiFake(events, failAuthorizationFor = "missing"),
+        ).syncOnce("user-1")
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertTrue(consent.getAllPhotos("user-1").isEmpty())
+        assertFalse(events.contains("upload"))
+    }
+
+    @Test fun unsyncedAnalysisAuthorizationWaitsWithoutFailure() = runTest {
+        val events = mutableListOf<String>()
+        val consent = grantedConsent(authorized("a-1"))
+        val result = AnalysisSyncRunner(
+            FakeAnalysisDao(listOf(analysis("a-1", SyncState.PENDING_UPLOAD))), FakeAnalysisSyncApi(), "test",
+            uploadPolicy = { UploadPolicy(enabled = false) },
+            consentDao = consent, trainingApi = ConsentApiFake(events),
+        ).syncOnce("user-1")
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertTrue(events.isEmpty())
+        assertTrue(consent.getPhoto("user-1", "a-1")!!.authorized)
+    }
+
+    @Test fun trainingCopyBeforeCutoffIsNeverUploaded() = runTest {
+        val events = mutableListOf<String>()
+        val consent = grantedConsent(authorized("a-1"))
+        AnalysisSyncRunner(
+            FakeAnalysisDao(listOf(analysis("a-1", createdAt = 10))), remoteWith("a-1"), "test",
+            uploadPolicy = { UploadPolicy(cutoffMs = 10) },
+            photoFile = { error("training photo must not be read") },
+            consentDao = consent, trainingApi = ConsentApiFake(events),
+        ).syncOnce("user-1")
+        assertFalse(events.contains("upload"))
+        assertFalse(events.contains("photo-auth:true"))
+        assertFalse(consent.getPhoto("user-1", "a-1")!!.authorized)
+    }
+
+    @Test fun reacceptanceDoesNotDropPendingPhotoRevocation() = runTest {
+        val events = mutableListOf<String>()
+        // Revoked, then accepted again before the sync ran: consent is granted again.
+        val consent = grantedConsent(TrainingPhotoAuthorizationEntity("user-1", "a-1", TRAINING_TERMS_VERSION, false, 12))
+        AnalysisSyncRunner(
+            FakeAnalysisDao(listOf(analysis("a-1"))), remoteWith("a-1"), "test",
+            consentDao = consent, trainingApi = ConsentApiFake(events),
+        ).syncOnce("user-1")
+        assertEquals(listOf("photo-auth:false", "delete:${trainingPhotoPath("user-1", "a-1")}"), events)
+        assertEquals("SYNCED", consent.getPhoto("user-1", "a-1")!!.syncState)
+        // Already settled revocations are not re-sent on later passes.
+        events.clear()
+        AnalysisSyncRunner(
+            FakeAnalysisDao(listOf(analysis("a-1"))), remoteWith("a-1"), "test",
+            consentDao = consent, trainingApi = ConsentApiFake(events),
+        ).syncOnce("user-1")
+        assertTrue(events.isEmpty())
+    }
+
+    @Test fun revocationOnlyPushesPhotoRevocationsEvenWithActiveConsent() = runTest {
+        val events = mutableListOf<String>()
+        val consent = grantedConsent(TrainingPhotoAuthorizationEntity("user-1", "a-1", TRAINING_TERMS_VERSION, false, 12))
+        val api = remoteWith("a-1")
+        val result = AnalysisSyncRunner(
+            FakeAnalysisDao(listOf(analysis("a-1", SyncState.PENDING_UPLOAD))), api, "test",
+            consentDao = consent, trainingApi = ConsentApiFake(events),
+        ).syncTrainingRevocationOnly("user-1")
+        assertEquals(SyncRunResult.Completed(0), result)
+        assertEquals(listOf("photo-auth:false", "delete:${trainingPhotoPath("user-1", "a-1")}"), events)
+        assertTrue(api.upsertCalls.isEmpty())
     }
 }

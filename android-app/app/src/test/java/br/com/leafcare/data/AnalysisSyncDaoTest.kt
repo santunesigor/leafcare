@@ -253,6 +253,29 @@ class AnalysisSyncDaoTest {
         } finally { db.close() }
     }
 
+    @Test fun pendingRevocationQueueIgnoresConsentAndSettledRows() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries().build()
+        try {
+            val dao = db.trainingConsentDao()
+            dao.save(TrainingConsentEntity("account-a", granted = true, decidedAt = 1, syncState = "SYNCED"))
+            dao.savePhoto(TrainingPhotoAuthorizationEntity("account-a", "revoked", TRAINING_TERMS_VERSION, false, 2))
+            dao.savePhoto(TrainingPhotoAuthorizationEntity("account-a", "settled", TRAINING_TERMS_VERSION, false, 3, "SYNCED"))
+            dao.savePhoto(TrainingPhotoAuthorizationEntity("account-a", "granted", TRAINING_TERMS_VERSION, true, 4, "SYNCED"))
+            dao.savePhoto(TrainingPhotoAuthorizationEntity("account-b", "other", TRAINING_TERMS_VERSION, false, 5))
+            assertEquals(listOf("revoked"), dao.getPendingRevocations("account-a").map { it.analysisId })
+
+            dao.revokePhoto("account-a", "granted")
+            assertEquals(setOf("revoked", "granted"), dao.getPendingRevocations("account-a").map { it.analysisId }.toSet())
+            dao.revokePhoto("account-a", "settled")
+            assertEquals("SYNCED", dao.getPhoto("account-a", "settled")?.syncState)
+
+            dao.deletePhoto("account-a", "revoked")
+            assertNull(dao.getPhoto("account-a", "revoked"))
+            assertNotNull(dao.getPhoto("account-b", "other"))
+        } finally { db.close() }
+    }
+
     @Test fun migration2To3PreservesExistingAnalyses() = runBlocking {        val file = dbFile("sync-migrate-photo")
 
         Room.databaseBuilder(context, LegacyV2AppDatabase::class.java, file.absolutePath)
