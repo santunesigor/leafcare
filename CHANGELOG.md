@@ -1,5 +1,12 @@
 # Changelog — LeafCare
 
+## [1.7.3] - 2026-11-11
+
+- APK 1.7.3 (versionCode 17): fotos do histórico aparecem assim que o download termina, sem precisar abrir a câmera (#36).
+- Tema completo com as cores do app: diálogos, calendário, menus e chips não usam mais o lilás padrão do Material 3; diálogos seguem o padrão da ajuda (#37).
+- Modal de filtrar fotos do admin com chips de situação, seções, erro de data visível e rodapé Limpar/Aplicar (#38).
+- Ajustes visuais em Privacidade e fotos, confirmações do admin e no resultado (#39).
+
 ## [1.7.2] - 2026-11-11
 
 - APK 1.7.2 (versionCode 16): correções de estabilidade sem alteração de modelo, dataset ou schema.
