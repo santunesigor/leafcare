@@ -66,6 +66,10 @@ As políticas permitem que cada usuário manipule somente os próprios arquivos.
 
 Revoga execução direta de funções internas por perfis públicos e recria políticas explicitamente para usuários autenticados.
 
+### `20261111120000_legal_documents_v1_4_training_by_terms.sql`
+
+Documentos v1.4: o aceite (`accept_current_legal_documents`) e o cadastro com v1.4 (`handle_new_user`) também gravam `training_consents` (`granted`, versão `1.2`). As políticas de consentimento, autorizações por foto e do bucket `training-photos` passam a exigir recibo v1.4 e consentimento 1.2; revogações (`granted=false`, `authorized=false`) são aceitas com qualquer versão. Testes: `supabase/tests/legal-acceptance.sql` e `training-consent.sql`.
+
 ## RLS
 
 `profiles` e `analyses` usam Row Level Security.

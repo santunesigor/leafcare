@@ -13,26 +13,38 @@ SELECT set_config('request.jwt.claim.sub','90000000-0000-0000-0000-000000000001'
 DO $$ BEGIN
  BEGIN INSERT INTO storage.objects(bucket_id,name) VALUES('training-photos','90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000003.jpg'); RAISE EXCEPTION 'training upload without consent accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
-INSERT INTO public.training_consents(user_id,terms_version,granted) VALUES(auth.uid(),'1.1',false);
+INSERT INTO public.training_consents(user_id,terms_version,granted) VALUES(auth.uid(),'1.2',false);
 DO $$ BEGIN
  BEGIN UPDATE public.training_consents SET granted=true WHERE user_id=auth.uid(); RAISE EXCEPTION 'consent enabled before current legal acceptance'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN INSERT INTO public.training_photo_authorizations(user_id,analysis_id,terms_version,authorized)
-   VALUES(auth.uid(),'90000000-0000-0000-0000-000000000004','1.1',false); RAISE EXCEPTION 'cross-account analysis authorization accepted';
+   VALUES(auth.uid(),'90000000-0000-0000-0000-000000000004','1.2',false); RAISE EXCEPTION 'cross-account analysis authorization accepted';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;
+-- Superseded documents (1.3) and the superseded training version (1.1) no longer authorize uploads.
 INSERT INTO public.legal_document_acceptances(user_id,terms_version,privacy_version)
 VALUES('90000000-0000-0000-0000-000000000001','1.3','1.3');
 SET LOCAL ROLE authenticated;
-UPDATE public.training_consents SET granted=true WHERE user_id=auth.uid();
+DO $$ BEGIN
+ BEGIN UPDATE public.training_consents SET granted=true WHERE user_id=auth.uid(); RAISE EXCEPTION 'consent enabled with superseded documents'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+-- Accepting documents 1.4 is the consent.
+SELECT public.accept_current_legal_documents('1.4','1.4');
+DO $$ BEGIN
+ BEGIN INSERT INTO public.training_photo_authorizations(user_id,analysis_id,terms_version,authorized)
+   VALUES(auth.uid(),'90000000-0000-0000-0000-000000000003','1.1',true); RAISE EXCEPTION 'superseded training version authorized';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
 INSERT INTO public.training_photo_authorizations(user_id,analysis_id,terms_version,authorized)
- VALUES(auth.uid(),'90000000-0000-0000-0000-000000000003','1.1',true);
+ VALUES(auth.uid(),'90000000-0000-0000-0000-000000000003','1.2',true);
 INSERT INTO storage.objects(bucket_id,name) VALUES('training-photos','90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000003.jpg');
 SELECT pg_temp.assert_true((SELECT count(*)=1 FROM storage.objects WHERE bucket_id='training-photos'),'current global and per-photo choices permit own photo upload');
 DO $$ BEGIN
  BEGIN INSERT INTO storage.objects(bucket_id,name) VALUES('training-photos','90000000-0000-0000-0000-000000000002/90000000-0000-0000-0000-000000000004.jpg'); RAISE EXCEPTION 'cross-account training upload accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
-UPDATE public.training_consents SET granted=false WHERE user_id=auth.uid();
+-- A revocation is accepted with any version, including a superseded one still stored on a device.
+UPDATE public.training_consents SET granted=false, terms_version='1.1' WHERE user_id=auth.uid();
+UPDATE public.training_photo_authorizations SET authorized=false, terms_version='1.1' WHERE user_id=auth.uid();
 DELETE FROM storage.objects WHERE bucket_id='training-photos' AND name='90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000003.jpg';
 SELECT pg_temp.assert_true((SELECT count(*)=0 FROM storage.objects WHERE bucket_id='training-photos'),'revoked user can delete own training object');
 RESET ROLE;
