@@ -3,7 +3,7 @@
 - [x] 1.1 Criar a migração v1.4 (aceite + consentimento, políticas v1.4/v1.2, revogação com qualquer versão)
 - [x] 1.2 Atualizar `legal-acceptance.sql` e `training-consent.sql` e incluir `training-consent.sql` em `run-local.sh`
 - [x] 1.3 Rodar `supabase/tests/run-local.sh`
-- [ ] 1.4 Aplicar a migração no projeto de produção
+- [x] 1.4 Aplicar a migração no projeto de produção (`supabase db push`, 11/11/2026)
 
 ## 2. Android
 
