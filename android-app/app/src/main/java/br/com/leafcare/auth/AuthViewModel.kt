@@ -118,7 +118,9 @@ class AuthViewModel internal constructor(
     /** Rechecks the current receipt when the app resumes; network errors never block local inference. */
     fun refreshLegalAcceptance() {
         val api = legalAcceptanceApi ?: return
-        val userId = authRepository.user.value?.id ?: return
+        // The session is published before `user`, so read the id from the session
+        // itself; otherwise a fresh login could skip this check and stay on Loading.
+        val userId = currentUserId() ?: return
         _legalAcceptance.value = LegalAcceptanceState.CHECKING
         viewModelScope.launch {
             _legalAcceptance.value = try {
@@ -127,11 +129,14 @@ class AuthViewModel internal constructor(
                 // A cached, authenticated app must remain usable offline. No receipt is fabricated.
                 LegalAcceptanceState.UNAVAILABLE
             }
-            if (authRepository.user.value?.id != userId) {
+            if (currentUserId() != userId) {
                 _legalAcceptance.value = LegalAcceptanceState.NOT_REQUIRED
             }
         }
     }
+
+    private fun currentUserId(): String? =
+        authRepository.session.value?.user?.id ?: authRepository.user.value?.id
 
     fun acceptCurrentLegalDocuments() {
         val api = legalAcceptanceApi ?: return

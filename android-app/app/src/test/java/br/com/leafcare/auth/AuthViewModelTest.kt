@@ -4,6 +4,9 @@ import android.app.Application
 import io.github.jan.supabase.gotrue.user.UserInfo
 import io.github.jan.supabase.gotrue.user.UserSession
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.MainCoroutineDispatcher
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -136,6 +139,28 @@ class AuthViewModelTest {
 
         assertEquals(1, backend.signInCalls)
         assertEquals(0, backend.signUpCalls)
+    }
+
+    @Test fun signIn_resolvesLegalAcceptanceWithoutStayingOnLoading() = runTest(dispatcher) {
+        // Android Main.immediate resumes the session collector inline, before the
+        // repository publishes `user`: the race that left the gate on Loading.
+        Dispatchers.setMain(PostedImmediateMain(dispatcher))
+        val legalApi = object : LegalAcceptanceApi {
+            var checks = 0
+            override suspend fun hasCurrentAcceptance(): Boolean { checks++; return true }
+            override suspend fun acceptCurrentDocuments() = Unit
+        }
+        val vm = AuthViewModel(Application(), AuthRepository(backend), recoveryStore, legalApi)
+        advanceUntilIdle()
+        backend.session = testSession()
+        vm.setEmail("a@b.com")
+        vm.setPassword("senha123")
+
+        vm.signIn()
+        advanceUntilIdle()
+
+        assertEquals(1, legalApi.checks)
+        assertEquals(LegalAcceptanceState.CURRENT, vm.legalAcceptance.value)
     }
 
     @Test fun signupWithoutSession_goesToVerifyEmailWithoutAppNavigation() = runTest(dispatcher) {
@@ -854,4 +879,19 @@ class AuthViewModelTest {
         ),
         expiresAt = Clock.System.now()
     )
+}
+
+/**
+ * Mimics Android `Dispatchers.Main.immediate`: work posted from outside runs
+ * as a task, and resumptions inside that task run inline (no queueing).
+ */
+private class PostedImmediateMain(private val posted: CoroutineDispatcher) : MainCoroutineDispatcher() {
+    private var onMain = false
+    override val immediate: MainCoroutineDispatcher get() = this
+    override fun isDispatchNeeded(context: CoroutineContext): Boolean = !onMain
+    override fun dispatch(context: CoroutineContext, block: Runnable) =
+        posted.dispatch(context, Runnable {
+            onMain = true
+            try { block.run() } finally { onMain = false }
+        })
 }
