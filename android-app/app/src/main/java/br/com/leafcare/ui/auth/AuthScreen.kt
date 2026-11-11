@@ -107,10 +107,11 @@ private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
     val state by viewModel.legalAcceptance.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     AuthScaffold(onBack = { viewModel.signOut() }) {
-        AuthHeader(logoSize = 56, title = "Documentos atualizados", subtitle = "Aceite para continuar usando o LeafCare")
+        // Shown to accounts created outside the app (invites) and to accounts that accepted an older version.
+        AuthHeader(logoSize = 56, title = "Termos de uso", subtitle = "Aceite para usar o LeafCare")
         Spacer(Modifier.height(12.dp))
         Text(
-            "Os Termos de Uso e a Política de Privacidade foram atualizados (versão 1.4, publicada em 11/11/2026).",
+            "Leia e aceite os Termos de Uso e a Política de Privacidade (versão 1.4, publicada em 11/11/2026).",
             style = MaterialTheme.typography.bodyMedium,
             color = LeafColors.Text,
             textAlign = TextAlign.Center

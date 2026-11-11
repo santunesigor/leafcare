@@ -1,5 +1,9 @@
 # Changelog — LeafCare
 
+## [1.8.2] - 2026-11-11
+
+- APK 1.8.2 (versionCode 20): a tela de aceite deixa de dizer "Documentos atualizados" para contas que nunca aceitaram os termos (contas convidadas ou criadas pelo servidor); o texto passa a servir para contas novas e antigas.
+
 ## [1.8.1] - 2026-11-11
 
 - APK 1.8.1 (versionCode 19): a tela de aceite explica quando o servidor ainda não foi atualizado para os documentos v1.4, em vez de pedir para conferir a conexão.
