@@ -84,6 +84,7 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
             }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) { this@LeafCareViewModel.error(error.message ?: "Não foi possível analisar a imagem.") }
+            catch (_: OutOfMemoryError) { this@LeafCareViewModel.error("Imagem grande demais para este aparelho. Escolha uma cópia menor.") }
             finally { temporary?.delete(); _ui.update { it.copy(busy = false) } }
         }
     }

@@ -110,11 +110,17 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
         onFlash = { flash = !flash }, onSwitch = { lens = if (lens == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK },
         enabled = ready && !capturing, galleryEnabled = !capturing, flashAvailable = hasFlash && ready && !capturing,
         switchAvailable = canSwitch && ready && !capturing, flashOn = flash, showGuide = permitted,
-        onCapture = {
+        onCapture = capture@{
             capturing = true
             imageCapture.flashMode = if (flash && hasFlash) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
             previewView.display?.let { imageCapture.targetRotation = it.rotation }
-            val file = File.createTempFile("capture-", ".jpg", context.cacheDir)
+            val file = try {
+                File.createTempFile("capture-", ".jpg", context.cacheDir)
+            } catch (error: java.io.IOException) {
+                capturing = false
+                vm.error("Sem espaço para salvar a foto. Libere armazenamento e tente novamente.")
+                return@capture
+            }
             imageCapture.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), executor,
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {

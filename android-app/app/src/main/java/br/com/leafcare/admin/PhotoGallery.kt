@@ -196,13 +196,15 @@ import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun AdminDateField(label: String, isoDate: String, onDateChange: (String) -> Unit) {
-    val displayFormat = DateTimeFormatter.ofPattern("dd/MM/uuuu")
+    val displayFormat = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT)
     val isoFormat = DateTimeFormatter.ISO_LOCAL_DATE.withResolverStyle(ResolverStyle.STRICT)
     fun parse(value: String): LocalDate? = runCatching { LocalDate.parse(value, isoFormat) }.getOrNull()
+    // The field shows DD/MM/AAAA: typed text is parsed in that format, not ISO.
+    fun parseTyped(value: String): LocalDate? = runCatching { LocalDate.parse(value, displayFormat) }.getOrNull()
     var text by remember { mutableStateOf(parse(isoDate)?.format(displayFormat).orEmpty()) }
     LaunchedEffect(isoDate) { if (isoDate != "!invalid!") text = parse(isoDate)?.format(displayFormat).orEmpty() }
     var showPicker by remember { mutableStateOf(false) }
-    val selected = parse(isoDate) ?: parse(text)
+    val selected = parse(isoDate) ?: parseTyped(text)
     OutlinedTextField(
         value = text,
         onValueChange = { input ->
@@ -213,7 +215,7 @@ import org.json.JSONObject
                     append(char)
                 }
             }
-            onDateChange(parse(text)?.format(isoFormat) ?: if (text.isEmpty()) "" else "!invalid!")
+            onDateChange(parseTyped(text)?.format(isoFormat) ?: if (text.isEmpty()) "" else "!invalid!")
         },
         label = { Text(label) },
         placeholder = { Text("DD/MM/AAAA") },
