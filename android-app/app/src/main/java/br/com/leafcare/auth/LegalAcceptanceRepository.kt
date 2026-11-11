@@ -12,6 +12,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.Instant
 
 internal interface LegalAcceptanceApi {
     suspend fun hasCurrentAcceptance(): Boolean
@@ -61,6 +62,24 @@ internal class LegalAcceptanceRepository(
     }
 
     override suspend fun acceptCurrentDocuments() {
+        // A revocation not yet pushed is recorded before the new grant, so
+        // accepting again right away never erases it. Its photo revocations
+        // stay pending and the sync sends them whatever the consent.
+        val userId = holder.auth.currentUserOrNull()?.id ?: error("Sessão indisponível")
+        val local = consentDao?.get(userId)
+        if (local != null && !local.granted && local.syncState == "PENDING") {
+            request(
+                "/rest/v1/training_consents?on_conflict=user_id",
+                method = "POST",
+                body = JSONObject()
+                    .put("user_id", userId)
+                    .put("terms_version", local.termsVersion)
+                    .put("granted", false)
+                    .put("decided_at", Instant.ofEpochMilli(local.decidedAt).toString()),
+                prefer = "resolution=merge-duplicates,return=minimal",
+            )
+            consentDao.markConsentSynced(userId)
+        }
         request(
             "/rest/v1/rpc/accept_current_legal_documents",
             method = "POST",
@@ -69,11 +88,11 @@ internal class LegalAcceptanceRepository(
                 .put("accepted_privacy_version", PRIVACY_POLICY_VERSION)
         )
         // The server recorded the consent with the receipt; mirror it so the app opens offline later.
-        val userId = holder.auth.currentUserOrNull()?.id ?: return
+        if (holder.auth.currentUserOrNull()?.id != userId) return
         consentDao?.save(TrainingConsentEntity(userId, TRAINING_TERMS_VERSION, true, System.currentTimeMillis(), "SYNCED"))
     }
 
-    private suspend fun request(path: String, method: String, body: JSONObject? = null): ByteArray = withContext(Dispatchers.IO) {
+    private suspend fun request(path: String, method: String, body: JSONObject? = null, prefer: String? = null): ByteArray = withContext(Dispatchers.IO) {
         val session = holder.auth.currentSessionOrNull() ?: error("Sessão indisponível")
         val connection = URL(BuildConfig.SUPABASE_URL + path).openConnection() as HttpURLConnection
         try {
@@ -84,6 +103,7 @@ internal class LegalAcceptanceRepository(
             connection.setRequestProperty("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY)
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("Cache-Control", "no-store")
+            if (prefer != null) connection.setRequestProperty("Prefer", prefer)
             if (body != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json")
