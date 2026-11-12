@@ -11,7 +11,7 @@
 - [x] 2.2 Selo "Treino" sem dias para cópias permanentes e texto do bloco de treinamento
 - [x] 2.3 Remover código, recursos e dependências sem uso
 - [x] 2.4 `testDebugUnitTest`, `verifyModelAssets`, `lintDebug` e APK debug (versionCode 27)
-- [ ] 2.5 Testar no aparelho, com a migração aplicada: reaceite v1.5 de uma conta v1.4, cadastro novo, uso offline com aceite no aparelho, revogação e novo aceite (inclui a pendência 2.6 de `training-consent-by-terms`)
+- [x] 2.5 Teste ponta a ponta em emulador (Pixel 7, API 35) contra produção, com conta de teste v1.4 apagada depois: reaceite v1.5, análise com cópia de treino permanente, uso offline com sincronização ao voltar, revogação (cópias apagadas, histórico mantido) e novo aceite. Celular físico e tempo no Galaxy A06 seguem pendentes
 
 ## 3. Pipeline
 
