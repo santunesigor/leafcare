@@ -42,6 +42,10 @@ O replay da integração nas 104 imagens de validação manteve todas as classes
 
 Tempo do benchmark em desktop i5-13400, duas threads: inferência TFLite mediana 2,11 ms/P95 2,20 ms; pipeline Python mediana 3,63 ms/P95 3,91 ms. Isso não mede Android. A meta de análise completa até três segundos no Galaxy A06 segue pendente de aparelho conectado.
 
+## Retreino com fotos do app
+
+As fotos analisadas no app (cópias de treino, com revisão humana) podem treinar novos candidatos com esta mesma receita: TLA com o split histórico mais fotos de campo separadas por pessoa, com um `field_test` para avaliar em fotos reais. O passo a passo, as regras dos Termos v1.4 e os critérios de promoção estão em [Retreinar o modelo](RETREINAMENTO.md). O código fica em `machine-learning/retraining/`; os ciclos, em `machine-learning/runs/`, ignorado pelo Git.
+
 ## Executar e validar
 
 Com Python 3.12, dentro de `machine-learning/`:

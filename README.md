@@ -65,6 +65,7 @@ O modelo só deve ser substituído após solicitação explícita e validação 
 - [Desenvolvimento e ferramentas](docs/DEVELOPMENT.md)
 - [Testes e QA](docs/TESTING.md)
 - [Machine Learning](docs/MACHINE_LEARNING.md) e [benchmarks](docs/benchmarks/BENCHMARK_MODELOS.md)
+- [Retreinar o modelo com as fotos do app](docs/RETREINAMENTO.md)
 - [Supabase, migrations e sincronização](docs/SUPABASE.md)
 - [Administração e revisão de fotos](docs/SUPERADMIN.md)
 - [Contexto de desenvolvimento e limites](docs/AI_CONTEXT.md)

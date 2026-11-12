@@ -61,6 +61,7 @@ import org.json.JSONObject
                 contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item(span = { GridItemSpan(2) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (query.optString("training") == "true") AdminBadge("Cópias de treino", LeafColors.Info)
                         if (query.optString("class_id").isNotBlank()) AdminBadge(catalog.get(query.getString("class_id")).name)
                         if (query.optString("model").isNotBlank()) AdminBadge("Modelo ${shortId(query.getString("model"))}")
                         if (query.optString("from").isNotBlank() || query.optString("until").isNotBlank()) Text("Período UTC: ${query.optString("from").ifBlank { "início" }} até ${query.optString("until").ifBlank { "hoje" }}", style = MaterialTheme.typography.bodySmall)
@@ -104,7 +105,10 @@ import org.json.JSONObject
                 else TextButton(onClick = { attempt++ }, enabled = enabled) { Icon(Icons.Outlined.Refresh, null, Modifier.size(16.dp)); Text("Recarregar", style = MaterialTheme.typography.labelSmall) }
             }
             Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
+                    TrainingBadge(row, short = true)
+                }
                 Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text("${percent(row.optDouble("confidence").toFloat())} · previsão original", style = MaterialTheme.typography.labelSmall, color = LeafColors.Muted)
                 if (!row.isNull("reviewed_class")) Text("Revisão: ${catalog.get(row.getString("reviewed_class")).name}", style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, color = LeafColors.Green)
@@ -151,7 +155,10 @@ import org.json.JSONObject
             AdminPanel {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     AdminSectionTitle("Avaliação humana")
-                    AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        TrainingBadge(row)
+                        AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
+                    }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (!row.isNull("reviewed_class")) Text(catalog.get(row.getString("reviewed_class")).name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -177,16 +184,17 @@ import org.json.JSONObject
     var user by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("user_id")) }
     var from by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("from")) }
     var until by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("until")) }
+    var trainingOnly by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("training") == "true") }
     var advanced by rememberSaveable(state.photoQuery) { mutableStateOf(model.isNotBlank() || user.isNotBlank()) }
     val invalidDate = from == "!invalid!" || until == "!invalid!"
     val inverted = !invalidDate && from.isNotBlank() && until.isNotBlank() && from > until
     AdminSheet("Filtrar fotos", close, footer = {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             LeafButton("Limpar", {
-                status = "pending"; classFilter = ""; model = ""; user = ""; from = ""; until = ""
+                status = "pending"; classFilter = ""; model = ""; user = ""; from = ""; until = ""; trainingOnly = false
             }, secondary = true, modifier = Modifier.weight(1f), enabled = !state.busy)
             LeafButton("Aplicar filtros", {
-                close(); apply(JSONObject().put("status", status).put("class_id", classFilter).put("model", model.trim()).put("user_id", user.trim()).put("from", from.trim()).put("until", until.trim()))
+                close(); apply(JSONObject().put("status", status).put("class_id", classFilter).put("model", model.trim()).put("user_id", user.trim()).put("from", from.trim()).put("until", until.trim()).put("training", if (trainingOnly) "true" else ""))
             }, modifier = Modifier.weight(1.6f), enabled = !state.busy && !invalidDate && !inverted)
         }
     }) {
@@ -195,6 +203,11 @@ import org.json.JSONObject
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     reviewStatuses.forEach { (key, name) -> StatusChip(name, key == status) { status = key } }
                 }
+            }
+        }
+        item {
+            FilterSection("Treinamento") {
+                StatusChip("Só cópias de treino", trainingOnly, Role.Checkbox) { trainingOnly = !trainingOnly }
             }
         }
         item {
@@ -236,13 +249,13 @@ import org.json.JSONObject
 }
 
 /** Same selection language as the history filter: Pale + green label + check. */
-@Composable private fun StatusChip(label: String, selected: Boolean, onClick: () -> Unit) {
+@Composable private fun StatusChip(label: String, selected: Boolean, role: Role = Role.RadioButton, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Row(
         Modifier.heightIn(min = 40.dp).clip(shape)
             .background(if (selected) LeafColors.Tint else Color.White)
             .border(1.dp, if (selected) LeafColors.Green else LeafColors.Border, shape)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .selectable(selected = selected, role = role, onClick = onClick)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {

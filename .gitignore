@@ -55,3 +55,6 @@ Thumbs.db
 
 # Fotos autorizadas exportadas para triagem local (dados sensíveis)
 machine-learning/data/authorized_training/
+# Ciclos de retreino (referenciam fotos de campo, checkpoints e TFLites candidatos) e ambientes
+machine-learning/runs/
+machine-learning/.cache/

@@ -47,6 +47,19 @@ internal fun pendingLabel(total: Int, pending: Int) = when {
     pending == 1 -> "foto aguardando avaliação"
     else -> "fotos aguardando avaliação"
 }
+/** Whole days until a training copy is deleted (90 days after upload); null when the photo has none. */
+internal fun trainingDaysLeft(row: JSONObject, now: Instant = Instant.now()): Int? {
+    if (row.isNull("training_expires_at")) return null
+    val raw = row.optString("training_expires_at").takeIf { it.isNotBlank() } ?: return null
+    val expires = runCatching { java.time.OffsetDateTime.parse(raw).toInstant() }.getOrElse { runCatching { Instant.parse(raw) }.getOrNull() } ?: return null
+    val hours = java.time.Duration.between(now, expires).toHours().coerceAtLeast(0)
+    return ((hours + 23) / 24).toInt()
+}
+/** "Treino · N dias": the photo can train the model; amber when it expires within 14 days. */
+@Composable internal fun TrainingBadge(row: JSONObject, short: Boolean = false) {
+    val days = trainingDaysLeft(row) ?: return
+    AdminBadge(if (short) "Treino" else "Treino · ${if (days <= 1) "1 dia" else "$days dias"}", if (days <= 14) LeafColors.Warning else LeafColors.Info)
+}
 internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw.takeLast(4)}" else raw
 
 @Composable internal fun AdminPanel(content: @Composable ColumnScope.() -> Unit) {
@@ -79,7 +92,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
 }
 /** Overview that fits one screen: pending work, totals, review results and models. */
 @Composable internal fun AdminDashboard(data: JSONObject, busy: Boolean, onReview: () -> Unit,
-    browse: (JSONObject) -> Unit, managesAccounts: Boolean, users: () -> Unit) {
+    browse: (JSONObject) -> Unit, managesAccounts: Boolean, onReviewTraining: () -> Unit = {}, users: () -> Unit) {
     val total = data.optInt("photos")
     val reviewed = data.optInt("reviewed")
     val pending = (total - reviewed).coerceAtLeast(0)
@@ -117,6 +130,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
                 ReviewLegend(statuses, busy, browse)
             }
         }
+        data.optJSONObject("training")?.let { training -> TrainingSummary(training, busy, onReviewTraining) }
         val models = data.optJSONObject("models") ?: JSONObject()
         Column {
             AdminSectionHeader("Modelos de origem")
@@ -128,6 +142,26 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
                 }
             }
         }
+    }
+}
+
+/**
+ * Training copies are what can retrain the model: only confirmed or corrected
+ * ones enter a dataset, and each is deleted 90 days after upload.
+ */
+@Composable private fun TrainingSummary(training: JSONObject, busy: Boolean, onReviewTraining: () -> Unit) {
+    val awaiting = training.optInt("awaiting_review")
+    val expiring = training.optInt("expiring_soon")
+    Column {
+        AdminSectionHeader("Treinamento do modelo", if (awaiting > 0) "Revisar cópias" else null, !busy, onReviewTraining)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AdminStatTile("${training.optInt("ready")}", "Prontas", Modifier.weight(1f))
+            AdminStatTile("$awaiting", "Aguardando", Modifier.weight(1f), detail = if (expiring > 0) "$expiring vencendo" else null,
+                enabled = !busy, onClick = if (awaiting > 0) onReviewTraining else null)
+            AdminStatTile("${training.optInt("excluded")}", "Fora do treino", Modifier.weight(1f))
+        }
+        Text("Só cópias confirmadas ou corrigidas entram no treino. Cada cópia é apagada 90 dias após o envio.",
+            Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
     }
 }
 

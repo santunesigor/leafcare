@@ -41,7 +41,7 @@ import org.json.JSONObject
     val back = { if (!state.busy) actions.load("triage", JSONObject()) }
     BackHandler(onBack = back)
     Column(Modifier.fillMaxSize().background(LeafColors.Pale)) {
-        AdminTopBar("Avaliação", "${reviewStatuses[state.photoFilterStatus]} · ${state.reviewedCount} salvas", back, "Voltar ao painel de triagens", state.busy, backEnabled = !state.busy) {
+        AdminTopBar("Avaliação", listOfNotNull(reviewStatuses[state.photoFilterStatus], "cópias de treino".takeIf { JSONObject(state.photoQuery).optString("training") == "true" }, "${state.reviewedCount} salvas").joinToString(" · "), back, "Voltar ao painel de triagens", state.busy, backEnabled = !state.busy) {
             IconButton(onClick = { filtersOpen = true }, enabled = !state.busy) { Icon(Icons.Outlined.Tune, "Filtrar fotos", tint = LeafColors.Green) }
             IconButton(onClick = actions.refresh, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "Atualizar fila", tint = LeafColors.Green) }
         }
@@ -107,6 +107,7 @@ import org.json.JSONObject
             Column(Modifier.fillMaxWidth().heightIn(max = 138.dp).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("PREVISÃO ORIGINAL", color = LeafColors.Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    TrainingBadge(row); Spacer(Modifier.width(6.dp))
                     AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
                 }
                 Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

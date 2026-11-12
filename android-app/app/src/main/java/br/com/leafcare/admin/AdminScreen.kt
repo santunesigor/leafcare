@@ -131,7 +131,8 @@ internal fun AdminContent(
                         evaluate = { actions.load("photos", JSONObject().put("status", "pending")) }, open = openGallery)
                 } else item {
                     AdminDashboard(state.dashboard, state.busy, onReview = { actions.load("photos", JSONObject().put("status", "pending")) },
-                        browse = openGallery, managesAccounts = state.managesAccounts) { actions.load("users", JSONObject()) }
+                        browse = openGallery, managesAccounts = state.managesAccounts,
+                        onReviewTraining = { actions.load("photos", JSONObject().put("status", "pending").put("training", "true")) }) { actions.load("users", JSONObject()) }
                 }
             } else {
                 if (state.section == "users") item {

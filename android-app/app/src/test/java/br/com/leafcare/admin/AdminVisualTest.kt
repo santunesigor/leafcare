@@ -119,6 +119,33 @@ class AdminVisualTest {
         compose.onNode(hasText("Triagem") and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).performClick(); assertEquals("triage", section)
         compose.onNode(hasText("Usuários") and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).performClick(); assertEquals("users", section)
     }
+    @Test fun trainingSummaryOpensPendingTrainingCopies() {
+        var section = ""; var query = JSONObject()
+        show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, dashboard = JSONObject("""{"users":2,"photos":11,"reviewed":3,"statuses":{"pending":8,"confirmed":2,"corrected":1},"models":{},"training":{"copies":6,"ready":2,"awaiting_review":3,"excluded":1,"expiring_soon":1,"ready_classes":{"frog_eye":2}}}""")),
+            actions(load = { s, p -> section = s; query = p }))
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Treinamento do modelo"))
+        compose.onNodeWithText("1 vencendo").assertIsDisplayed()
+        capture("admin-resumo-treinamento")
+        compose.onNodeWithText("Revisar cópias").performClick()
+        assertEquals("photos", section); assertEquals("true", query.getString("training")); assertEquals("pending", query.getString("status"))
+    }
+    @Test fun trainingCopyShowsDaysLeftInReview() {
+        val now = java.time.Instant.parse("2026-11-12T00:00:00Z")
+        assertEquals(10, trainingDaysLeft(JSONObject().put("training_expires_at", "2026-11-21T12:00:00.123+00:00"), now))
+        assertNull(trainingDaysLeft(JSONObject().put("training_expires_at", JSONObject.NULL), now))
+        assertNull(trainingDaysLeft(JSONObject(), now))
+        val row = photo().put("training_expires_at", java.time.Instant.now().plus(java.time.Duration.ofDays(10)).toString())
+        show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "photos", rows = listOf(row)))
+        compose.onNodeWithText("Treino · 10 dias").assertIsDisplayed()
+    }
+    @Test fun filterCanLimitToTrainingCopies() {
+        var query = JSONObject()
+        show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "photos", rows = listOf(photo())), actions(load = { _, p -> query = p }))
+        compose.onNodeWithContentDescription("Filtrar fotos").performClick()
+        compose.onNodeWithText("Só cópias de treino").performScrollTo().performClick()
+        compose.onNodeWithText("Aplicar filtros").performClick()
+        assertEquals("true", query.getString("training"))
+    }
     @Test fun photoQueueOpensDirectlyAndFiltersStayInPanel() {
         var skipped = false
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "photos", rows = listOf(photo())), actions(nextPhoto = { skipped = true }))

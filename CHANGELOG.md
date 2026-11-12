@@ -2,7 +2,7 @@
 
 ## [1.8.0] - em preparação
 
-Release reunindo tudo desde a 1.7.1. Durante a preparação, a versão do app fica em 1.8.0 e só o `versionCode` sobe a cada APK de teste (atual: 23).
+Release reunindo tudo desde a 1.7.1. Durante a preparação, a versão do app fica em 1.8.0 e só o `versionCode` sobe a cada APK de teste (atual: 24).
 
 ### Termos v1.4 e treinamento
 - Termos de Uso e Política de Privacidade v1.4: o uso das fotos analisadas para treinamento passa a ser condição de uso, registrada no servidor junto com o aceite; sem aceite, o app não pode ser usado (offline, só para quem já aceitou no aparelho). A tela de aceite serve para contas novas e antigas e explica quando o servidor ainda não foi atualizado.
@@ -10,6 +10,13 @@ Release reunindo tudo desde a 1.7.1. Durante a preparação, a versão do app fi
 - Privacidade e fotos mostra o estado da autorização e permite revogar com confirmação; depois disso, o app pede um novo aceite.
 - Revogar apaga de fato as cópias de treinamento no servidor; excluir uma análise remove sua cópia; excluir uma conta pelo painel remove também as cópias; fotos inconclusivas não são usadas para treinamento; revogações pendentes são enviadas antes de um novo aceite e ao sair da conta.
 - Migrations `20261111120000_legal_documents_v1_4_training_by_terms` e `20261111150000_training_photo_rules` e função `leafcare-admin` publicadas em produção.
+
+### Retreino do modelo com as fotos do app
+- Guia completo em `docs/RETREINAMENTO.md`, com as regras dos Termos v1.4, a preparação (ambientes, TLA, professor DINOv2-B, chave de serviço), o ciclo passo a passo e os critérios de promoção.
+- Supabase: `training_pool()` define em um só lugar quais cópias podem treinar: análise ativa e conclusiva feita depois do aceite v1.4, consentimento vigente, conta fora de exclusão, revisão confirmada ou corrigida, cópia com menos de 90 dias. Migration `20261112120000_training_pool` aplicada em produção.
+- Exportador corrigido: ainda exigia o consentimento 1.1 e não exportaria nenhuma foto da v1.4. Passa a usar `training_pool()`, decodifica como o app, agrupa por pessoa sem identificador reutilizável e mantém a limpeza de 30 dias funcionando no Python do sistema.
+- Novo pacote `machine-learning/retraining/`: monta o ciclo (TLA com split histórico + fotos de campo por pessoa, com teste de campo), treina com a receita do modelo atual, converte para TFLite com paridade e promove só por comando explícito, após replay com o pré-processamento do app.
+- Admin: bloco "Treinamento do modelo" no Resumo, selo "Treino · N dias" e filtro "Só cópias de treino"; a fila mostra primeiro as cópias de treino pendentes que vencem antes.
 
 ### Conta e estabilidade
 - Login não fica carregando indefinidamente (#18); abertura offline com token expirado não trava (#19); voltar ao app não reinicia a navegação nem perde a foto da galeria (#20).

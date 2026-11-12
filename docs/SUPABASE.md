@@ -74,6 +74,10 @@ Documentos v1.4: o aceite (`accept_current_legal_documents`) e o cadastro com v1
 
 Revogações apagam de fato as cópias de treinamento: o usuário passa a enxergar a própria pasta de `training-photos` (o Postgres aplica políticas SELECT a um DELETE com WHERE; sem isso, a exclusão removia 0 linhas). Cópias novas exigem análise ativa, conclusiva e conta liberada para envio (`can_send_training_photo`, com pausa, exclusão pendente e corte). Excluir cópias continua permitido com envios pausados; tombstones de análises seguem aguardando a liberação. A função `leafcare-admin` remove `analysis-photos` e `training-photos` antes de excluir a conta. Testes: `supabase/tests/training-consent.sql` e `supabase/functions/leafcare-admin/handler_test.ts`.
 
+### `20261112120000_training_pool.sql`
+
+Retreino com fotos de campo. `training_pool()` (somente `service_role`) lista as cópias de `training-photos` com menos de 90 dias e o estado de cada uma: `ready` (análise ativa e conclusiva feita depois do aceite v1.4, consentimento e autorização 1.2 vigentes, conta fora de exclusão e revisão `confirmed`/`corrected`), `awaiting_review`, `excluded` (duvidosa/rejeitada) ou `ineligible`. O rótulo de treino é a classe revisada. `admin_command` passa a devolver no painel `training` (prontas, aguardando revisão, fora do treino e quantas vencem em 14 dias), nas fotos `training_expires_at`/`training_state` e aceita o filtro `training=true`; a fila mostra primeiro as cópias de treino pendentes que vencem antes. Testes: `supabase/tests/training-pool.sql`. Uso completo: [Retreinar o modelo](RETREINAMENTO.md).
+
 ## RLS
 
 `profiles` e `analyses` usam Row Level Security.

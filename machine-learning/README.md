@@ -18,7 +18,9 @@ O modelo atual é **MobileNetV4 Small destilado**, TFLite float32 de 9,70 MiB co
 | `export_tflite.py`, `legacy/` | Pipeline Keras histórico; rejeita o modelo destilado atual. |
 | `experiments/dinov2/`, `experiments/vision/` | Benchmarks históricos e utilitários de métricas usados pelos experimentos. |
 | `data/`, `import_tla.py`, `prepare_dataset.py`, `tla_class_map.yaml` | Dataset, split e proveniência; nenhuma alteração nesta promoção. |
-| `export_authorized_training.py` | Exportação de fotos com consentimento vigente e revisão humana, para pasta local privada ignorada pelo Git. |
+| `export_authorized_training.py` | Estado do pool de treino e exportação das cópias prontas (revisão humana, regras v1.4) para pasta local privada, apagada em 30 dias. |
+| `retraining/` | Ciclo de retreino: montar TLA + campo, treinar com a receita definida, converter para TFLite e promover. Guia: [Retreinar o modelo](../docs/RETREINAMENTO.md). |
+| `runs/`, `.cache/` | Ciclos de retreino e ambientes locais; ignorados pelo Git. |
 
 `docs/` é irmã de `machine-learning/`. Nenhum experimento ou relatório entra no APK; somente o bundle e catálogo dos assets Android.
 
@@ -40,6 +42,15 @@ python deploy_distilled.py --install --pixel-parity-dir /tmp/leafcare-distilled-
 
 O backend Keras não possui modelo correspondente ao aluno. Arquivos `model.keras` locais antigos não participam da inferência atual. Novos testes permanecem isolados em `experiments/`; sua promoção ao app exige solicitação explícita.
 
-### Fotos autorizadas para triagem
+### Fotos do app para retreino
 
-O consentimento geral é opcional, desmarcado por padrão, e cada foto requer autorização individual antes da análise. O servidor aceita upload apenas para a própria conta, após aceite das versões atuais da Política e dos Termos, consentimento geral vigente e autorização vigente daquela foto. Recusar ou revogar mantém a análise e o histórico normais; revogações são sincronizadas antes de novos uploads. O bucket `training-photos` é privado e separado do histórico. Cópias no Supabase expiram após 90 dias; uma Edge Function percorre o bucket diariamente e remove arquivos vencidos. Exportações locais expiram após 30 dias; `--cleanup-only` executa a remoção e o timer de usuário em `systemd/` agenda essa verificação diária neste ambiente. `python export_authorized_training.py` consulta somente autorizações atuais, exige revisão humana (`confirmed`/`corrected`), valida qualidade, remove EXIF/identificadores e grava em `data/authorized_training/`, ignorada pelo Git. O exportador remove a pasta anterior antes de cada execução para reconciliar revogações. A chave de serviço é exclusiva do pipeline confiável: nunca deve ser colocada no APK, em arquivos versionados ou em logs. Backups manuais do banco mantidos pela equipe no Google Drive têm acesso restrito e retenção máxima de 30 dias; exportação SQL não inclui os arquivos de Storage.
+Desde os Termos v1.4, o uso das fotos analisadas para treinamento é condição de uso. Cada análise conclusiva feita depois do aceite gera uma cópia no bucket privado `training-photos`, separado do histórico. A cópia só entra em um conjunto de treino depois de revisão humana: confirmada ou corrigida no painel admin.
+
+- **Elegibilidade.** A função `training_pool()` do banco decide quem entra; o exportador baixa apenas o estado `ready`.
+- **Retenção.** Cópias no Supabase expiram em 90 dias (Edge Function diária). Exportações locais expiram em 30 dias: `--cleanup-only` remove e o timer de usuário em `systemd/` roda isso todo dia, com o Python do sistema.
+- **Anonimização.** A exportação recodifica as imagens, sem EXIF e sem identificadores de conta ou análise. Agrupa as fotos por pessoa com uma chave aleatória descartada a cada exportação.
+- **Chave de serviço.** É exclusiva do pipeline confiável: nunca no APK, em arquivos versionados ou em logs.
+
+Backups manuais do banco no Google Drive têm acesso restrito e retenção máxima de 30 dias; a exportação SQL não inclui os arquivos de Storage.
+
+O ciclo completo (exportar, montar o ciclo, treinar, converter, conferir e promover) está em [Retreinar o modelo](../docs/RETREINAMENTO.md).
