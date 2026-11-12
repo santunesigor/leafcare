@@ -279,7 +279,11 @@ class AuthViewModelTest {
             override suspend fun hasCurrentAcceptance(): Boolean = accepted
             override suspend fun acceptCurrentDocuments() { accepted = true }
         }
-        val vm = AuthViewModel(Application(), AuthRepository(backend), recoveryStore, legalApi)
+        val repository = AuthRepository(backend)
+        val vm = AuthViewModel(Application(), repository, recoveryStore, legalApi)
+        // Restore runs on the real IO dispatcher: let it finish without a session
+        // before the invite link brings one, or it may sign in ahead of the link.
+        repository.sessionChecked.first { it }
         advanceUntilIdle()
         backend.session = testSession()
         fun gate() = br.com.leafcare.appGateDestination(vm.session.value, vm.bootstrap.value, vm.legalAcceptance.value)
