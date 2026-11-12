@@ -2,7 +2,9 @@ package br.com.leafcare.ui
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
@@ -12,7 +14,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.unit.*
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.leafcare.R
 import br.com.leafcare.data.*
@@ -143,12 +144,19 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
             TextButton(onClick = onDelete, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(stringResource(R.string.button_delete), color = MaterialTheme.colorScheme.error) }
         }
     }
-    enlarged?.let { asset -> Dialog(onDismissRequest = { enlarged = null }) {
-        Surface(shape = RoundedCornerShape(24.dp), color = Color.White) { Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
-            AsyncImage(asset, stringResource(R.string.cd_enlarged_reference), Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Fit)
-            LeafButton(stringResource(R.string.button_close), { enlarged = null }, secondary = true)
-        } }
-    } }
+    enlarged?.let { asset ->
+        // Photo-only dialog: tap outside, back or the corner button closes it.
+        LeafDialogWindow({ enlarged = null }) {
+            Box {
+                AsyncImage(asset, stringResource(R.string.cd_enlarged_reference), Modifier.fillMaxWidth().aspectRatio(1f).background(Color(0xFF17241B)), contentScale = ContentScale.Fit)
+                IconButton(onClick = { enlarged = null }, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                    Box(Modifier.size(36.dp).background(Color.White.copy(alpha = .92f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(androidx.compose.material.icons.Icons.Outlined.Close, stringResource(R.string.button_close), Modifier.size(20.dp), tint = LeafColors.Text)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

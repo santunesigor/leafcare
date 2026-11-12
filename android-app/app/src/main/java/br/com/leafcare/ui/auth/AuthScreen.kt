@@ -650,7 +650,7 @@ fun NewPasswordScreen(
             onDismiss = { viewModel.dismissCancelDialog() },
             message = "Se você sair agora, será necessário solicitar um novo link de recuperação por e-mail.",
             actions = {
-                LeafButton("Continuar recuperação", { viewModel.dismissCancelDialog() })
+                LeafButton("Continuar", { viewModel.dismissCancelDialog() })
                 LeafButton("Sair", { viewModel.cancelRecovery() }, secondary = true, danger = true)
             },
         )
@@ -715,7 +715,7 @@ fun ProfileScreen(
             onDismiss = { pendingSignOut = null },
             message = unsyncedSignOutMessage(count),
             actions = {
-                LeafButton("Sair mesmo assim", { pendingSignOut = null; viewModel.signOut() }, danger = true)
+                LeafButton("Sair", { pendingSignOut = null; viewModel.signOut() }, danger = true)
                 LeafButton("Cancelar", { pendingSignOut = null }, secondary = true)
             },
         )

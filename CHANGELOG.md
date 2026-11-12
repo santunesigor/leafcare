@@ -1,5 +1,11 @@
 # Changelog — LeafCare
 
+## [1.8.4] - 2026-11-11
+
+- APK 1.8.4 (versionCode 22): modais mais compactos e consistentes. Diálogos com cartão menor, título de 18sp e botões lado a lado (Cancelar à esquerda, ação principal à direita), empilhando só quando o texto não cabe; rótulos curtos ("Excluir", "Revogar", "Sair", "Continuar").
+- "Analisando no aparelho" vira um aviso compacto com indicador ao lado do texto; ajuda da câmera usa o mesmo diálogo; foto ampliada do resultado fecha pelo botão no canto, sem botão "Fechar" extra.
+- Admin: painéis inferiores ocupam só a altura do conteúdo, cabeçalho compacto e sem botão "Fechar" duplicado; confirmações de conta (pausar, papel, convite, recuperação, exclusão) abrem em diálogo em vez de ocupar a tela inteira; detalhes da conta e da foto com informações em linhas mais enxutas.
+
 ## [1.8.3] - 2026-11-11
 
 - APK 1.8.3 (versionCode 21): revisão completa dos fluxos de conta, produtor, sincronização e admin.

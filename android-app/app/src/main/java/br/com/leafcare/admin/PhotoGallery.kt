@@ -150,22 +150,30 @@ import org.json.JSONObject
         item {
             AdminPanel {
                 AdminSectionTitle("Previsão original")
-                Text(catalog.get(row.getString("class_id")).name, fontWeight = FontWeight.SemiBold)
-                Text("${percent(row.optDouble("confidence").toFloat())} de confiança")
-                val top3 = row.optJSONArray("top3") ?: JSONArray()
-                repeat(top3.length()) { i -> val p = top3.getJSONObject(i)
-                    Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${percent(p.optDouble("confidence").toFloat())}", style = MaterialTheme.typography.bodySmall)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("${catalog.get(row.getString("class_id")).name} · ${percent(row.optDouble("confidence").toFloat())} de confiança", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    val top3 = row.optJSONArray("top3") ?: JSONArray()
+                    repeat(top3.length()) { i -> val p = top3.getJSONObject(i)
+                        Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${percent(p.optDouble("confidence").toFloat())}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+                    }
                 }
             }
         }
         item {
             AdminPanel {
-                AdminSectionTitle("Avaliação humana")
-                AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
-                if (!row.isNull("reviewed_class")) Text(catalog.get(row.getString("reviewed_class")).name)
-                if (!row.isNull("reviewed_at")) Text(adminDate(row.getString("reviewed_at")), style = MaterialTheme.typography.bodySmall)
-                if (!row.isNull("reviewer_id")) Text("Revisor: ${shortId(row.getString("reviewer_id"))}", style = MaterialTheme.typography.bodySmall)
-                if (!row.isNull("note") && row.optString("note").isNotBlank()) Text(row.getString("note"))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    AdminSectionTitle("Avaliação humana")
+                    AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (!row.isNull("reviewed_class")) Text(catalog.get(row.getString("reviewed_class")).name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    if (!row.isNull("note") && row.optString("note").isNotBlank()) Text(row.getString("note"), style = MaterialTheme.typography.bodyMedium)
+                    val meta = listOfNotNull(
+                        row.optString("reviewed_at").takeIf { !row.isNull("reviewed_at") }?.let(::adminDate),
+                        row.optString("reviewer_id").takeIf { !row.isNull("reviewer_id") }?.let { "Revisor: ${shortId(it)}" },
+                    )
+                    if (meta.isNotEmpty()) Text(meta.joinToString("  ·  "), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+                }
             }
         }
         item { Text("Enviada por: ${row.label("email")}\n${adminDate(row.label("created_at"))}\nModelo: ${shortId(row.label("model_sha256"))}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted) }
@@ -184,7 +192,7 @@ import org.json.JSONObject
     var advanced by rememberSaveable(state.photoQuery) { mutableStateOf(model.isNotBlank() || user.isNotBlank()) }
     val invalidDate = from == "!invalid!" || until == "!invalid!"
     val inverted = !invalidDate && from.isNotBlank() && until.isNotBlank() && from > until
-    AdminSheet("Filtrar fotos", close, heightFraction = .78f, footer = {
+    AdminSheet("Filtrar fotos", close, footer = {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             LeafButton("Limpar", {
                 status = "pending"; classFilter = ""; model = ""; user = ""; from = ""; until = ""

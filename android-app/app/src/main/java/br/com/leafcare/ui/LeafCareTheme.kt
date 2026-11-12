@@ -6,7 +6,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.unit.*
@@ -92,8 +95,12 @@ fun LeafButton(
 }
 
 /**
- * The app's dialog language (same as HelpSheet): white surface, 24dp corners,
- * title in the help-title style, muted message and full-width LeafButtons.
+ * The app's dialog language: a compact white card (20dp corners, 20dp inner
+ * padding), 18sp title, muted 14sp message and actions side by side — cancel
+ * on the left, the main action on the right — falling back to a stack only
+ * when a label does not fit (long text or enlarged fonts).
+ *
+ * Pass actions main-first: `LeafButton("Excluir"…); LeafButton("Cancelar"…)`.
  */
 @Composable
 fun LeafDialog(
@@ -101,9 +108,14 @@ fun LeafDialog(
     onDismiss: () -> Unit,
     message: String? = null,
     dismissible: Boolean = true,
-    actions: @Composable ColumnScope.() -> Unit = {},
+    actions: @Composable () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
+    LeafDialogWindow(onDismiss, dismissible) { LeafDialogContent(title, message, actions, content) }
+}
+
+@Composable
+internal fun LeafDialogWindow(onDismiss: () -> Unit, dismissible: Boolean = true, content: @Composable () -> Unit) {
     androidx.compose.ui.window.Dialog(
         onDismissRequest = { if (dismissible) onDismiss() },
         properties = androidx.compose.ui.window.DialogProperties(
@@ -112,9 +124,7 @@ fun LeafDialog(
             dismissOnClickOutside = dismissible,
         ),
     ) {
-        Surface(Modifier.padding(15.dp).widthIn(max = 390.dp).fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White) {
-            LeafDialogContent(title, message, actions, content)
-        }
+        Surface(Modifier.padding(horizontal = 24.dp, vertical = 16.dp).widthIn(max = 360.dp).fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = Color.White, content = content)
     }
 }
 
@@ -122,15 +132,59 @@ fun LeafDialog(
 fun LeafDialogContent(
     title: String,
     message: String? = null,
-    actions: @Composable ColumnScope.() -> Unit = {},
+    actions: @Composable () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
-    Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.46).sp, color = LeafColors.Text)
-            message?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = LeafColors.Muted) }
+            Text(title, Modifier.semantics { heading() }, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.2).sp, color = LeafColors.Text)
+            message?.let { Text(it, style = MaterialTheme.typography.bodyMedium, lineHeight = 20.sp, color = LeafColors.Muted) }
         }
         content()
-        Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = actions)
+        Box(Modifier.padding(top = 4.dp)) { LeafDialogActions(actions) }
+    }
+}
+
+/**
+ * Lays out dialog buttons in one row (reversed, so the first/main action sits
+ * on the right) when every label fits its share; otherwise stacks them with
+ * the main action on top.
+ */
+@Composable
+fun LeafDialogActions(content: @Composable () -> Unit) {
+    Layout(content) { measurables, constraints ->
+        val width = constraints.maxWidth
+        if (measurables.isEmpty()) return@Layout layout(width, 0) {}
+        val gap = 10.dp.roundToPx()
+        val count = measurables.size
+        val slot = (width - gap * (count - 1)) / count
+        val row = count > 1 && measurables.all { it.maxIntrinsicWidth(Constraints.Infinity) <= slot }
+        if (row) {
+            val placeables = measurables.map { it.measure(Constraints.fixedWidth(slot)) }
+            val height = placeables.maxOf { it.height }
+            layout(width, height) {
+                placeables.asReversed().forEachIndexed { index, p -> p.place(index * (slot + gap), (height - p.height) / 2) }
+            }
+        } else {
+            val placeables = measurables.map { it.measure(Constraints.fixedWidth(width)) }
+            layout(width, placeables.sumOf { it.height } + gap * (count - 1)) {
+                var y = 0
+                placeables.forEach { it.place(0, y); y += it.height + gap }
+            }
+        }
+    }
+}
+
+/** Blocking progress in the dialog language: spinner beside title and message. */
+@Composable
+fun LeafProgressDialog(title: String, message: String) {
+    LeafDialogWindow(onDismiss = {}, dismissible = false) {
+        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            CircularProgressIndicator(Modifier.size(28.dp), color = LeafColors.Green, trackColor = LeafColors.Border, strokeWidth = 3.dp)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, Modifier.semantics { heading() }, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, color = LeafColors.Text)
+                Text(message, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+            }
+        }
     }
 }

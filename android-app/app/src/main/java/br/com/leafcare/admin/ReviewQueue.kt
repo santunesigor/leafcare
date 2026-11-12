@@ -22,6 +22,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -208,22 +211,43 @@ import org.json.JSONObject
     }
 }
 
-/** Bounded sheet: only fields scroll; system bars and IME are consumed once. */
+/**
+ * Sheet that hugs its content up to [heightFraction] of the window: only the
+ * list scrolls, the header and an optional footer stay put. System bars and
+ * IME are consumed once. The close button in the header is the only close
+ * control unless a footer adds actions.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun AdminSheet(
     title: String, onClose: () -> Unit, dismissEnabled: Boolean = true, heightFraction: Float = .94f,
-    footer: @Composable () -> Unit = { TextButton(onClick = onClose, enabled = dismissEnabled, modifier = Modifier.fillMaxWidth().padding(8.dp)) { Text("Fechar") } },
+    footer: (@Composable () -> Unit)? = null,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = { if (dismissEnabled) onClose() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { dismissEnabled || it != SheetValue.Hidden }),
-        containerColor = LeafColors.Pale, contentColor = LeafColors.Text, contentWindowInsets = { WindowInsets(0, 0, 0, 0) }, dragHandle = null) {
-        Column(Modifier.fillMaxWidth().fillMaxHeight(heightFraction).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).navigationBarsPadding().imePadding()) {
-            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                IconButton(onClick = onClose, enabled = dismissEnabled) { Icon(Icons.Outlined.Close, "Fechar painel") }
-            }
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
-            Surface(color = Color.White, shadowElevation = 6.dp) { footer() }
+        containerColor = LeafColors.Pale, contentColor = LeafColors.Text, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }, dragHandle = null) {
+        Column(Modifier.fillMaxWidth().maxHeightFraction(heightFraction).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).navigationBarsPadding().imePadding()) {
+            AdminSheetHeader(title, onClose, dismissEnabled)
+            LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth(), contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+            footer?.let { Surface(color = Color.White, shadowElevation = 6.dp) { it() } }
         }
     }
+}
+
+/** Sheet header: grab handle, title and close button in one compact block. */
+@Composable internal fun AdminSheetHeader(title: String, onClose: () -> Unit, enabled: Boolean = true) {
+    Column(Modifier.fillMaxWidth()) {
+        Box(Modifier.padding(top = 8.dp).size(width = 32.dp, height = 4.dp).background(LeafColors.Border, RoundedCornerShape(2.dp)).align(Alignment.CenterHorizontally))
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, Modifier.weight(1f).semantics { heading() }, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+            IconButton(onClick = onClose, enabled = enabled) { Icon(Icons.Outlined.Close, "Fechar painel") }
+        }
+    }
+}
+
+/** Caps the height at a fraction of the incoming maximum without forcing it. */
+internal fun Modifier.maxHeightFraction(fraction: Float) = layout { measurable, constraints ->
+    val max = if (constraints.hasBoundedHeight) (constraints.maxHeight * fraction).toInt() else constraints.maxHeight
+    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = max))
+    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
 }

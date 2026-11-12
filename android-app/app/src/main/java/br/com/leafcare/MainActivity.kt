@@ -206,13 +206,7 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                         onCamera = { nav.navigate("camera") { popUpTo("history"); launchSingleTop = true } }) }
             }
             if (state.busy) {
-                LeafDialog(title = stringResource(R.string.analyzing_title), onDismiss = {}, dismissible = false) {
-                    Row(Modifier.fillMaxWidth().background(LeafColors.Tint, RoundedCornerShape(14.dp)).padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        CircularProgressIndicator(Modifier.size(26.dp), color = LeafColors.Green, trackColor = LeafColors.Border, strokeWidth = 3.dp)
-                        Text(stringResource(R.string.analyzing_message), style = MaterialTheme.typography.bodyMedium, color = LeafColors.Text)
-                    }
-                }
+                LeafProgressDialog(stringResource(R.string.analyzing_title), stringResource(R.string.analyzing_message))
             }
             state.error?.let { message ->
                 LeafDialog(title = stringResource(R.string.error_dialog_title), onDismiss = vm::clearError, message = message,

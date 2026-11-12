@@ -182,8 +182,7 @@ internal fun AdminContent(
             }
         }
     }
-    if (state.allowed && invite) AdminSheet("Convidar usuário", { invite = false }, dismissEnabled = !state.busy, heightFraction = .68f,
-        footer = { TextButton(onClick = { invite = false }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().padding(8.dp)) { Text("Cancelar") } }) {
+    if (state.allowed && invite) AdminSheet("Convidar usuário", { invite = false }, dismissEnabled = !state.busy) {
         item {
             Text("Informe o e-mail da pessoa. Depois, escolha um aplicativo para compartilhar o link de acesso ou envie o convite por e-mail.", color = LeafColors.Muted)
         }

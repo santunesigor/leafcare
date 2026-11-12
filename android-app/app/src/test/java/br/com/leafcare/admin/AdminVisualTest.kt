@@ -394,14 +394,14 @@ class AdminVisualTest {
         }))
         compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasText("Excluir conta e dados"))
         compose.onNodeWithText("Excluir conta e dados").performClick()
-        compose.onNodeWithText("Excluir conta").assertIsNotEnabled()
+        compose.onNodeWithText("Excluir").assertIsNotEnabled()
         capture("admin-confirmar-exclusao")
-        val email = compose.onNode(hasSetTextAction() and hasText("E-mail da conta"))
+        val email = compose.onNode(hasSetTextAction() and hasText("Digite o e-mail para confirmar"))
         email.performTextInput("errado@exemplo.com")
-        compose.onNodeWithText("Excluir conta").assertIsNotEnabled()
+        compose.onNodeWithText("Excluir").assertIsNotEnabled()
         assertEquals("", action)
         email.performTextReplacement("igor@exemplo.com")
-        compose.onNodeWithText("Excluir conta").assertIsEnabled().performClick()
+        compose.onNodeWithText("Excluir").assertIsEnabled().performClick()
         assertEquals("delete", action)
     }
     private fun capture(name: String) {

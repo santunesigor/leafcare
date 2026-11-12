@@ -178,7 +178,7 @@ class AuthBackButtonTest {
         }
         compose.onNodeWithContentDescription("Voltar").performClick()
         compose.onNodeWithText("Cancelar recuperação?").assertExists().assertIsDisplayed()
-        compose.onNodeWithText("Continuar recuperação").assertExists()
+        compose.onNodeWithText("Continuar").assertExists()
         compose.onNodeWithText("Sair").assertExists()
     }
 
@@ -188,7 +188,7 @@ class AuthBackButtonTest {
             LeafCareTheme { NewPasswordScreen(vm, {}, confirmCancelRecovery = true) }
         }
         compose.onNodeWithContentDescription("Voltar").performClick()
-        compose.onNodeWithText("Continuar recuperação").performClick()
+        compose.onNodeWithText("Continuar").performClick()
         compose.onNodeWithText("Cancelar recuperação?").assertDoesNotExist()
         compose.onNodeWithText("Nova senha").assertExists()
     }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.FactCheck
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.*
@@ -29,7 +28,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import br.com.leafcare.data.DiseaseCatalog
+import androidx.compose.ui.text.style.TextOverflow
 import br.com.leafcare.ui.LeafButton
+import br.com.leafcare.ui.LeafDialog
 import br.com.leafcare.ui.LeafColors
 import org.json.JSONArray
 import org.json.JSONObject
@@ -44,45 +45,19 @@ import org.json.JSONObject
     var operation by remember(row) { mutableStateOf<String?>(null) }
     val deleting = row.optBoolean("deletion_pending")
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = { if (!busy) actions.closeDetails() }, sheetState = sheet, containerColor = LeafColors.Pale, contentColor = LeafColors.Text, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
-        val action = operation
-        if (action != null) {
-            Column(Modifier.fillMaxWidth().fillMaxHeight(.9f).imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                IconButton(onClick = { operation = null }, enabled = !busy) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar ao usuário") }
-                AdminPanel {
-                    Icon(if (action == "delete") Icons.Outlined.DeleteOutline else Icons.Outlined.AdminPanelSettings, null, tint = if (action == "delete") MaterialTheme.colorScheme.error else LeafColors.Green, modifier = Modifier.size(30.dp))
-                    Text(when (action) { "delete" -> "Excluir esta conta?"; "pause" -> if (row.optBoolean("uploads_enabled")) "Pausar os envios?" else "Liberar novos envios?"; "role" -> "Alterar permissão?"; else -> "Enviar e-mail de acesso?" }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(row.label("email"), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-                    Text(when(action) {
-                        "delete" -> "Exclui conta, análises, revisões e fotos remotas. Cópias em aparelhos offline permanecem. Digite o e-mail da conta para confirmar."
-                        "pause" -> if (row.optBoolean("uploads_enabled")) "Login, uso local e leitura continuam. Novos envios ficarão pausados." else "Só resultados novos poderão ser enviados. O acumulado fica local."
-                        "role" -> "Admin revisa fotos. Superadmin gerencia admins e usuários. Apenas o proprietário gerencia superadmins; sua conta permanece protegida."
-                        else -> "As instruções serão enviadas por e-mail para esta conta."
-                    }, color = LeafColors.Muted)
-                    if (action == "role") Choice("Novo papel", chosenRole, roleChoices(state.role), !busy) { chosenRole = it }
-                    if (action == "delete") OutlinedTextField(confirmation, { confirmation = it }, label = { Text("E-mail da conta") }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), colors = leafFieldColors())
+    ModalBottomSheet(onDismissRequest = { if (!busy) actions.closeDetails() }, sheetState = sheet, containerColor = LeafColors.Pale, contentColor = LeafColors.Text,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp), dragHandle = null) {
+        Column(Modifier.fillMaxWidth().maxHeightFraction(.9f)) {
+            Box(Modifier.padding(top = 8.dp).size(width = 32.dp, height = 4.dp).background(LeafColors.Border, RoundedCornerShape(2.dp)).align(Alignment.CenterHorizontally))
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(44.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Person, null, tint = LeafColors.Green, modifier = Modifier.size(24.dp)) }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(row.optString("display_name").takeIf { it.isNotBlank() && it != "null" } ?: "Conta do usuário", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(row.label("email"), color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    LeafButton(if (action == "delete") "Excluir conta" else "Confirmar", {
-                        actions.action(action, JSONObject().put("id", row.getString("id")).put("enabled", !row.optBoolean("uploads_enabled"))
-                            .put("role", chosenRole).put("confirmation", confirmation)); operation = null
-                    }, danger = action == "delete",
-                        enabled = manageable && !busy && (action != "role" || chosenRole != row.optString("role")) && (action != "delete" || confirmation.equals(row.label("email"), true)))
-                    LeafButton("Cancelar", { operation = null }, secondary = true, enabled = !busy)
-                }
+                IconButton(onClick = actions.closeDetails, enabled = !busy) { Icon(Icons.Outlined.Close, "Fechar usuário") }
             }
-        } else {
-            LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(.9f), contentPadding = PaddingValues(20.dp, 0.dp, 20.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Box(Modifier.size(54.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Person, null, tint = LeafColors.Green, modifier = Modifier.size(28.dp)) }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(row.optString("display_name").takeIf { it.isNotBlank() && it != "null" } ?: "Conta do usuário", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(row.label("email"), color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
-                        }
-                        IconButton(onClick = actions.closeDetails, enabled = !busy) { Icon(Icons.Outlined.Close, "Fechar usuário") }
-                    }
-                }
+            LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth(), contentPadding = PaddingValues(20.dp, 0.dp, 20.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 error?.let { item { AdminNotice(it, error = true) } }
                 item {
                     AdminPanel {
@@ -90,10 +65,12 @@ import org.json.JSONObject
                             AdminBadge(roleLabel(row.optString("role")))
                             UploadsBadge(row)
                         }
-                        DetailLine("Cadastro", adminDate(row.label("created_at")))
-                        DetailLine("Último acesso", adminDate(row.label("last_sign_in_at")))
-                        DetailLine("E-mail", if (row.isNull("email_confirmed_at")) "Aguardando confirmação" else "Confirmado")
-                        Text("${row.optInt("analyses")} análises  ·  ${row.optInt("photos")} fotos", color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            DetailLine("Cadastro", adminDate(row.label("created_at")))
+                            DetailLine("Último acesso", adminDate(row.label("last_sign_in_at")))
+                            DetailLine("E-mail", if (row.isNull("email_confirmed_at")) "Aguardando confirmação" else "Confirmado")
+                            DetailLine("Envios", "${row.optInt("analyses")} análises · ${row.optInt("photos")} fotos")
+                        }
                     }
                 }
                 if (!manageable) item {
@@ -102,19 +79,23 @@ import org.json.JSONObject
                 item {
                     AdminPanel {
                         AdminSectionTitle("Acesso e sincronização")
-                        AccountAction(if (row.optBoolean("uploads_enabled")) "Pausar envios" else "Liberar novos envios", "Login e uso offline continuam disponíveis", Icons.Outlined.Sync, !busy && !deleting && manageable) { operation = "pause" }
-                        HorizontalDivider(color = LeafColors.Border)
-                        AccountAction("Alterar papel", "Escolha o nível de acesso desta pessoa", Icons.Outlined.AdminPanelSettings, !busy && !deleting && manageable) { operation = "role" }
+                        Column {
+                            AccountAction(if (row.optBoolean("uploads_enabled")) "Pausar envios" else "Liberar novos envios", "Login e uso offline continuam disponíveis", Icons.Outlined.Sync, !busy && !deleting && manageable) { operation = "pause" }
+                            HorizontalDivider(color = LeafColors.Border)
+                            AccountAction("Alterar papel", "Escolha o nível de acesso desta pessoa", Icons.Outlined.AdminPanelSettings, !busy && !deleting && manageable) { operation = "role" }
+                        }
                     }
                 }
                 item {
                     AdminPanel {
                         AdminSectionTitle("Conta")
-                        AccountAction("Reenviar convite / acesso", "Enviar instruções por e-mail", Icons.Outlined.MailOutline, !busy && !deleting && manageable) { operation = "reinvite" }
-                        HorizontalDivider(color = LeafColors.Border)
-                        AccountAction("Recuperar senha", "O usuário escolhe a nova senha", Icons.Outlined.LockReset, !busy && !deleting && manageable) { operation = "recovery" }
-                        HorizontalDivider(color = LeafColors.Border)
-                        AccountAction("Ver atividades", "Histórico de ações desta conta", Icons.Outlined.History, !busy) { actions.history(row.getString("id")) }
+                        Column {
+                            AccountAction("Reenviar convite / acesso", "Enviar instruções por e-mail", Icons.Outlined.MailOutline, !busy && !deleting && manageable) { operation = "reinvite" }
+                            HorizontalDivider(color = LeafColors.Border)
+                            AccountAction("Recuperar senha", "O usuário escolhe a nova senha", Icons.Outlined.LockReset, !busy && !deleting && manageable) { operation = "recovery" }
+                            HorizontalDivider(color = LeafColors.Border)
+                            AccountAction("Ver atividades", "Histórico de ações desta conta", Icons.Outlined.History, !busy) { actions.history(row.getString("id")) }
+                        }
                     }
                 }
                 item {
@@ -126,11 +107,44 @@ import org.json.JSONObject
             }
         }
     }
+    operation?.let { action ->
+        val email = row.label("email")
+        val pausing = row.optBoolean("uploads_enabled")
+        LeafDialog(
+            title = when (action) { "delete" -> "Excluir esta conta?"; "pause" -> if (pausing) "Pausar os envios?" else "Liberar novos envios?"; "role" -> "Alterar permissão?"; "recovery" -> "Enviar recuperação de senha?"; else -> "Enviar e-mail de acesso?" },
+            onDismiss = { operation = null },
+            dismissible = !busy,
+            message = when (action) {
+                "delete" -> "Exclui conta, análises, revisões e fotos remotas. Cópias em aparelhos offline permanecem."
+                "pause" -> if (pausing) "Login, uso local e leitura continuam. Novos envios ficarão pausados." else "Só resultados novos poderão ser enviados. O acumulado fica local."
+                "role" -> "Admin revisa fotos. Superadmin gerencia admins e usuários. Apenas o proprietário gerencia superadmins."
+                "recovery" -> "A pessoa recebe um link por e-mail para escolher uma nova senha."
+                else -> "As instruções serão enviadas por e-mail para esta conta."
+            },
+            actions = {
+                LeafButton(when (action) { "delete" -> "Excluir"; "recovery", "reinvite" -> "Enviar"; else -> "Confirmar" }, {
+                    actions.action(action, JSONObject().put("id", row.getString("id")).put("enabled", !pausing)
+                        .put("role", chosenRole).put("confirmation", confirmation)); operation = null
+                }, danger = action == "delete",
+                    enabled = manageable && !busy && (action != "role" || chosenRole != row.optString("role")) && (action != "delete" || confirmation.equals(email, true)))
+                LeafButton("Cancelar", { operation = null }, secondary = true, enabled = !busy)
+            },
+        ) {
+            Row(Modifier.fillMaxWidth().background(LeafColors.Tint, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.Person, null, Modifier.size(18.dp), tint = LeafColors.Green)
+                Text(email, style = MaterialTheme.typography.bodyMedium, color = LeafColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (action == "role") Choice("Novo papel", chosenRole, roleChoices(state.role), !busy) { chosenRole = it }
+            if (action == "delete") OutlinedTextField(confirmation, { confirmation = it }, label = { Text("Digite o e-mail para confirmar") }, singleLine = true,
+                shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), colors = leafFieldColors())
+        }
+    }
 }
 
 @Composable private fun AccountAction(title: String, subtitle: String, icon: ImageVector, enabled: Boolean, danger: Boolean = false, onClick: () -> Unit) {
     val color = if (danger) MaterialTheme.colorScheme.error else LeafColors.Green
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(enabled = enabled, onClick = onClick).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).clickable(enabled = enabled, onClick = onClick).padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, Modifier.size(23.dp), tint = if (enabled) color else LeafColors.Muted)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, color = if (enabled) color else LeafColors.Muted, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -140,8 +154,8 @@ import org.json.JSONObject
     }
 }
 @Composable private fun DetailLine(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted, modifier = Modifier.width(96.dp))
+        Text(value, style = MaterialTheme.typography.bodySmall, color = LeafColors.Text, modifier = Modifier.weight(1f))
     }
 }

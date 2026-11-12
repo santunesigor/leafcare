@@ -70,7 +70,7 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit, onRevoked: 
         onDismiss = { confirmRevoke = false },
         message = "Novos envios param e as cópias de treinamento serão excluídas. O LeafCare só poderá ser usado novamente depois de aceitar os termos outra vez.",
         actions = {
-            LeafButton("Revogar e sair do app", { confirmRevoke = false; vm.revokeTrainingConsent(onRevoked) }, danger = true)
+            LeafButton("Revogar", { confirmRevoke = false; vm.revokeTrainingConsent(onRevoked) }, danger = true)
             LeafButton("Cancelar", { confirmRevoke = false }, secondary = true)
         },
     )
