@@ -1,53 +1,38 @@
 # Changelog — LeafCare
 
-## [1.8.4] - 2026-11-11
+## [1.8.0] - em preparação
 
-- APK 1.8.4 (versionCode 22): modais mais compactos e consistentes. Diálogos com cartão menor, título de 18sp e botões lado a lado (Cancelar à esquerda, ação principal à direita), empilhando só quando o texto não cabe; rótulos curtos ("Excluir", "Revogar", "Sair", "Continuar").
-- "Analisando no aparelho" vira um aviso compacto com indicador ao lado do texto; ajuda da câmera usa o mesmo diálogo; foto ampliada do resultado fecha pelo botão no canto, sem botão "Fechar" extra.
-- Admin: painéis inferiores ocupam só a altura do conteúdo, cabeçalho compacto e sem botão "Fechar" duplicado; confirmações de conta (pausar, papel, convite, recuperação, exclusão) abrem em diálogo em vez de ocupar a tela inteira; detalhes da conta e da foto com informações em linhas mais enxutas.
+Release reunindo tudo desde a 1.7.1. Durante a preparação, a versão do app fica em 1.8.0 e só o `versionCode` sobe a cada APK de teste (atual: 23).
 
-## [1.8.3] - 2026-11-11
-
-- APK 1.8.3 (versionCode 21): revisão completa dos fluxos de conta, produtor, sincronização e admin.
-- Privacidade: revogar o consentimento apaga de fato as cópias de treinamento no servidor (antes a exclusão não removia nada); excluir uma análise remove sua cópia; excluir uma conta pelo painel remove também as cópias de treinamento; fotos inconclusivas não são usadas para treinamento; uma revogação pendente é enviada antes de um novo aceite e ao sair da conta.
-- Sincronização: autorizações que nunca poderiam ser enviadas não travam mais a fila em novas tentativas; revogações e exclusões vão antes da política de envio; atualizações recusadas pelo servidor ficam pendentes em vez de sumirem; a restauração não mistura contas.
-- Conta: link de convite/recuperação não trava mais na tela de aceite; a troca de senha não mostra mensagens antigas; e-mail recusado pelo servidor mostra "E-mail inválido"; o histórico da conta anterior não aparece após trocar de conta.
-- Câmera e resultado: resolução limitada para não estourar o limite de 16 MP; permissão e câmera escolhida sobrevivem à rotação; sem mensagens técnicas em inglês; o resultado volta ao histórico se a análise for apagada; limpeza de arquivos órfãos.
-- Sair da conta avisa quando há análises ainda não enviadas, que seriam apagadas se outra conta entrar no aparelho; o diálogo de exclusão diz que a análise sai também da conta.
-- Visual: cores de situação de revisão consistentes no admin, botões e campos no padrão do app, áreas de toque de 48dp, ícone de perfil, textos corrigidos.
-- Migration `20261111150000_training_photo_rules` e função `leafcare-admin` publicadas em produção.
-
-## [1.8.2] - 2026-11-11
-
-- APK 1.8.2 (versionCode 20): a tela de aceite deixa de dizer "Documentos atualizados" para contas que nunca aceitaram os termos (contas convidadas ou criadas pelo servidor); o texto passa a servir para contas novas e antigas.
-
-## [1.8.1] - 2026-11-11
-
-- APK 1.8.1 (versionCode 19): a tela de aceite explica quando o servidor ainda não foi atualizado para os documentos v1.4, em vez de pedir para conferir a conexão.
-- Card do uso das fotos no treinamento mais curto e legível: ícone, frase principal e três pontos.
-
-## [1.8.0] - 2026-11-11
-
-- APK 1.8.0 (versionCode 18): Termos de Uso e Política de Privacidade v1.4. O uso das fotos analisadas para treinamento passa a ser condição de uso, registrada no servidor junto com o aceite; sem aceite, o app não pode ser usado (offline, só para quem já aceitou no aparelho).
-- O modal "Analisar fotografia" foi removido: capturar ou escolher uma foto inicia a análise, e a foto é autorizada automaticamente.
+### Termos v1.4 e treinamento
+- Termos de Uso e Política de Privacidade v1.4: o uso das fotos analisadas para treinamento passa a ser condição de uso, registrada no servidor junto com o aceite; sem aceite, o app não pode ser usado (offline, só para quem já aceitou no aparelho). A tela de aceite serve para contas novas e antigas e explica quando o servidor ainda não foi atualizado.
+- Card do uso das fotos no treinamento curto e legível; o modal "Analisar fotografia" foi removido: capturar ou escolher uma foto inicia a análise.
 - Privacidade e fotos mostra o estado da autorização e permite revogar com confirmação; depois disso, o app pede um novo aceite.
-- Migration `20261111120000_legal_documents_v1_4_training_by_terms`; revogações são aceitas com qualquer versão de consentimento.
+- Revogar apaga de fato as cópias de treinamento no servidor; excluir uma análise remove sua cópia; excluir uma conta pelo painel remove também as cópias; fotos inconclusivas não são usadas para treinamento; revogações pendentes são enviadas antes de um novo aceite e ao sair da conta.
+- Migrations `20261111120000_legal_documents_v1_4_training_by_terms` e `20261111150000_training_photo_rules` e função `leafcare-admin` publicadas em produção.
 
-## [1.7.3] - 2026-11-11
+### Conta e estabilidade
+- Login não fica carregando indefinidamente (#18); abertura offline com token expirado não trava (#19); voltar ao app não reinicia a navegação nem perde a foto da galeria (#20).
+- Recuperação de senha resiste a rotação e ao encerramento do processo (#21, #24); sair sem internet desconecta localmente (#22); erro ao aceitar os termos permanece visível (#23); link de convite/recuperação não trava na tela de aceite.
+- Troca de senha sem mensagens antigas; e-mail recusado pelo servidor mostra "E-mail inválido"; o histórico da conta anterior não aparece após trocar de conta; sair avisa quando há análises ainda não enviadas.
 
-- APK 1.7.3 (versionCode 17): fotos do histórico aparecem assim que o download termina, sem precisar abrir a câmera (#36).
-- Tema completo com as cores do app: diálogos, calendário, menus e chips não usam mais o lilás padrão do Material 3; diálogos seguem o padrão da ajuda (#37).
-- Modal de filtrar fotos do admin com chips de situação, seções, erro de data visível e rodapé Limpar/Aplicar (#38).
-- Ajustes visuais em Privacidade e fotos, confirmações do admin e no resultado (#39).
+### Sincronização
+- Worker aguarda a sessão (#25), exclusões durante upload não se perdem (#26), fila não fica bloqueada (#31) e fotos de treinamento seguem o histórico (#30).
+- Revogações não são sobrescritas por consentimento antigo (#28) e sincronizam mesmo aguardando novo aceite (#29); revogações e exclusões vão antes da política de envio; atualizações recusadas ficam pendentes; a restauração não mistura contas.
+- Fotos do histórico aparecem assim que o download termina (#36).
 
-## [1.7.2] - 2026-11-11
+### Câmera e resultado
+- Resolução limitada para não estourar 16 MP; permissão e câmera escolhida sobrevivem à rotação; captura sem espaço e falta de memória mostram erro em vez de fechar o app (#34); sem mensagens técnicas em inglês; o resultado volta ao histórico se a análise for apagada; limpeza de arquivos órfãos.
 
-- APK 1.7.2 (versionCode 16): correções de estabilidade sem alteração de modelo, dataset ou schema.
-- Login não fica mais carregando indefinidamente (#18); abertura offline com token expirado não trava (#19); voltar ao app não reinicia a navegação nem perde a foto da galeria (#20).
-- Recuperação de senha resiste a rotação e ao encerramento do processo (#21, #24); sair sem internet desconecta localmente (#22); erro ao aceitar os termos permanece visível (#23).
-- Sincronização: worker aguarda a sessão (#25), exclusões durante upload não se perdem (#26), fila não fica bloqueada (#31) e fotos de treinamento seguem o histórico (#30).
-- Privacidade: revogações apagam todas as cópias possíveis (#27), não são sobrescritas por consentimento antigo (#28) e sincronizam mesmo aguardando novo aceite (#29).
-- Admin: rotação mantém o painel (#32) e datas digitadas no filtro funcionam (#33). Captura sem espaço e falta de memória mostram erro em vez de fechar o app (#34).
+### Visual
+- Tema completo com as cores do app, sem o lilás padrão do Material 3 (#37); áreas de toque de 48dp, ícone de perfil, textos corrigidos.
+- Modais compactos: cartão menor, título de 18sp, botões lado a lado (Cancelar à esquerda, ação principal à direita) que empilham só quando o texto não cabe; "Analisando no aparelho" como aviso compacto; ajuda da câmera no mesmo padrão; foto ampliada fecha pelo botão no canto.
+
+### Admin
+- Telas refeitas para caber sem rolagem desnecessária: cabeçalho único de 56dp (voltar, título, papel e atualizar) em todas as telas do admin e abas segmentadas em uma linha, no lugar do bloco "LEAFCARE / Administração" e dos quatro cartões de ícones.
+- Resumo sem repetir a triagem: faixa de pendentes com "Avaliar" (abre a fila direto), totais em uma linha (recebidas, revisadas, usuários e pausados), barra de resultados com legenda e modelos de origem.
+- Triagem com um único cartão de progresso e "Avaliar pendentes", situações e classes em listas agrupadas; Usuários e Atividades em listas agrupadas, sem títulos repetindo a aba, com "Convidar" ao lado do título da lista; paginação só aparece quando há outra página.
+- Painéis inferiores ocupam só a altura do conteúdo; confirmações de conta abrem em diálogo; filtro de fotos com chips de situação e rodapé Limpar/Aplicar (#38); rotação mantém o painel (#32) e datas digitadas no filtro funcionam (#33); cores de situação consistentes.
 
 ## [1.7.1] - 2026-10-19
 

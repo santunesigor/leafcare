@@ -52,19 +52,13 @@ import org.json.JSONObject
     val back = { if (!state.busy) actions.load(state.galleryOrigin, JSONObject()) }
     BackHandler(enabled = state.selected == null, onBack = back)
     Column(Modifier.fillMaxSize().background(LeafColors.Pale)) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = back, enabled = !state.busy) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar da galeria") }
-            Column(Modifier.weight(1f)) {
-                Text("Consultar fotos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(reviewStatuses[state.photoFilterStatus] ?: "Todas", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-            }
+        AdminTopBar("Consultar fotos", reviewStatuses[state.photoFilterStatus] ?: "Todas", back, "Voltar da galeria", state.busy, backEnabled = !state.busy) {
             IconButton(onClick = { filtersOpen = true }, enabled = !state.busy) { Icon(Icons.Outlined.Tune, "Filtrar fotos", tint = LeafColors.Green) }
             IconButton(onClick = actions.refresh, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "Atualizar galeria", tint = LeafColors.Green) }
         }
-        if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         key(state.page, state.photoQuery) {
             LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.weight(1f).fillMaxWidth().testTag("photo-gallery"),
-                contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item(span = { GridItemSpan(2) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (query.optString("class_id").isNotBlank()) AdminBadge(catalog.get(query.getString("class_id")).name)
@@ -80,13 +74,7 @@ import org.json.JSONObject
                 if (state.rows.isEmpty()) item(span = { GridItemSpan(2) }) {
                     AdminEmpty(if (state.busy) "Carregando fotos…" else "Sem fotos nesta seleção", "Ajuste os filtros ou atualize a consulta.", Icons.Outlined.PhotoLibrary)
                 }
-                item(span = { GridItemSpan(2) }) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { actions.page(-1) }, enabled = state.page > 0 && !state.busy) { Text("Anterior") }
-                        Text("Página ${state.page + 1}", style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = { actions.page(1) }, enabled = state.rows.size == 20 && !state.busy) { Text("Próxima") }
-                    }
-                }
+                item(span = { GridItemSpan(2) }) { AdminPager(state.page, state.rows.size == 20, state.busy, actions.page) }
             }
         }
     }
@@ -106,7 +94,7 @@ import org.json.JSONObject
         catch (_: Exception) { null }
         finally { loading = false }
     }
-    Surface(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(18.dp), color = androidx.compose.ui.graphics.Color.White,
+    Surface(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(14.dp), color = androidx.compose.ui.graphics.Color.White,
         border = BorderStroke(1.dp, LeafColors.Border), modifier = Modifier.fillMaxWidth().testTag("gallery-$id")) {
         Column {
             Box(Modifier.fillMaxWidth().aspectRatio(1f).background(LeafColors.Border), contentAlignment = Alignment.Center) {
@@ -115,7 +103,7 @@ import org.json.JSONObject
                 else if (loading) CircularProgressIndicator(Modifier.size(26.dp), strokeWidth = 2.dp)
                 else TextButton(onClick = { attempt++ }, enabled = enabled) { Icon(Icons.Outlined.Refresh, null, Modifier.size(16.dp)); Text("Recarregar", style = MaterialTheme.typography.labelSmall) }
             }
-            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
                 Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text("${percent(row.optDouble("confidence").toFloat())} · previsão original", style = MaterialTheme.typography.labelSmall, color = LeafColors.Muted)

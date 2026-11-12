@@ -41,16 +41,10 @@ import org.json.JSONObject
     val back = { if (!state.busy) actions.load("triage", JSONObject()) }
     BackHandler(onBack = back)
     Column(Modifier.fillMaxSize().background(LeafColors.Pale)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = back, enabled = !state.busy) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar ao painel de triagens") }
-            Column(Modifier.weight(1f)) {
-                Text("Avaliação", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("${reviewStatuses[state.photoFilterStatus]} · ${state.reviewedCount} salvas", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-            }
+        AdminTopBar("Avaliação", "${reviewStatuses[state.photoFilterStatus]} · ${state.reviewedCount} salvas", back, "Voltar ao painel de triagens", state.busy, backEnabled = !state.busy) {
             IconButton(onClick = { filtersOpen = true }, enabled = !state.busy) { Icon(Icons.Outlined.Tune, "Filtrar fotos", tint = LeafColors.Green) }
             IconButton(onClick = actions.refresh, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "Atualizar fila", tint = LeafColors.Green) }
         }
-        Box(Modifier.fillMaxWidth().height(3.dp)) { if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = LeafColors.Green) }
         if (state.rows.isEmpty()) {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
                 state.error?.let { AdminNotice(it, error = true); TextButton(onClick = actions.retryPhoto, enabled = !state.busy) { Text("Tentar novamente") } }

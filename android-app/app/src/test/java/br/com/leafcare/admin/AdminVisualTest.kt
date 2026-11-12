@@ -108,14 +108,15 @@ class AdminVisualTest {
         adminButton.performClick(); cameraButton.performClick()
         assertTrue(admin && camera)
     }
-    @Test fun dashboardOpensTriagePanelAndKeepsNavigation() {
+    @Test fun dashboardOpensPendingQueueAndKeepsNavigation() {
         var section = ""; var filters = JSONObject()
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, dashboard = JSONObject("""{"users":2,"photos":11,"reviewed":3,"paused":0,"statuses":{"pending":8,"confirmed":2,"corrected":1},"classes":{"frog_eye":5,"healthy":2},"models":{"modelo-exemplo":11}}""")),
             actions(load = { s, p -> section = s; filters = p }))
         compose.onNodeWithText("8").assertIsDisplayed()
         capture("admin-resumo")
-        compose.onNodeWithText("Abrir painel de triagem").performClick()
-        assertEquals("triage", section); assertFalse(filters.has("status"))
+        compose.onNodeWithText("Avaliar").performClick()
+        assertEquals("photos", section); assertEquals("pending", filters.getString("status"))
+        compose.onNode(hasText("Triagem") and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).performClick(); assertEquals("triage", section)
         compose.onNode(hasText("Usuários") and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).performClick(); assertEquals("users", section)
     }
     @Test fun photoQueueOpensDirectlyAndFiltersStayInPanel() {
@@ -155,7 +156,6 @@ class AdminVisualTest {
         var section = ""; var query = JSONObject()
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "triage", dashboard = JSONObject("""{"photos":11,"reviewed":3,"classes":{"frog_eye":5}}""")),
             actions(load = { s, p -> section = s; query = p }))
-        compose.onNodeWithText("Painel de triagens").assertIsDisplayed()
         compose.onNodeWithText("3 de 11 fotos revisadas").assertIsDisplayed()
         capture("admin-painel-triagens")
         compose.onNodeWithText("Avaliar pendentes").performClick()
@@ -185,7 +185,7 @@ class AdminVisualTest {
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "triage", dashboard = JSONObject("""{"photos":11,"reviewed":11}""")))
         compose.onNodeWithText("100%").assertIsDisplayed()
         compose.onNodeWithText("Nenhuma pendência").assertIsNotEnabled()
-        compose.onNodeWithText("Ver todas as fotos").performScrollTo().assertIsEnabled()
+        compose.onNodeWithText("Ver todas").performScrollTo().assertIsEnabled()
     }
     @Test fun dashboardLoadingDoesNotLookLikeAnEmptyQueue() {
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "triage", busy = true))
@@ -237,7 +237,7 @@ class AdminVisualTest {
     @Test fun invitationCanBeSharedThroughAppsAfterEnteringRecipientEmail() {
         var operation = ""; var email = ""
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "users"), actions(action = { op, data -> operation = op; email = data.getString("email") }))
-        compose.onNodeWithText("Convidar usuário").performClick()
+        compose.onNodeWithText("Convidar").performClick()
         compose.onNodeWithText("Compartilhar convite").assertIsNotEnabled()
         compose.onNodeWithText("Enviar por e-mail").assertIsNotEnabled()
         compose.onNode(hasSetTextAction() and hasText("E-mail da pessoa")).performTextInput("pessoa@exemplo.com")
@@ -248,7 +248,7 @@ class AdminVisualTest {
     @Test fun emailInvitationRemainsAvailable() {
         var operation = ""
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "users"), actions(action = { op, _ -> operation = op }))
-        compose.onNodeWithText("Convidar usuário").performClick()
+        compose.onNodeWithText("Convidar").performClick()
         compose.onNode(hasSetTextAction() and hasText("E-mail da pessoa")).performTextInput("pessoa@exemplo.com")
         compose.onNodeWithText("Enviar por e-mail").performClick()
         assertEquals("invite", operation)
