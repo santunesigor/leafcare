@@ -28,8 +28,8 @@ SET LOCAL ROLE authenticated;
 DO $$ BEGIN
  BEGIN UPDATE public.training_consents SET granted=true WHERE user_id=auth.uid(); RAISE EXCEPTION 'consent enabled with superseded documents'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
--- Accepting documents 1.4 is the consent.
-SELECT public.accept_current_legal_documents('1.4','1.4');
+-- Accepting documents 1.5 is the consent.
+SELECT public.accept_current_legal_documents('1.5','1.5');
 DO $$ BEGIN
  BEGIN INSERT INTO public.training_photo_authorizations(user_id,analysis_id,terms_version,authorized)
    VALUES(auth.uid(),'90000000-0000-0000-0000-000000000003','1.1',true); RAISE EXCEPTION 'superseded training version authorized';
@@ -60,7 +60,7 @@ INSERT INTO public.analyses(id,user_id,class_id,display_name,scientific_name,con
 INSERT INTO storage.objects(bucket_id,name) VALUES('analysis-photos','90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000005.jpg');
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub','90000000-0000-0000-0000-000000000001',true);
-SELECT public.accept_current_legal_documents('1.4','1.4');
+SELECT public.accept_current_legal_documents('1.5','1.5');
 INSERT INTO public.training_photo_authorizations(user_id,analysis_id,terms_version,authorized)
  SELECT auth.uid(), id, '1.2', true FROM public.analyses
  WHERE id IN ('90000000-0000-0000-0000-000000000005','90000000-0000-0000-0000-000000000006','90000000-0000-0000-0000-000000000007','90000000-0000-0000-0000-000000000008');
@@ -82,4 +82,22 @@ END $$;
 DELETE FROM storage.objects WHERE bucket_id='training-photos' AND name='90000000-0000-0000-0000-000000000001/90000000-0000-0000-0000-000000000005.jpg';
 RESET ROLE;
 SELECT pg_temp.assert_true((SELECT count(*)=0 FROM storage.objects WHERE bucket_id='training-photos'),'paused account can delete its training copies');
+
+-- A user who accepted only documents 1.4 can still send training copies; they keep the 90-day retention.
+INSERT INTO auth.users(id,email) VALUES('90000000-0000-0000-0000-000000000009','v14-only@test.local');
+INSERT INTO public.legal_document_acceptances(user_id,terms_version,privacy_version)
+VALUES('90000000-0000-0000-0000-000000000009','1.4','1.4');
+INSERT INTO public.analyses(id,user_id,class_id,display_name,scientific_name,confidence,top3,inconclusive,threshold,inference_ms,model_sha256,app_version)
+ VALUES('90000000-0000-0000-0000-00000000000a','90000000-0000-0000-0000-000000000009','frog_eye','Olho-de-rã','Cercospora',0.8,'[]',false,0.5,3,'test-model','test');
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','90000000-0000-0000-0000-000000000009',true);
+INSERT INTO public.training_consents(user_id,terms_version,granted) VALUES(auth.uid(),'1.2',true);
+INSERT INTO public.training_photo_authorizations(user_id,analysis_id,terms_version,authorized)
+ VALUES(auth.uid(),'90000000-0000-0000-0000-00000000000a','1.2',true);
+INSERT INTO storage.objects(bucket_id,name) VALUES('training-photos','90000000-0000-0000-0000-000000000009/90000000-0000-0000-0000-00000000000a.jpg');
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT pg_temp.assert_true((SELECT expires_at=uploaded_at+interval '90 days' FROM public.training_pool()
+  WHERE analysis_id='90000000-0000-0000-0000-00000000000a'),'copy sent under documents 1.4 expires 90 days after upload');
+RESET ROLE;
 ROLLBACK;

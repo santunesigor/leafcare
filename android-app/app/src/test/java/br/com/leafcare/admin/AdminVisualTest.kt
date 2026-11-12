@@ -138,6 +138,14 @@ class AdminVisualTest {
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "photos", rows = listOf(row)))
         compose.onNodeWithText("Treino · 10 dias").assertIsDisplayed()
     }
+    @Test fun permanentTrainingCopyShowsBadgeWithoutDays() {
+        assertTrue(isTrainingCopy(JSONObject().put("training_state", "ready").put("training_expires_at", JSONObject.NULL)))
+        assertFalse(isTrainingCopy(photo()))
+        val row = photo().put("training_state", "awaiting_review").put("training_expires_at", JSONObject.NULL)
+        show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "photos", rows = listOf(row)))
+        compose.onNodeWithText("Treino").assertIsDisplayed()
+        compose.onNodeWithText("Treino ·", substring = true).assertDoesNotExist()
+    }
     @Test fun filterCanLimitToTrainingCopies() {
         var query = JSONObject()
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "photos", rows = listOf(photo())), actions(load = { _, p -> query = p }))

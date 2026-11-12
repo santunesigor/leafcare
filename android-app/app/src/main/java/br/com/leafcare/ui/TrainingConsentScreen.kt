@@ -3,8 +3,6 @@ package br.com.leafcare.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,10 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,9 +50,9 @@ fun TrainingConsentScreen(vm: LeafCareViewModel, onBack: () -> Unit, onRevoked: 
                 }
             }
             Text("Como suas fotos são usadas", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
-            Text("Usar o LeafCare inclui autorizar o uso das fotos que você analisa para treinar o modelo de IA. Cada foto com resultado conclusivo é copiada para uma área privada, separada do histórico, e só entra em um conjunto de treinamento após revisão humana e validação de qualidade. Identificadores da conta e metadados EXIF são removidos na exportação.", color = LeafColors.Text)
+            Text("Usar o LeafCare inclui autorizar o uso das fotos que você analisa para treinar o modelo de IA. Cada foto com resultado conclusivo é copiada para uma área privada, separada do histórico, e só entra em um conjunto de treinamento após revisão humana e validação de qualidade. Identificadores da conta e metadados EXIF são removidos na cópia usada no treino.", color = LeafColors.Text)
             Text("Prazos", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
-            Text("Cada cópia é apagada em até 90 dias do envio, ou antes, se você revogar. Exportações locais de treinamento são apagadas em até 30 dias.", color = LeafColors.Text)
+            Text("As cópias ficam no conjunto de treinamento por tempo indeterminado e são apagadas quando você revoga, exclui a análise ou exclui a conta. Cópias de fotos analisadas antes da versão 1.5 são apagadas em até 90 dias do envio.", color = LeafColors.Text)
             Text("Revogação", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
             Text("Ao revogar, novos envios param e a exclusão das cópias sob controle do projeto é iniciada assim que houver conexão. Como esse uso é condição para usar o app, o LeafCare só volta a funcionar com um novo aceite. Pesos de modelos já treinados não são desfeitos automaticamente.", color = LeafColors.Text)
             PrivacyContactCard()

@@ -10,7 +10,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.Charset
 import java.security.MessageDigest
-import kotlin.collections.emptyList
 
 data class ClassifierResult(
     val predictions: List<Prediction>,

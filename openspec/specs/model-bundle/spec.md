@@ -52,6 +52,6 @@ O pipeline SHALL verificar pixels RGB compartilhados entre Python e Kotlin contr
 
 - [LeafClassifier](../../../android-app/app/src/main/java/br/com/leafcare/ml/LeafClassifier.kt)
 - [ModelBundleTest](../../../android-app/app/src/test/java/br/com/leafcare/ModelBundleTest.kt)
-- [Testes do bundle e do ensemble histórico](../../../machine-learning/tests/test_ensemble.py)
+- [Testes de contrato do bundle](../../../machine-learning/tests/test_contract.py)
 - [Validador do bundle](../../../machine-learning/validate_bundle.py)
 - [Contrato e métricas](../../../docs/MACHINE_LEARNING.md)

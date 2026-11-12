@@ -284,7 +284,7 @@ class AuthViewModelTest {
         backend.session = testSession()
         fun gate() = br.com.leafcare.appGateDestination(vm.session.value, vm.bootstrap.value, vm.legalAcceptance.value)
 
-        vm.handleAuthDeeplink("leafcare://auth/reset-password#access_token=at&refresh_token=rt&type=invite")
+        vm.noteDeeplink("leafcare://auth/reset-password#access_token=at&refresh_token=rt&type=invite")
         advanceUntilIdle()
         vm.syncLegalAcceptanceScreen() // gate effect
         assertEquals(LegalAcceptanceState.REQUIRED, vm.legalAcceptance.value)
@@ -419,7 +419,7 @@ class AuthViewModelTest {
         // Regression guard: signup confirmation OTP stays out (no corporate
         // SMTP domain). VerifyEmail is the link-confirmation screen (no code).
         assertEquals(
-            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.TermsOfUse, AuthScreen.PrivacyPolicy, AuthScreen.LegalAcceptance, AuthScreen.VerifyEmail, AuthScreen.ForgotPassword, AuthScreen.NewPassword, AuthScreen.Profile),
+            setOf(AuthScreen.Login, AuthScreen.SignUp, AuthScreen.TermsOfUse, AuthScreen.PrivacyPolicy, AuthScreen.LegalAcceptance, AuthScreen.VerifyEmail, AuthScreen.ForgotPassword, AuthScreen.NewPassword),
             AuthScreen.values().toSet()
         )
     }
@@ -612,7 +612,7 @@ class AuthViewModelTest {
         recoveryStore.lastRecoveryRequestAt = System.currentTimeMillis() - 42_000L
         backend.failExchange = true
 
-        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=used-code")
+        viewModel.noteDeeplink("leafcare://auth/reset-password?code=used-code")
         advanceUntilIdle()
 
         val error = viewModel.error.value.orEmpty()
@@ -801,7 +801,7 @@ class AuthViewModelTest {
         // No repo session yet; the fake backend yields one after the exchange.
         backend.session = testSession()
 
-        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=pkce-code")
+        viewModel.noteDeeplink("leafcare://auth/reset-password?code=pkce-code")
         advanceUntilIdle()
 
         assertEquals(listOf("pkce-code"), backend.exchangeCodeCalls)
@@ -812,7 +812,7 @@ class AuthViewModelTest {
     @Test fun recoveryDeeplinkTokens_opensNewPassword() = runTest(dispatcher) {
         backend.session = testSession()
 
-        viewModel.handleAuthDeeplink(
+        viewModel.noteDeeplink(
             "leafcare://auth/reset-password#access_token=at&refresh_token=rt&type=recovery"
         )
         advanceUntilIdle()
@@ -826,8 +826,8 @@ class AuthViewModelTest {
         backend.session = null
         viewModel.setScreen(AuthScreen.Login)
 
-        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=%20")
-        viewModel.handleAuthDeeplink("https://evil.example/x")
+        viewModel.noteDeeplink("leafcare://auth/reset-password?code=%20")
+        viewModel.noteDeeplink("https://evil.example/x")
         advanceUntilIdle()
 
         assertTrue(backend.exchangeCodeCalls.isEmpty())
@@ -843,7 +843,7 @@ class AuthViewModelTest {
         advanceUntilIdle()
         viewModel.setScreen(AuthScreen.Login)
 
-        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=pkce-code")
+        viewModel.noteDeeplink("leafcare://auth/reset-password?code=pkce-code")
         advanceUntilIdle()
 
         // A logged-in session is never replaced by a link tap.
@@ -853,7 +853,7 @@ class AuthViewModelTest {
 
     @Test fun cancelRecovery_signsOutAndReturnsToForgotPassword() = runTest(dispatcher) {
         backend.session = testSession()
-        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=pkce-code")
+        viewModel.noteDeeplink("leafcare://auth/reset-password?code=pkce-code")
         advanceUntilIdle()
         assertEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
         assertEquals(AuthScreen.NewPassword, viewModel.uiState.value.currentScreen)
@@ -886,14 +886,14 @@ class AuthViewModelTest {
 
     @Test fun expiredLinkAfterPending_doesNotConserveStaleSession() = runTest(dispatcher) {
         backend.session = testSession()
-        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=first-code")
+        viewModel.noteDeeplink("leafcare://auth/reset-password?code=first-code")
         advanceUntilIdle()
         assertEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
 
         // A second, expired link drops the stale session and fails loudly.
         backend.session = null
         backend.failExchange = true
-        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=expired-code")
+        viewModel.noteDeeplink("leafcare://auth/reset-password?code=expired-code")
         advanceUntilIdle()
 
         assertEquals(1, backend.signOutCalls)
@@ -909,7 +909,7 @@ class AuthViewModelTest {
     @Test fun recoverySuccess_persistsPendingMarker() = runTest(dispatcher) {
         backend.session = testSession()
 
-        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=pkce-code")
+        viewModel.noteDeeplink("leafcare://auth/reset-password?code=pkce-code")
         advanceUntilIdle()
 
         assertEquals(AuthBootstrapState.RECOVERY_PENDING, viewModel.bootstrap.value)
@@ -918,7 +918,7 @@ class AuthViewModelTest {
 
     @Test fun updatePasswordSuccess_clearsPendingMarker() = runTest(dispatcher) {
         backend.session = testSession()
-        viewModel.handleAuthDeeplink("leafcare://auth/reset-password?code=pkce-code")
+        viewModel.noteDeeplink("leafcare://auth/reset-password?code=pkce-code")
         advanceUntilIdle()
         assertTrue(recoveryStore.isPending)
 
@@ -939,7 +939,7 @@ class AuthViewModelTest {
             viewModel.navigation.collect { events.add(it) }
         }
 
-        viewModel.handleAuthDeeplink("leafcare://auth/confirm-email?code=pkce-code")
+        viewModel.noteDeeplink("leafcare://auth/confirm-email?code=pkce-code")
         advanceUntilIdle()
 
         assertEquals(listOf("pkce-code"), backend.exchangeCodeCalls)
@@ -952,7 +952,7 @@ class AuthViewModelTest {
     @Test fun confirmDeeplinkTokens_authenticatesWithoutNewPassword() = runTest(dispatcher) {
         backend.session = testSession()
 
-        viewModel.handleAuthDeeplink(
+        viewModel.noteDeeplink(
             "leafcare://auth/confirm-email#access_token=at&refresh_token=rt&type=signup"
         )
         advanceUntilIdle()
@@ -965,8 +965,8 @@ class AuthViewModelTest {
         backend.session = null
         viewModel.setScreen(AuthScreen.Login)
 
-        viewModel.handleAuthDeeplink("leafcare://auth/confirm-email?code=%20")
-        viewModel.handleAuthDeeplink("leafcare://auth/unknown?code=abc")
+        viewModel.noteDeeplink("leafcare://auth/confirm-email?code=%20")
+        viewModel.noteDeeplink("leafcare://auth/unknown?code=abc")
         advanceUntilIdle()
 
         assertTrue(backend.exchangeCodeCalls.isEmpty())

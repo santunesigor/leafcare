@@ -30,7 +30,7 @@ internal class LegalAcceptanceRepository(
     private val consentDao: TrainingConsentDao? = null,
 ) : LegalAcceptanceApi {
     /**
-     * Current when the server holds the v1.4 receipt and the training consent it
+     * Current when the server holds the current (v1.5) receipt and the training consent it
      * grants. A revocation made on this device wins until it reaches the server;
      * the local consent follows the server otherwise.
      */
@@ -112,7 +112,7 @@ internal class LegalAcceptanceRepository(
             val status = connection.responseCode
             if (status !in 200..299) {
                 val detail = runCatching { connection.errorStream?.use { String(it.readBytes(), Charsets.UTF_8) } }.getOrNull().orEmpty()
-                // The server still runs an older document version: the 1.4 migration is missing.
+                // The server still runs an older document version: the 1.5 migration is missing.
                 if ("unsupported legal document version" in detail) throw LegalVersionUnsupportedException()
                 error("Não foi possível confirmar o aceite (${status})")
             }

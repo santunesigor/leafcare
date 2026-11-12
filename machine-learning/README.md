@@ -1,56 +1,59 @@
 # Machine Learning do LeafCare
 
-O modelo atual é **MobileNetV4 Small destilado**, TFLite float32 de 9,70 MiB com 16 classes. Professor DINOv2-B somente no treino. Contrato, métricas, comandos e limitações: [Machine Learning](../docs/MACHINE_LEARNING.md).
+Modelo do app: **MobileNetV4 Small destilado** de um professor DINOv2-B, TFLite float32, 16 classes, classificação no aparelho. Contrato, métricas e limitações: [Machine Learning](../docs/MACHINE_LEARNING.md). Ciclo de retreino: [Retreinar o modelo](../docs/RETREINAMENTO.md).
 
-## Organização
+## Arquivos
 
 | Caminho | Uso |
 | --- | --- |
-| `deploy_distilled.py` | Promoção hash-verificada do aluno selecionado; replay antes de atualizar bundle. |
-| `artifacts/` | TFLite, classes, catálogo, metadata, treinamento e métricas atuais. |
-| `leafcare/`, `predict.py`, `validate_bundle.py` | Preprocessing, CLI e validação do bundle instalado. |
-| `tests/` | Suíte padrão do contrato atual e replay dos resultados históricos. |
-| `experiments/distillation/` | Receita de treino/exportação; ambientes e checkpoints locais em `.cache`, ignorados. |
-| `benchmark_artifacts/distillation/` | Registros dos dez experimentos originais, preservados. |
-| `../docs/model-reports/mobilenetv4-distilled/` | Relatórios exclusivos da integração atual. |
-| `train_ensemble.py`, `experiments/ensemble/`, `benchmark_artifacts/ensemble/` | Receita e evidências históricas do ensemble; reproduzir no checkout `v1.1.2`. |
-| `../docs/model-reports/ensemble/` | Relatórios históricos do ensemble, preservados. |
-| `export_tflite.py`, `legacy/` | Pipeline Keras histórico; rejeita o modelo destilado atual. |
-| `experiments/dinov2/`, `experiments/vision/` | Benchmarks históricos e utilitários de métricas usados pelos experimentos. |
-| `data/`, `import_tla.py`, `prepare_dataset.py`, `tla_class_map.yaml` | Dataset, split e proveniência; nenhuma alteração nesta promoção. |
-| `export_authorized_training.py` | Estado do pool de treino e exportação das cópias prontas (revisão humana, regras v1.4) para pasta local privada, apagada em 30 dias. |
-| `retraining/` | Ciclo de retreino: montar TLA + campo, treinar com a receita definida, converter para TFLite e promover. Guia: [Retreinar o modelo](../docs/RETREINAMENTO.md). |
-| `runs/`, `.cache/` | Ciclos de retreino e ambientes locais; ignorados pelo Git. |
+| `artifacts/` | Bundle atual do app: `leafcare.tflite`, classes, catálogo, metadados, treino e métricas (também a referência de produção no retreino). |
+| `retrain.py` | Ponto de entrada único do retreino: `setup`, `status`, `sync`, `run`, `promote`. |
+| `training/` | Pipeline: `sync` (espelho das fotos), `dataset` (TLA + campo), `train` (professor e aluno), `export` (TFLite, paridade e replay), `promote` (recomendação e instalação), `metrics`. |
+| `leafcare/`, `predict.py`, `validate_bundle.py` | Pré-processamento e inferência com o contrato do app; previsão local e validação do bundle Android. |
+| `config.yaml` | Política do ciclo: seed, proporções do split de campo, mínimo de grupos, quase-duplicatas, tamanho mínimo, critério de promoção. |
+| `data/prepared/`, `data/groups.csv`, `data/import_report.json`, `import_tla.py`, `tla_class_map.yaml` | TLA: split histórico fixo (489/104/103) e proveniência. As imagens não são redistribuídas: importe uma vez com `import_tla.py` para `data/raw/`. |
+| `requirements*.txt` | `requirements.txt` (CI e testes), `requirements-train.txt` (treino), `requirements-export.txt` (conversão TFLite). |
+| `tests/` | Contrato, espelho, dataset, CLI e o ciclo completo de fumaça (opt-in). |
 
-`docs/` é irmã de `machine-learning/`. Nenhum experimento ou relatório entra no APK; somente o bundle e catálogo dos assets Android.
+Ignorados pelo Git: `data/raw/` (TLA), `data/field/` (espelho das fotos de campo, dados sensíveis), `runs/` (ciclos) e `.cache/` (ambientes, pesos pré-treinados, professores).
 
-## Comandos
+## Retreino
 
-Execute aqui, com Python 3.12 e `requirements.txt` instalados:
+Python 3.12 e [uv](https://docs.astral.sh/uv/). Credenciais só pelo ambiente: `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`.
 
 ```bash
+python retrain.py setup                       # cria .cache/retrain-venv e .cache/retrain-export-venv
+python retrain.py status                      # pool no servidor e espelho local; não baixa nada
+python retrain.py sync                        # atualiza data/field/
+python retrain.py run --name 2026-12-retreino # ciclo completo; retoma etapas concluídas
+python retrain.py promote --name 2026-12-retreino --model-name mobilenetv4-2026-12
+```
+
+`run` faz: sincronização → `runs/<ciclo>/dataset.json` (TLA com o split histórico + fotos `ready` com o rótulo revisado, split determinístico por pessoa: 70/15/15, teste de campo só com 5 grupos ou mais) → professor DINOv2-B treinado no ciclo e guardado em `.cache/teachers/` (ou `--teacher ARQUIVO`) → aluno destilado → TFLite com paridade → replay com o pré-processamento do app, do candidato e do modelo atual → `comparison.json`. A recomendação exige teste de campo, Top-1 de campo ≥ modelo atual e queda de Macro-F1 no teste TLA ≤ 0,02. `promote` só instala por comando explícito; depois rode os testes Android e gere o APK.
+
+O treino roda em `.cache/retrain-venv` (GPU quando houver; lotes de 8 cabem numa GTX 1650 de 4 GB) e a conversão em `.cache/retrain-export-venv`; `retrain.py` escolhe o ambiente sozinho.
+
+### Espelho `data/field/`
+
+As cópias do bucket privado `training-photos` ficam no servidor até revogação, exclusão da análise ou da conta (Termos v1.5); cópias dos Termos v1.4 vencem 90 dias após o envio. O espelho segue o servidor a cada `sync`: baixa fotos novas prontas, apaga as que saíram de `ready` (inclusive vencidas, também sem rede no início de `run`) e atualiza rótulos sem novo download.
+
+```
+data/field/            (modo 700)
+  .secret              chave HMAC local (modo 600); se for apagada, o espelho é refeito e os grupos mudam
+  manifest.json        por foto: rótulo revisado, grupo da pessoa, validade, hashes e tamanho
+  <chave>.jpg          JPEG recodificado, sem EXIF
+```
+
+Nomes e manifesto não têm IDs de conta ou análise: a chave da foto e o grupo da pessoa são HMAC-SHA256 com o segredo local, estáveis entre ciclos. A chave de serviço nunca entra no APK, em arquivos versionados ou em logs.
+
+## Testes
+
+```bash
+pip install -r requirements.txt
 python -m pytest -q
-python validate_bundle.py --require-model
+python validate_bundle.py
 python predict.py ../samples/reference_frog_eye.jpg
+
+# ciclo completo sintético (minutos, CPU), em qualquer um dos dois ambientes
+LEAFCARE_TRAINING_SMOKE=1 .cache/retrain-venv/bin/python -m pytest -q tests/test_smoke.py
 ```
-
-Com dados brutos e caches do experimento disponíveis:
-
-```bash
-python deploy_distilled.py --install --pixel-parity-dir /tmp/leafcare-distilled-parity
-```
-
-O backend Keras não possui modelo correspondente ao aluno. Arquivos `model.keras` locais antigos não participam da inferência atual. Novos testes permanecem isolados em `experiments/`; sua promoção ao app exige solicitação explícita.
-
-### Fotos do app para retreino
-
-Desde os Termos v1.4, o uso das fotos analisadas para treinamento é condição de uso. Cada análise conclusiva feita depois do aceite gera uma cópia no bucket privado `training-photos`, separado do histórico. A cópia só entra em um conjunto de treino depois de revisão humana: confirmada ou corrigida no painel admin.
-
-- **Elegibilidade.** A função `training_pool()` do banco decide quem entra; o exportador baixa apenas o estado `ready`.
-- **Retenção.** Cópias no Supabase expiram em 90 dias (Edge Function diária). Exportações locais expiram em 30 dias: `--cleanup-only` remove e o timer de usuário em `systemd/` roda isso todo dia, com o Python do sistema.
-- **Anonimização.** A exportação recodifica as imagens, sem EXIF e sem identificadores de conta ou análise. Agrupa as fotos por pessoa com uma chave aleatória descartada a cada exportação.
-- **Chave de serviço.** É exclusiva do pipeline confiável: nunca no APK, em arquivos versionados ou em logs.
-
-Backups manuais do banco no Google Drive têm acesso restrito e retenção máxima de 30 dias; a exportação SQL não inclui os arquivos de Storage.
-
-O ciclo completo (exportar, montar o ciclo, treinar, converter, conferir e promover) está em [Retreinar o modelo](../docs/RETREINAMENTO.md).

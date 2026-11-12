@@ -207,8 +207,8 @@ Depois de modificar o modelo, rode:
 
 ```bash
 cd machine-learning
-python export_tflite.py --config config.yaml
-python validate_bundle.py --require-model
+python retrain.py promote --name <ciclo> --model-name <nome>
+python validate_bundle.py
 ```
 
 E depois:

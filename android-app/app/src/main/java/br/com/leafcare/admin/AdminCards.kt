@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.automirrored.outlined.FactCheck
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,9 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.leafcare.data.DiseaseCatalog
-import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
-import br.com.leafcare.ui.percent
 import org.json.JSONObject
 import java.time.Instant
 import java.time.ZoneId
@@ -47,7 +44,7 @@ internal fun pendingLabel(total: Int, pending: Int) = when {
     pending == 1 -> "foto aguardando avaliação"
     else -> "fotos aguardando avaliação"
 }
-/** Whole days until a training copy is deleted (90 days after upload); null when the photo has none. */
+/** Whole days until a training copy is deleted (Terms v1.4 copies, 90 days after upload); null when it never expires or the photo has none. */
 internal fun trainingDaysLeft(row: JSONObject, now: Instant = Instant.now()): Int? {
     if (row.isNull("training_expires_at")) return null
     val raw = row.optString("training_expires_at").takeIf { it.isNotBlank() } ?: return null
@@ -55,10 +52,14 @@ internal fun trainingDaysLeft(row: JSONObject, now: Instant = Instant.now()): In
     val hours = java.time.Duration.between(now, expires).toHours().coerceAtLeast(0)
     return ((hours + 23) / 24).toInt()
 }
-/** "Treino · N dias": the photo can train the model; amber when it expires within 14 days. */
+/** Whether the photo has a training copy the server still counts (permanent copies carry no expiry). */
+internal fun isTrainingCopy(row: JSONObject): Boolean =
+    (!row.isNull("training_state") && row.optString("training_state").isNotBlank()) || trainingDaysLeft(row) != null
+/** "Treino · N dias" for copies that expire (amber within 14 days); "Treino" for permanent ones. */
 @Composable internal fun TrainingBadge(row: JSONObject, short: Boolean = false) {
-    val days = trainingDaysLeft(row) ?: return
-    AdminBadge(if (short) "Treino" else "Treino · ${if (days <= 1) "1 dia" else "$days dias"}", if (days <= 14) LeafColors.Warning else LeafColors.Info)
+    if (!isTrainingCopy(row)) return
+    val days = trainingDaysLeft(row)
+    AdminBadge(if (short || days == null) "Treino" else "Treino · ${if (days <= 1) "1 dia" else "$days dias"}", if (days != null && days <= 14) LeafColors.Warning else LeafColors.Info)
 }
 internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw.takeLast(4)}" else raw
 
@@ -147,7 +148,8 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
 
 /**
  * Training copies are what can retrain the model: only confirmed or corrected
- * ones enter a dataset, and each is deleted 90 days after upload.
+ * ones enter a dataset. Copies sent under Terms v1.5 stay in the set; v1.4
+ * copies are deleted 90 days after upload, so only those can be "vencendo".
  */
 @Composable private fun TrainingSummary(training: JSONObject, busy: Boolean, onReviewTraining: () -> Unit) {
     val awaiting = training.optInt("awaiting_review")
@@ -160,7 +162,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
                 enabled = !busy, onClick = if (awaiting > 0) onReviewTraining else null)
             AdminStatTile("${training.optInt("excluded")}", "Fora do treino", Modifier.weight(1f))
         }
-        Text("Só cópias confirmadas ou corrigidas entram no treino. Cada cópia é apagada 90 dias após o envio.",
+        Text("Só cópias confirmadas ou corrigidas entram no treino. Cópias enviadas a partir dos Termos v1.5 ficam no conjunto; as da v1.4 são apagadas 90 dias após o envio.",
             Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
     }
 }
@@ -226,20 +228,6 @@ private val reviewedStatuses = listOf("confirmed", "corrected", "uncertain", "re
     row.optBoolean("deletion_pending") -> AdminBadge("Exclusão pendente", LeafColors.Danger)
     row.optBoolean("uploads_enabled") -> AdminBadge("Envios ativos")
     else -> AdminBadge("Envios pausados", LeafColors.Warning)
-}
-@Composable internal fun AdminPhotoCard(row: JSONObject, catalog: DiseaseCatalog, enabled: Boolean, onClick: () -> Unit, thumbnail: @Composable () -> Unit) {
-    Surface(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(20.dp), color = Color.White, border = BorderStroke(1.dp, LeafColors.Border)) {
-        Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(84.dp, 104.dp).clip(RoundedCornerShape(14.dp)).background(LeafColors.Pale), contentAlignment = Alignment.Center) { thumbnail() }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
-                Text(catalog.get(row.getString("class_id")).name, fontWeight = FontWeight.SemiBold, maxLines = 2, style = MaterialTheme.typography.bodyMedium)
-                Text("${percent(row.optDouble("confidence").toFloat())} de confiança", color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
-                Text(row.label("email"), color = LeafColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
-            }
-            Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp), tint = LeafColors.Muted)
-        }
-    }
 }
 @Composable internal fun AdminAuditRow(row: JSONObject, catalog: DiseaseCatalog) {
     var expanded by remember(row) { mutableStateOf(false) }

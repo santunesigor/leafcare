@@ -5,7 +5,7 @@ test_container="leafcare-admin-test-${$}"
 trap 'docker rm -f "$test_container" >/dev/null 2>&1 || true' EXIT
 docker run --rm -d --name "$test_container" -e POSTGRES_HOST_AUTH_METHOD=trust -v "$repo_root/supabase:/workspace:ro" postgres:18 >/dev/null
 for attempt in {1..30}; do
- if docker exec "$test_container" pg_isready -U postgres >/dev/null 2>&1; then break; fi
+ if docker exec "$test_container" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then break; fi
  sleep 1
 done
 docker exec "$test_container" psql -U postgres -v ON_ERROR_STOP=1 -f /workspace/tests/bootstrap.sql >/dev/null

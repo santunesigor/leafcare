@@ -33,7 +33,6 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
     private var localConsentDecision = false
     private var consentUserId: String? = null
     private var consentObserver: Job? = null
-    fun currentConsentUserId(): String? = consentUserId
     private val _ui = MutableStateFlow(UiState())
     val ui = _ui.asStateFlow()
     private val navigation = Channel<String>(Channel.BUFFERED)

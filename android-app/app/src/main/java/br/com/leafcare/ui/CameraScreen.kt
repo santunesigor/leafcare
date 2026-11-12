@@ -1,6 +1,5 @@
 package br.com.leafcare.ui
 
-import androidx.compose.foundation.selection.toggleable
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -32,8 +31,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,7 +49,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import br.com.leafcare.data.TRAINING_UPLOADS_ENABLED
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)

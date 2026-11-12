@@ -8,8 +8,11 @@ openspec/
 ├── specs/            # contratos de referência do comportamento existente
 │   ├── offline-analysis/
 │   ├── model-bundle/
-│   └── account-data-sync/
+│   ├── account-data-sync/
+│   ├── photo-training-consent/
+│   └── superadmin/
 └── changes/
+    ├── cumulative-training-dataset/  # plano ativo: conjunto acumulado e retreino
     └── archive/      # histórico de trabalho concluído
 
 .agents/skills/       # seis workflows gerados para Codex

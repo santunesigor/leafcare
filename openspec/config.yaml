@@ -21,8 +21,10 @@ context: |
   Read AGENTS.md, README.md, docs/AI_CONTEXT.md and docs/DEVELOPMENT.md first.
   Code, tests, migrations and model artifacts are the source of truth; specs
   describe supported contracts and do not certify pending device validation.
-  ML guide: machine-learning/README.md. Current reports: docs/model-reports/mobilenetv4-distilled/. Ensemble reports are historical.
-  Keep benchmark_artifacts intact unless a later request changes that scope.
+  ML guide: machine-learning/README.md; retraining plan: docs/RETREINAMENTO.md
+  (single entry point machine-learning/retrain.py, cumulative TLA + field dataset).
+  Current reports: docs/model-reports/mobilenetv4-distilled/. Historical experiments
+  live only in Git history (tag v1.7.1).
   Follow the user's existing authorization for Git actions and changes.
   Never include credentials, local.properties, .env or signing keys in artifacts.
 

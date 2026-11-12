@@ -2,7 +2,6 @@ package br.com.leafcare.auth
 
 import android.app.Application
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.asLiveData
 import br.com.leafcare.LeafCareApplication
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.gotrue.Auth

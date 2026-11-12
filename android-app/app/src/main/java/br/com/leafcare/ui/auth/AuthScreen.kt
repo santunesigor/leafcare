@@ -29,7 +29,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -71,7 +70,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.leafcare.R
 import br.com.leafcare.auth.AuthScreen
 import br.com.leafcare.auth.AuthViewModel
+import br.com.leafcare.auth.LEGAL_DOCUMENT_PUBLICATION_DATE
 import br.com.leafcare.auth.LegalAcceptanceState
+import br.com.leafcare.auth.TERMS_OF_USE_VERSION
 import br.com.leafcare.ui.FigmaIcon
 import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
@@ -103,7 +104,6 @@ fun AuthNavHost(viewModel: AuthViewModel) {
             onBack = { viewModel.requestCancelRecovery() },
             confirmCancelRecovery = true
         )
-        AuthScreen.Profile -> ProfileScreen(viewModel, onBack = { viewModel.setScreen(AuthScreen.Login) })
     }
 }
 
@@ -116,7 +116,7 @@ private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
         AuthHeader(logoSize = 56, title = "Termos de Uso", subtitle = "Aceite para usar o LeafCare")
         Spacer(Modifier.height(12.dp))
         Text(
-            "Leia e aceite os Termos de Uso e a Política de Privacidade (versão 1.4, publicada em 11/11/2026).",
+            "Leia e aceite os Termos de Uso e a Política de Privacidade (versão $TERMS_OF_USE_VERSION, publicada em $LEGAL_DOCUMENT_PUBLICATION_DATE).",
             style = MaterialTheme.typography.bodyMedium,
             color = LeafColors.Text,
             textAlign = TextAlign.Center
@@ -167,7 +167,7 @@ internal fun TrainingConditionCard() {
             }
             Column(Modifier.padding(start = 48.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 TrainingPoint("Ficam em área privada e passam por revisão humana")
-                TrainingPoint("São apagadas em até 90 dias")
+                TrainingPoint("Ficam no conjunto de treino até você revogar")
                 TrainingPoint("Revogue quando quiser em Perfil → Privacidade e fotos")
             }
         }

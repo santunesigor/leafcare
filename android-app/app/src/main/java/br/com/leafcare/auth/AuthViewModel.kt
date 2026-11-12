@@ -3,8 +3,6 @@ package br.com.leafcare.auth
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import br.com.leafcare.LeafCareApplication
 import io.github.jan.supabase.gotrue.user.UserSession
@@ -18,7 +16,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -215,13 +212,6 @@ class AuthViewModel internal constructor(
         ) ?: return
         setScreen(target)
     }
-
-
-    /**
-     * Authenticated user's display name from user metadata, or null when
-     * unavailable. Home greeting falls back to a plain greeting in that case.
-     */
-    fun getAuthDisplayName(): String? = displayNameOf(user.value)
 
     private fun currentUserId(): String? =
         authRepository.session.value?.user?.id ?: authRepository.user.value?.id
@@ -456,15 +446,6 @@ class AuthViewModel internal constructor(
         processDeeplink(link, wasPending)
     }
 
-    /**
-     * Handles an auth deep-link return (`leafcare://auth/...`): signup
-     * confirmation opens the app directly; password recovery opens the
-     * new-password screen. See [noteDeeplink]. No browser/WebView.
-     */
-    fun handleAuthDeeplink(url: String) {
-        noteDeeplink(url)
-    }
-
     private fun processDeeplink(link: AuthDeeplink, wasPending: Boolean) {
         viewModelScope.launch {
             if (wasPending) {
@@ -651,8 +632,7 @@ enum class AuthScreen {
     LegalAcceptance,
     VerifyEmail,
     ForgotPassword,
-    NewPassword,
-    Profile
+    NewPassword
 }
 
 /**
@@ -714,7 +694,8 @@ internal fun parseAuthDeeplink(url: String): AuthDeeplink? {
 }
 
 /** Navigation events for auth flow */
-sealed interface AuthNavigationEvent {    data class NavigateToAuth(val initialScreen: AuthScreen = AuthScreen.Login) : AuthNavigationEvent
+sealed interface AuthNavigationEvent {
+    data object NavigateToAuth : AuthNavigationEvent
     object NavigateToApp : AuthNavigationEvent
 }
 
@@ -772,7 +753,7 @@ internal fun navigationForAuthResult(authenticated: Boolean): AuthNavigationEven
 
 /** After startup restore: existing session goes to App, otherwise to Auth. */
 internal fun navigationForSessionRestore(hasSession: Boolean): AuthNavigationEvent =
-    if (hasSession) AuthNavigationEvent.NavigateToApp else AuthNavigationEvent.NavigateToAuth()
+    if (hasSession) AuthNavigationEvent.NavigateToApp else AuthNavigationEvent.NavigateToAuth
 
 /**
  * Auth screen the acceptance requirement asks for, or null to stay. Recovery
@@ -799,7 +780,7 @@ internal fun legalAcceptanceScreenFor(
 
 /** After sign-out: always back to Auth. */
 internal fun navigationAfterSignOut(): AuthNavigationEvent =
-    AuthNavigationEvent.NavigateToAuth()
+    AuthNavigationEvent.NavigateToAuth
 
 /** Extracts the producer display name from a GoTrue user, or null when absent. */
 internal fun displayNameOf(user: io.github.jan.supabase.gotrue.user.UserInfo?): String? =

@@ -1,88 +1,70 @@
 # Retreinar o modelo com as fotos do app
 
-Este guia explica como usar as fotos que as pessoas analisam no LeafCare para treinar uma nova versão do modelo, do banco de dados até o APK. Ele cobre o modelo que definimos para o app: **MobileNetV4 Small destilado de um professor DINOv2-B**, a mesma receita do modelo atual ([Machine Learning](MACHINE_LEARNING.md)).
+Este é o plano de retreino do LeafCare. Ele explica como as fotos analisadas no app viram um conjunto de treino que cresce com o tempo e como gerar e promover uma nova versão do modelo com um único script.
 
-Tudo roda localmente, em `machine-learning/`. Nenhuma foto vai para um serviço externo de treino.
+O modelo continua o mesmo tipo de hoje: **MobileNetV4 Small destilado de um professor DINOv2-B** ([Machine Learning](MACHINE_LEARNING.md)). Tudo roda localmente, em `machine-learning/`. Nenhuma foto vai para um serviço externo de treino.
 
-## Visão geral do ciclo
+## Como o conjunto cresce
 
 ```text
-App (análise conclusiva)
-  └─ cópia no bucket privado training-photos ............ apagada 90 dias após o envio
-       └─ revisão humana no admin (confirmar/corrigir) ... só confirmadas/corrigidas servem
-            └─ training_pool() = 'ready' (banco)
-                 └─ 1. exportar → data/authorized_training/ ... apagada em 30 dias
-                      └─ 2. montar o ciclo (TLA + campo) → runs/<ciclo>/dataset.json
-                           └─ 3. treinar o candidato (receita definida)
-                                └─ 4. converter para TFLite + paridade
-                                     └─ 5. replay com o pré-processamento do app + comparação
-                                          └─ 6. decisão da equipe → promover → APK
+App: análise conclusiva
+  └─ cópia no bucket privado training-photos (Supabase) ...... fica até revogação/exclusão (Termos v1.5)
+       └─ revisão humana no admin: confirmar ou corrigir ....... duvidosa/rejeitada fica fora
+            └─ training_pool() = 'ready' ......................... o rótulo é a classe revisada
+                 └─ retrain.py sync → machine-learning/data/field/  espelho local, sem IDs e sem EXIF
+                      └─ retrain.py run: TLA + todas as fotos prontas
+                           └─ professor → aluno → TFLite → comparação com o modelo atual
+                                └─ retrain.py promote (decisão da equipe) → APK
 ```
 
-Cada ciclo é independente: só usa as cópias que existem naquele momento (até 90 dias de fotos). Os pesos treinados ficam; as fotos não. Isso é o que os Termos v1.4 permitem.
+- **Ponto de partida: o TLA.** As 696 imagens do dataset público, com o split histórico (treino 489, validação 104, teste 103), estão em todos os ciclos. Assim as métricas continuam comparáveis com todos os modelos anteriores.
+- **Fotos de campo acumuladas.** Toda foto revisada como confirmada ou corrigida entra no conjunto e fica nele nos ciclos seguintes. Cada ciclo usa o TLA mais tudo o que já foi revisado até ali.
+- **O que sai do conjunto:**
+  - fotos com autorização revogada, análise excluída ou conta excluída;
+  - fotos revisadas de novo como duvidosas ou rejeitadas;
+  - cópias da v1.4 depois de 90 dias.
 
-## O que os Termos v1.4 exigem e onde isso é garantido
+  A limpeza diária do servidor apaga essas cópias, e o próximo `sync` as remove do espelho local.
 
-| Regra (Termos/Política v1.4, seção 7) | Onde é aplicada |
+## O que os Termos v1.5 garantem e onde
+
+| Regra | Onde é aplicada |
 | --- | --- |
-| Só fotos analisadas **depois** do aceite da v1.4 | `training_pool()`: `analyses.created_at` ≥ primeiro aceite 1.4/1.4 da conta |
-| Consentimento (1.2) e autorização vigentes; revogação tira a foto | `training_pool()` exige `granted`/`authorized` na versão 1.2; a revogação também apaga a cópia |
-| Só análises ativas e conclusivas | `training_pool()` exclui `deleted_at` e `inconclusive`; o servidor já recusa o upload dessas |
-| Revisão humana antes de entrar em um conjunto | Só o estado `ready` (revisão `confirmed`/`corrected` com classe) é exportado; o rótulo é a classe revisada, nunca a prevista |
-| Validação de qualidade | Exportador: decodificação igual à do app, mínimo de 128 px, até 16 MP, sem duplicatas |
-| Cópia apagada em até 90 dias | Função `cleanup-training-photos` (cron diário 03:12 UTC); `training_pool()` ignora cópias com mais de 90 dias |
-| Exportação sem identificadores da conta e sem EXIF | Exportador: imagem recodificada, nomes por hash, sem e-mail/ID de conta ou análise; grupos por pessoa com chave aleatória descartada a cada exportação |
-| Exportação local apagada em até 30 dias | `export_authorized_training.py --cleanup-only` (timer systemd diário); montar o ciclo e treinar recusam exportação vencida |
-| Conta em exclusão sai do conjunto | `training_pool()` marca como `ineligible` quando `deletion_pending` |
-| Pesos treinados não são desfeitos | Documentado nos Termos; a promoção registra a origem de cada modelo |
-
-`training_pool()` só pode ser lida pelo pipeline com a chave de serviço e pelo painel admin. Os estados são:
-
-- `ready`: entra no treino;
-- `awaiting_review`: falta revisar;
-- `excluded`: revisada como duvidosa ou rejeitada;
-- `ineligible`: alguma regra acima não foi cumprida.
+| Só fotos analisadas depois do aceite (v1.4 ou v1.5) | `training_pool()`: análise posterior ao primeiro aceite |
+| Cópias da v1.5 sem prazo; as da v1.4 vencem em 90 dias | `training_copy_expires_at()` calcula `expires_at` por cópia (nulo = permanente) |
+| Revisão humana antes de entrar no conjunto | Só o estado `ready` (`confirmed`/`corrected` com classe) é baixado |
+| Revogação, exclusão da análise ou da conta removem a cópia | App (sincronização), painel (exclusão de conta) e `training_photos_to_delete()` na limpeza diária `cleanup-training-photos` (03:12 UTC), que pega até revogações feitas em outro aparelho |
+| Cópia local sem identificadores e sem EXIF | `retrain.py sync`: imagem recodificada e nomes por HMAC com segredo local |
+| Cópia local acompanha o servidor | Cada `sync` apaga o que saiu de `ready`; `run` recusa continuar um ciclo cujas fotos saíram |
+| Pesos treinados não são desfeitos | Documentado nos Termos; cada promoção registra a origem do modelo |
 
 ## Preparação (uma vez por computador)
 
-### 1. Ambientes Python
+Comandos em `machine-learning/`, com Python 3.12 e [`uv`](https://docs.astral.sh/uv/).
 
-Use Python 3.12 e [`uv`](https://docs.astral.sh/uv/). Dentro de `machine-learning/`:
+### 1. Ambientes
 
 ```bash
-# Treino (PyTorch, timm, scikit-learn). Com GPU NVIDIA, troque cpu por auto.
-uv venv --python 3.12 .cache/retrain-venv
-uv pip install --python .cache/retrain-venv/bin/python --torch-backend cpu -r experiments/distillation/requirements.txt
-
-# Conversão TFLite e replay (versões fixas do LiteRT)
-uv venv --python 3.12 .cache/retrain-export-venv
-uv pip install --python .cache/retrain-export-venv/bin/python --torch-backend cpu -r experiments/distillation/requirements-export.txt
+python retrain.py setup
 ```
 
-`.cache/` e `runs/` são ignorados pelo Git. A primeira execução baixa os pesos ImageNet do MobileNetV4 Small na revisão fixada.
+O comando cria `.cache/retrain-venv` (treino, com PyTorch e CUDA quando houver GPU) e `.cache/retrain-export-venv` (conversão TFLite), com as versões fixadas em `requirements-train.txt` e `requirements-export.txt`. O `retrain.py` escolhe sozinho o ambiente de cada etapa.
 
-### 2. Dataset TLA em `data/raw/`
+Se `.cache/retrain-venv` já existir com o PyTorch de CPU, apague a pasta e rode `setup` de novo para usar a GPU.
 
-As fotos do TLA não ficam no Git. Baixe os arquivos públicos do artigo ([doi:10.3389/fpls.2024.1333236](https://doi.org/10.3389/fpls.2024.1333236)), o ZIP do TLA e o do TTDD, e importe:
+### 2. TLA em `data/raw/`
+
+As imagens do TLA não ficam no Git. Baixe os arquivos públicos do artigo ([doi:10.3389/fpls.2024.1333236](https://doi.org/10.3389/fpls.2024.1333236)), o ZIP do TLA e o do TTDD, e importe uma vez:
 
 ```bash
 .cache/retrain-venv/bin/python import_tla.py --tla /caminho/TLA.zip --ttdd /caminho/TTDD.zip
 ```
 
-O manifesto `data/prepared/manifest.json` já registra o hash de cada imagem e o split. A montagem do ciclo confere tudo e recusa arquivos diferentes.
+Cada ciclo confere cada imagem com o hash do manifesto `data/prepared/manifest.json` e recusa arquivos diferentes.
 
-### 3. Professor DINOv2-B
+### 3. Chave de serviço do Supabase
 
-A destilação precisa do checkpoint do professor (`dinov2_vitb14.safetensors`, 343 MB, SHA256 `0423c9fe8cb99a8f741a4ffe1280e7f118b9e2744fd79a7bc329bf97ca86fae6`). **Em 12/11/2026 ele não estava neste computador nem nas releases do GitHub.** Há duas formas de obtê-lo:
-
-1. **Recuperar a cópia original**, se alguém da equipe tiver a pasta `experiments/vision/.cache/finetune/`. Depois, publique-a como asset de uma release privada para não perder de novo.
-2. **Treinar o professor de novo no TLA**, com a receita de [`experiments/vision`](../machine-learning/experiments/vision/README.md) (`experiments.vision.benchmark --models dinov2_vitb14` e depois `experiments.vision.finetune --models dinov2_vitb14`). O resultado deve ficar perto do original (Macro-F1 de validação registrado em `benchmark_artifacts/vision_finetune/dinov2_vitb14/`), mas o hash não será o mesmo. O treino registra se o professor usado é o original (`matches_recorded_teacher`).
-
-Sem professor, `retraining.train` treina só supervisionado. O resultado serve de diagnóstico, mas **não pode ser promovido**: só a receita definida vai para o app.
-
-### 4. Chave de serviço do Supabase
-
-No painel do Supabase: **Project Settings → API Keys → `service_role`** (legada) ou uma chave secreta nova. Use só em variáveis de ambiente da sessão:
+No painel do Supabase: **Project Settings → API Keys → `service_role`**. Use só em variáveis da sessão do terminal:
 
 ```bash
 export SUPABASE_URL=https://nhkqfanjfcivcbndivav.supabase.co
@@ -91,152 +73,111 @@ read -rs SUPABASE_SERVICE_ROLE_KEY && export SUPABASE_SERVICE_ROLE_KEY
 
 Nunca coloque a chave em arquivo versionado, no APK, em issue ou em log.
 
-## Antes de treinar: revisar as cópias
+### 4. Guardar o segredo do espelho
 
-O treino só aproveita cópias revisadas, e elas somem 90 dias após o envio. No app, na conta admin:
+O primeiro `sync` cria `data/field/.secret`. Faça backup dele em lugar seguro, junto com a pasta `data/field/`. Se o segredo se perder, o espelho é baixado de novo com chaves novas, e as pessoas podem mudar de split, o que quebra a comparação do `field_test` entre ciclos.
 
-- **Resumo → Treinamento do modelo** mostra as cópias prontas, as que aguardam revisão (com quantas vencem em até 14 dias) e as que ficaram fora do treino. "Revisar cópias" abre a fila só com cópias de treino pendentes, a que vence primeiro no topo.
-- Na fila e na galeria, o selo **Treino · N dias** indica uma cópia de treino e quanto tempo ela ainda tem. O filtro **Só cópias de treino** limita a consulta a elas.
-- Confirme quando a classe prevista está certa e corrija quando não está. Duvidosa e Rejeitada ficam fora do treino.
+## Dia a dia: revisar
 
-Para ver o estado sem baixar fotos:
+O treino só usa cópias revisadas. No app, na conta admin:
 
-```bash
-.cache/retrain-venv/bin/python export_authorized_training.py --status
-```
+- **Resumo → Treinamento do modelo** mostra as cópias prontas, as que aguardam revisão e as que ficaram fora. "Revisar cópias" abre a fila só com as cópias pendentes.
+- O selo **Treino** marca uma cópia de treino. As cópias da v1.4 mostram **Treino · N dias**: revise essas antes, porque elas vencem.
+- Confirme quando a classe prevista está certa e corrija quando não está. Na dúvida, marque Duvidosa: ela fica fora do treino.
 
-### Quando vale a pena retreinar
-
-Não há número mágico. Como referência para o ciclo trazer evidência útil:
-
-- pelo menos **5 pessoas diferentes** com fotos prontas. Abaixo disso, todas as fotos de campo vão para o treino e não existe teste de campo, só o teste TLA;
-- algumas fotos prontas por classe nas doenças mais comuns no campo. Classes sem foto de campo continuam aprendendo só com o TLA;
-- fotos de condições reais variadas: luz, distância, aparelhos.
-
-## Passo a passo de um ciclo
-
-Comandos em `machine-learning/`. Use um nome de ciclo com data, por exemplo `2026-12-ciclo1`.
-
-### 1. Exportar as fotos prontas
+Para ver o estado sem baixar nada:
 
 ```bash
-.cache/retrain-venv/bin/python export_authorized_training.py
+python retrain.py status
 ```
 
-Gera `data/authorized_training/` com as imagens e o `manifest.json`: classe revisada, previsão original, grupo por pessoa, hashes, `delete_after`. A pasta anterior é apagada antes, o que reconcilia revogações e exclusões. A exportação vale 30 dias: o ciclo inteiro precisa caber nesse prazo, ou basta exportar de novo.
+## Rodar um ciclo
 
-### 2. Montar o ciclo
+Use um nome com data, por exemplo `2026-12-retreino`.
 
 ```bash
-.cache/retrain-venv/bin/python -m retraining.dataset --run 2026-12-ciclo1
+python retrain.py run --name 2026-12-retreino
 ```
 
-Gera `runs/2026-12-ciclo1/dataset.json`:
+Etapas, todas gravadas em `runs/<ciclo>/`:
 
-- **TLA** mantém o split histórico (treino 489, validação 104, teste 103), para comparar com todos os modelos anteriores.
-- **Fotos de campo** são separadas por pessoa: 70% treino, 15% validação e 15% `field_test`. Todas as fotos de uma pessoa, e quase-duplicatas, ficam no mesmo split. A atribuição é fixa por grupo dentro de uma exportação.
-- Fotos de campo iguais ou quase iguais a uma do TLA são descartadas.
-- `production_model_on_field_test` registra o acerto do modelo em uso nas fotos de teste de campo, usando a previsão gravada na hora da análise. É a linha de base.
+1. **Sincronizar** `data/field/` com o servidor. Use `--no-sync` para trabalhar sem rede. Mesmo assim, as cópias vencidas são apagadas.
+2. **Montar o conjunto** (`dataset.json`): TLA com o split histórico mais as fotos prontas.
+   - Fotos de campo são separadas por pessoa: 70% treino, 15% validação e 15% `field_test`. A divisão é fixa, então uma pessoa fica sempre no mesmo split, ciclo após ciclo.
+   - Quase-duplicatas ficam juntas, e fotos que repetem o TLA são descartadas.
+   - Com menos de 5 pessoas, todas as fotos de campo vão para o treino, o ciclo avisa e não há teste de campo.
+3. **Professor DINOv2-B**: fine-tune nos splits de treino e validação do ciclo, guardado em `.cache/teachers/` e reaproveitado se o conjunto não mudar. `--teacher ARQUIVO` usa um checkpoint já treinado. Na primeira vez, o script baixa cerca de 350 MB de pesos pré-treinados, conferidos por hash.
+4. **Aluno MobileNetV4 Small**, com a receita do modelo atual:
 
-Leia `warnings`: avisa quando há poucas pessoas, quando faltam classes no campo e quando nada de campo foi aproveitado.
+   | Item | Valor |
+   | --- | --- |
+   | Pesos iniciais | ImageNet (`mobilenetv4_conv_small.e2400_r224_in1k`, revisão fixada) |
+   | Cabeça inicial | probe logístico, escolhido pela validação |
+   | Etapas | 3 épocas só da cabeça + até 15 do encoder, paciência 5 |
+   | Otimização | AdamW, batch 8, BatchNorm congelada, seed 42 |
+   | Perda | 0,5 × entropia cruzada balanceada + 0,5 × destilação do professor (T = 4) |
+   | Seleção e calibração | Macro-F1 de validação; temperatura e limiar só pela validação |
 
-### 3. Treinar o candidato
+5. **TLA test e `field_test`** são avaliados só depois da seleção.
+6. **TFLite**: conversão no contrato do app, com paridade (mesmo Top-1, erro ≤ 1e-4).
+7. **Replay**: o candidato e o modelo atual rodam com o pré-processamento do app nas mesmas imagens. O resultado sai em `comparison.json`.
+
+Se o comando parar no meio, rode de novo com o mesmo nome: as etapas prontas são reaproveitadas. Se alguma foto do ciclo tiver saído do conjunto nesse meio-tempo, o ciclo recusa continuar e pede um nome novo.
+
+Tempo esperado: o aluno atual levou 79 s numa GTX 1650 de 4 GB. O professor ViT-B leva bem mais, e em CPU tudo é bem mais lento. Com mais fotos de campo, o tempo cresce na mesma proporção.
+
+## Decidir e promover
+
+Leia `runs/<ciclo>/comparison.json`. A recomendação automática só é positiva quando:
+
+- existe `field_test`;
+- o Top-1 no `field_test` é pelo menos igual ao do modelo atual;
+- o Macro-F1 no teste TLA não cai mais de 0,02.
+
+Ela é só um apoio. Quem decide é a equipe. Para instalar:
 
 ```bash
-.cache/retrain-venv/bin/python -m retraining.train --run 2026-12-ciclo1 --teacher /caminho/dinov2_vitb14.safetensors
+python retrain.py promote --name 2026-12-retreino --model-name mobilenetv4-2026-12
 ```
 
-A receita é a mesma do modelo atual, sem mudanças:
-
-| Item | Valor |
-| --- | --- |
-| Aluno | `mobilenetv4_conv_small.e2400_r224_in1k` (timm, revisão fixada), pesos ImageNet |
-| Cabeça inicial | probe logístico C=1 (com e sem pesos de classe), escolhido pela validação |
-| Etapas | 3 épocas só da cabeça (lr 1e-3) + até 15 épocas do encoder (cabeça 1e-4, encoder 1e-5), paciência 5 |
-| Otimização | AdamW, weight decay 1e-4, batch 8, BatchNorm congelada, float32, seed 42 |
-| Augmentation | flips H/V, rotação ±12° com fundo branco, brilho/contraste 0,1, saturação 0,05 |
-| Perda | 0,5 × entropia cruzada balanceada + 0,5 × T² × KL(professor ‖ aluno), T = 4 |
-| Seleção | Macro-F1 de validação, desempate por Top-1 e Top-3, época mais cedo |
-| Calibração | temperatura por NLL na validação; limiar com acerto ≥ 90% entre aceitas na validação |
-
-Validação TLA + validação de campo escolhem a época e calibram. O teste TLA e o `field_test` só são lidos depois disso.
-
-Tempo esperado: o treino do aluno atual levou 79 s (18 épocas) numa GTX 1650. Os alvos do professor ViT-B, um passe por imagem de treino em cada uma das 18 épocas, levam mais. Em CPU tudo é bem mais lento. Com fotos de campo, o tempo cresce na proporção das imagens de treino.
-
-Saídas em `runs/<ciclo>/`: `checkpoint.safetensors`, `experiment_config.json`, `history.json`, métricas de validação/teste/campo, matrizes de confusão, previsões, `comparison.json` e `run_summary.json`.
-
-### 4. Converter para TFLite
-
-```bash
-.cache/retrain-export-venv/bin/python -m retraining.export_model --run 2026-12-ciclo1
-```
-
-Gera `model_float32.tflite` no contrato do app: entrada RGB 0–255 NHWC `[1,224,224,3]`, normalização ImageNet, temperatura e softmax no grafo, saída `[1,16]`. Exige mesmo Top-1 e erro ≤ 1e-4 em todas as imagens de validação.
-
-### 5. Conferir com o pré-processamento do app
-
-```bash
-.cache/retrain-export-venv/bin/python -m retraining.promote --run 2026-12-ciclo1
-```
-
-Sem `--install`, nada muda. O script decodifica cada imagem de validação, teste e teste de campo como o app (EXIF, sRGB, resize bicúbico 256, recorte 224), roda o TFLite e exige as mesmas probabilidades e métricas do treino.
-
-Então leia `runs/<ciclo>/comparison.json`. A recomendação automática só é positiva quando:
-
-- o Macro-F1 no teste TLA não cai mais de 0,02 em relação ao modelo atual;
-- o Top-1 nas fotos de campo é pelo menos igual ao do modelo atual;
-- existe teste de campo.
-
-É uma recomendação. Quem decide é a equipe.
-
-### 6. Promover para o app (decisão explícita)
-
-Só depois da decisão da equipe:
-
-```bash
-.cache/retrain-export-venv/bin/python -m retraining.promote --run 2026-12-ciclo1 --install --name mobilenetv4-retreino-2026-12
-```
-
-Isso substitui `leafcare.tflite` e `model_metadata.json` em `artifacts/` e nos assets Android, atualiza `training_metadata.json`/`metrics.json` e grava os relatórios em `docs/model-reports/<nome>/`. Os relatórios incluem um resumo do ciclo, sem fotos nem linhas por imagem. Um candidato não recomendado só entra com `--allow-unrecommended`, depois de registrar o motivo.
+O comando substitui o bundle em `artifacts/` e nos assets Android, atualiza os metadados e grava o relatório em `docs/model-reports/<nome>/`, sem fotos nem linhas por imagem. Um candidato não recomendado só entra com `--allow-unrecommended`, depois de registrar o motivo.
 
 Depois da promoção:
 
 1. `cd ../android-app && bash gradlew testDebugUnitTest verifyModelAssets assembleDebug`;
-2. testar no aparelho: análise de referência, tempo no Galaxy A06 (meta ≤ 3 s), resultados inconclusivos;
-3. atualizar [Machine Learning](MACHINE_LEARNING.md) com as métricas novas, o CHANGELOG e a versão do app (modelo novo = versão minor);
-4. publicar o checkpoint do aluno, e do professor se ainda não estiver salvo, como asset de release, junto do APK.
+2. testar no aparelho: análise de referência, tempo no Galaxy A06 (meta ≤ 3 s) e resultados inconclusivos;
+3. atualizar [Machine Learning](MACHINE_LEARNING.md), o CHANGELOG e a versão do app (modelo novo = versão minor);
+4. guardar o checkpoint do aluno e do professor como asset da release, junto do APK.
 
 As análises antigas continuam com o hash e o limiar do modelo que as gerou.
 
-## Testar o pipeline sem dados reais
+## Testar sem dados reais
 
-Teste de fumaça com imagens sintéticas, 16 classes, TLA e campo, professor com pesos aleatórios. Ele confere o encadeamento, não a qualidade:
+O teste de fumaça usa imagens sintéticas e um professor pequeno com pesos aleatórios. Ele percorre a cadeia toda: sync falso, conjunto, professor, aluno, TFLite, replay, retomada e promoção numa pasta temporária. Ele confere o encadeamento, não a qualidade.
 
 ```bash
-LEAFCARE_TRAINING_SMOKE=1 .cache/retrain-venv/bin/python -m pytest -q tests/test_retraining_smoke.py -k distilled
-LEAFCARE_TRAINING_SMOKE=1 .cache/retrain-export-venv/bin/python -m pytest -q tests/test_retraining_smoke.py -k tflite
-.cache/retrain-venv/bin/python -m pytest -q -m "not tensorflow"
+.cache/retrain-venv/bin/python -m pytest -q
+LEAFCARE_TRAINING_SMOKE=1 .cache/retrain-venv/bin/python -m pytest -q tests/test_smoke.py
 ```
 
-Para a parte do banco: `bash supabase/tests/run-local.sh` (Postgres em Docker) inclui `training-pool.sql`, que cobre cada regra da tabela acima.
+Para o banco: `bash supabase/tests/run-local.sh` (Postgres em Docker) cobre cada regra da tabela acima em `training-pool.sql`.
 
-## Limitações e decisões em aberto
+## Riscos e limites
 
-- **Janela de 90 dias.** Os Termos v1.4 não permitem guardar as fotos de campo além de 90 dias, nem as exportações além de 30. Cada ciclo só aprende com as fotos daquele período. Acumular um conjunto de campo permanente exige mudar os Termos e a Política, uma decisão do controlador, e pedir novo aceite.
-- **Professor ausente.** Veja a seção do professor. Sem ele não há promoção.
-- **Teste de campo pequeno.** Com poucas pessoas, as métricas de campo variam muito de um ciclo para outro. Trate como indício, não como prova.
-- **Rótulo revisado.** A qualidade do treino depende da revisão. Use Duvidosa quando houver dúvida, porque fotos duvidosas ficam fora.
-- **Contrato fixo de 16 classes.** O pipeline não adiciona nem remove classes. Isso exige outra mudança, no app, no catálogo e no banco.
+- **Armazenamento.** As cópias deixam de vencer, então o bucket `training-photos` só cresce. Acompanhe o uso no painel do Supabase e o limite do plano.
+- **Professor novo a cada ciclo.** O checkpoint original do DINOv2-B se perdeu. O professor treinado pelo ciclo fica perto do original, mas não é idêntico. Por isso o candidato sempre é comparado com o modelo atual antes de qualquer promoção.
+- **Teste de campo pequeno no começo.** Com poucas pessoas, as métricas de campo variam muito. Trate como indício, não como prova. Quando o conjunto passar de 5 pessoas, as fotos de campo passam a ser divididas entre treino, validação e teste, o que acontece uma única vez.
+- **Rótulo revisado.** A qualidade do treino depende da revisão.
+- **16 classes fixas.** O pipeline não adiciona nem remove classes. Isso exige outra mudança, no app, no catálogo e no banco.
 
 ## Arquivos
 
 | Caminho | Papel |
 | --- | --- |
-| `supabase/migrations/20261112120000_training_pool.sql` | `training_pool()` e dados de treino no painel admin |
-| `supabase/tests/training-pool.sql` | Testes de cada regra de elegibilidade e do painel |
-| `machine-learning/export_authorized_training.py` | Estado do pool, exportação local e limpeza de 30 dias |
-| `machine-learning/retraining/dataset.py` | Monta o ciclo (TLA + campo, split por pessoa, linha de base) |
-| `machine-learning/retraining/train.py` | Treina o candidato com a receita definida |
-| `machine-learning/retraining/export_model.py` | Converte para TFLite e confere paridade |
-| `machine-learning/retraining/promote.py` | Replay com o pré-processamento do app e promoção |
-| `machine-learning/systemd/` | Timer diário de limpeza das exportações |
+| `machine-learning/retrain.py` | Ponto de entrada: `setup`, `status`, `sync`, `run`, `promote` |
+| `machine-learning/training/` | Espelho, conjunto, treino, conversão/replay, promoção e métricas |
+| `machine-learning/data/field/` | Espelho local das fotos de campo (fora do Git) |
+| `machine-learning/runs/` | Ciclos (fora do Git) |
+| `supabase/migrations/20261112120000_training_pool.sql` | `training_pool()` e dados de treino no painel |
+| `supabase/migrations/20261112180000_legal_documents_v1_5_permanent_training.sql` | Aceite v1.5, retenção por cópia e `training_photos_to_delete()` |
+| `supabase/functions/cleanup-training-photos/` | Limpeza diária das cópias que precisam sair |
