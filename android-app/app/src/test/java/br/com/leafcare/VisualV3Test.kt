@@ -17,6 +17,7 @@ import br.com.leafcare.ui.*
 import br.com.leafcare.data.*
 import coil.imageLoader
 import java.io.File
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -134,6 +135,30 @@ class VisualV3Test {
         val file = File("build/reports/screenshots/$name.png"); file.parentFile!!.mkdirs()
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         assertTrue(bitmap.width >= 300)
+    }
+    @Test fun restoredAnalysisWithoutPhotoExplainsWhereThePhotoIs() {
+        val missing = File(compose.activity.cacheDir, "never-downloaded.img")
+        val inconclusive = AnalysisEntity("inc", "never-downloaded.img", 1791298800000, "brown_spot", "Mancha-marrom", "Alternaria spp.", .28f,
+            """[{"name":"Mancha-marrom","confidence":0.28}]""", true, .5f, 14.0, "fixture", syncStatus = SyncState.SYNCED,
+            photoSyncStatus = PhotoSyncState.LOCAL_ONLY)
+        assertTrue(isPhotoUnavailable(inconclusive, missing))
+        assertFalse(isPhotoUnavailable(inconclusive.copy(photoSyncStatus = PhotoSyncState.REMOTE_ONLY), missing))
+        val present = File(compose.activity.cacheDir, "present.img").apply { writeBytes(byteArrayOf(1)) }
+        assertFalse(isPhotoUnavailable(inconclusive, present))
+        compose.setContent { LeafCareTheme { HistoryContent(listOf(inconclusive), {}, {}, { missing }, null) } }
+        compose.onNodeWithContentDescription("Foto disponível só no aparelho em que a análise foi feita").assertIsDisplayed()
+        capture("historico-foto-so-no-aparelho")
+    }
+    @Test fun restoredInconclusiveResultSaysThePhotoStayedOnTheDevice() {
+        val missing = File(compose.activity.cacheDir, "never-downloaded.img")
+        val inconclusive = AnalysisEntity("inc", "never-downloaded.img", 1791298800000, "brown_spot", "Mancha-marrom", "Alternaria spp.", .28f,
+            """[{"name":"Mancha-marrom","confidence":0.28}]""", true, .5f, 14.0, "fixture", syncStatus = SyncState.SYNCED,
+            photoSyncStatus = PhotoSyncState.LOCAL_ONLY)
+        val disease = DiseaseInfo("Mancha-marrom", "Alternaria spp.", "Doença fúngica.", listOf("Manchas."), "Umidade.", "Procure um técnico.", false)
+        compose.setContent { LeafCareTheme { ResultContent(inconclusive, disease, missing, {}, {}, {}) } }
+        compose.onNodeWithText("Foto não guardada na conta").assertIsDisplayed()
+        compose.onNodeWithText("Fotos de resultados inconclusivos não são enviadas para a conta; ficam só no aparelho em que a análise foi feita. O resultado continua salvo.").assertIsDisplayed()
+        capture("resultado-foto-so-no-aparelho")
     }
     @Test fun trainingConditionCardIsReadable() {
         compose.setContent {

@@ -107,6 +107,10 @@
     <!-- Content Descriptions -->
     <string name="cd_photo_analyzed">Foto analisada</string>
     <string name="cd_photo_history">Foto da folha analisada</string>
+    <string name="photo_only_on_device">Foto disponível só no aparelho em que a análise foi feita</string>
+    <string name="photo_unavailable_title">Foto não guardada na conta</string>
+    <string name="photo_unavailable_inconclusive">Fotos de resultados inconclusivos não são enviadas para a conta; ficam só no aparelho em que a análise foi feita. O resultado continua salvo.</string>
+    <string name="photo_unavailable_local">A foto desta análise ficou só no aparelho em que ela foi feita. O resultado continua salvo.</string>
     <string name="cd_reference_image">Referência de %1$s</string>
     <string name="cd_enlarged_reference">Imagem de referência ampliada</string>
 </resources>

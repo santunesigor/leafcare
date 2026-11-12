@@ -558,10 +558,12 @@ class AnalysisSyncRunnerTest {
         displayName: String = "Olho-de-rã",
         deletedAt: String? = null,
         photoPath: String? = "user-1/$id.jpg",
+        inconclusive: Boolean = false,
+        createdAt: String = "2024-09-23T12:00:00Z",
     ) = buildJsonObject {
         put("id", id)
         put("user_id", "user-1")
-        put("created_at", "2024-09-23T12:00:00Z")
+        put("created_at", createdAt)
         put("class_id", "frog_eye")
         put("display_name", displayName)
         put("scientific_name", "Cercospora nicotianae")
@@ -572,13 +574,27 @@ class AnalysisSyncRunnerTest {
                 put("confidence", 0.82)
             }
         })
-        put("inconclusive", false)
+        put("inconclusive", inconclusive)
         put("threshold", 0.7)
         put("inference_ms", 30.0)
         put("model_sha256", "abc123")
         put("app_version", "0.3.0")
         if (photoPath == null) put("photo_path", JsonNull) else put("photo_path", photoPath)
         if (deletedAt == null) put("deleted_at", JsonNull) else put("deleted_at", deletedAt)
+    }
+
+    @Test fun restoreKeepsInconclusiveHistoryWithoutPhoto() = runTest(dispatcher) {
+        val dao = FakeAnalysisDao()
+        // Same shape as production: no photo, Postgres offset timestamp.
+        val api = FakeAnalysisSyncApi(fetchRows = listOf(remoteRow(id = "inc", photoPath = null, inconclusive = true,
+            createdAt = "2026-11-12T12:03:55.675+00:00")))
+
+        runner(dao, api).restoreOnce("user-1")
+
+        val row = dao.get("inc")
+        assertNotNull(row)
+        assertEquals(true, row?.inconclusive)
+        assertEquals(PhotoSyncState.LOCAL_ONLY, row?.photoSyncStatus)
     }
 
     @Test fun restoreInsertsMissingRowAsSynced() = runTest(dispatcher) {

@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.AdminPanelSettings
+import androidx.compose.material.icons.outlined.HideImage
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -271,9 +272,15 @@ fun HistoryContent(rows: List<br.com.leafcare.data.AnalysisEntity>, onCamera: ()
                         Row(Modifier.padding(10.dp).heightIn(min = 66.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             // Stable across recompositions; reloads when the photo state changes. Pale shows while loading.
-                            val imageModel = rememberAnalysisPhoto(row, remember(row.photoName) { photo(row.photoName) })
-                            AsyncImage(model = imageModel, contentDescription = stringResource(R.string.cd_photo_history),
-                                modifier = Modifier.size(72.dp, 66.dp).clip(RoundedCornerShape(11.dp)).background(LeafColors.Pale), contentScale = ContentScale.Crop)
+                            val source = remember(row.photoName) { photo(row.photoName) }
+                            if (rememberPhotoUnavailable(row, source)) {
+                                Box(Modifier.size(72.dp, 66.dp).clip(RoundedCornerShape(11.dp)).background(LeafColors.Pale), contentAlignment = Alignment.Center) {
+                                    Icon(androidx.compose.material.icons.Icons.Outlined.HideImage, stringResource(R.string.photo_only_on_device), Modifier.size(24.dp), tint = LeafColors.Muted)
+                                }
+                            } else {
+                                AsyncImage(model = rememberAnalysisPhoto(row, source), contentDescription = stringResource(R.string.cd_photo_history),
+                                    modifier = Modifier.size(72.dp, 66.dp).clip(RoundedCornerShape(11.dp)).background(LeafColors.Pale), contentScale = ContentScale.Crop)
+                            }
                             Column(Modifier.weight(1f)) {
                                 Text(if (row.inconclusive) stringResource(R.string.result_inconclusive_title) else row.displayName, style = MaterialTheme.typography.titleSmall)
                                 if (!row.inconclusive) Text(row.scientificName, fontStyle = FontStyle.Italic, style = MaterialTheme.typography.bodySmall)

@@ -2,7 +2,7 @@
 
 ## [1.8.0] - em preparação
 
-Release reunindo tudo desde a 1.7.1. Durante a preparação, a versão do app fica em 1.8.0 e só o `versionCode` sobe a cada APK de teste (atual: 24).
+Release reunindo tudo desde a 1.7.1. Durante a preparação, a versão do app fica em 1.8.0 e só o `versionCode` sobe a cada APK de teste (atual: 25).
 
 ### Termos v1.4 e treinamento
 - Termos de Uso e Política de Privacidade v1.4: o uso das fotos analisadas para treinamento passa a ser condição de uso, registrada no servidor junto com o aceite; sem aceite, o app não pode ser usado (offline, só para quem já aceitou no aparelho). A tela de aceite serve para contas novas e antigas e explica quando o servidor ainda não foi atualizado.
@@ -27,6 +27,7 @@ Release reunindo tudo desde a 1.7.1. Durante a preparação, a versão do app fi
 - Worker aguarda a sessão (#25), exclusões durante upload não se perdem (#26), fila não fica bloqueada (#31) e fotos de treinamento seguem o histórico (#30).
 - Revogações não são sobrescritas por consentimento antigo (#28) e sincronizam mesmo aguardando novo aceite (#29); revogações e exclusões vão antes da política de envio; atualizações recusadas ficam pendentes; a restauração não mistura contas.
 - Fotos do histórico aparecem assim que o download termina (#36).
+- Resultados inconclusivos voltam normalmente ao entrar de novo na conta (reinstalação ou troca de conta), mas a foto deles fica só no aparelho onde a análise foi feita, como diz a Política de Privacidade. Antes aparecia um quadro vazio que parecia resultado perdido; agora o histórico mostra um ícone e o resultado explica onde a foto ficou.
 
 ### Câmera e resultado
 - Resolução limitada para não estourar 16 MP; permissão e câmera escolhida sobrevivem à rotação; captura sem espaço e falta de memória mostram erro em vez de fechar o app (#34); sem mensagens técnicas em inglês; o resultado volta ao histórico se a análise for apagada; limpeza de arquivos órfãos.

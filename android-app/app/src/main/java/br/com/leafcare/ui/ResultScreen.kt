@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.HideImage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
@@ -13,6 +14,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.*
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.leafcare.R
@@ -61,10 +63,21 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
     var enlarged by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().background(Color.White).verticalScroll(rememberScrollState())) {
         Box(Modifier.fillMaxWidth().height(256.dp).background(Color(0xFF1E3521))) {
-            AsyncImage(rememberAnalysisPhoto(analysis, photo), stringResource(R.string.cd_photo_analyzed), Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            val unavailable = rememberPhotoUnavailable(analysis, photo)
+            if (unavailable) {
+                Column(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)) {
+                    Icon(androidx.compose.material.icons.Icons.Outlined.HideImage, null, Modifier.size(36.dp), tint = Color.White.copy(alpha = .85f))
+                    Text(stringResource(R.string.photo_unavailable_title), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                    Text(stringResource(if (analysis.inconclusive) R.string.photo_unavailable_inconclusive else R.string.photo_unavailable_local),
+                        color = Color.White.copy(alpha = .8f), fontSize = 13.sp, lineHeight = 18.sp, textAlign = TextAlign.Center)
+                }
+            } else {
+                AsyncImage(rememberAnalysisPhoto(analysis, photo), stringResource(R.string.cd_photo_analyzed), Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(0f to Color(0x61050F06), .38f to Color.Transparent, 1f to Color(0x40050F06))))
             Box(Modifier.padding(start = 16.dp, top = 18.dp)) { RoundIconButton(R.drawable.v3_back_light, stringResource(R.string.camera_back_desc), onBack, dark = true) }
-            Text(stringResource(R.string.cd_photo_analyzed), Modifier.align(Alignment.TopEnd).padding(top = 31.dp, end = 22.dp), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            if (!unavailable) Text(stringResource(R.string.cd_photo_analyzed), Modifier.align(Alignment.TopEnd).padding(top = 31.dp, end = 22.dp), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
         Column(Modifier.padding(horizontal = 22.dp, vertical = 24.dp)) {
             Text(if (analysis.inconclusive) stringResource(R.string.result_inconclusive_title) else stringResource(R.string.result_identified_title), color = LeafColors.Green, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.54.sp)

@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import br.com.leafcare.data.AnalysisEntity
+import br.com.leafcare.data.PhotoSyncState
+import java.io.File
 import coil.request.ImageRequest
 
 /**
@@ -22,3 +24,17 @@ fun rememberAnalysisPhoto(analysis: AnalysisEntity, photo: Any): ImageRequest {
             .build()
     }
 }
+
+/**
+ * True when the photo is not on this device and will not be downloaded: the
+ * analysis came back from the account (new install or account switch) but its
+ * photo was never sent. Inconclusive photos are never sent (Privacy Policy,
+ * section 4), so only the result returns. While a remote photo is still
+ * downloading (REMOTE_ONLY) this is false and the usual loading tint shows.
+ */
+fun isPhotoUnavailable(analysis: AnalysisEntity, photo: Any): Boolean =
+    analysis.photoSyncStatus != PhotoSyncState.REMOTE_ONLY && photo is File && !photo.isFile
+
+@Composable
+fun rememberPhotoUnavailable(analysis: AnalysisEntity, photo: Any): Boolean =
+    remember(photo, analysis.photoSyncStatus) { isPhotoUnavailable(analysis, photo) }
