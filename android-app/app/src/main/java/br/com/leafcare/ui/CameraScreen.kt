@@ -67,8 +67,11 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
     var permitted by rememberSaveable { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     var asked by rememberSaveable { mutableStateOf(false) }
     var help by remember { mutableStateOf(false) }
+    // Flashlight (torch): continuous light while framing and capturing, so the
+    // person sees the lighting the photo will have.
     var flash by remember { mutableStateOf(false) }
     var hasFlash by remember { mutableStateOf(false) }
+    var boundCamera by remember { mutableStateOf<Camera?>(null) }
     var canSwitch by remember { mutableStateOf(false) }
     var lens by rememberSaveable { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     // False once the screen leaves: a capture interrupted by that is not an error.
@@ -91,7 +94,11 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { vm.analyze(it) } }
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) permitted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            if (event == Lifecycle.Event.ON_RESUME) {
+                permitted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                // The camera closes in the background and turns the light off; restore it.
+                if (flash && hasFlash) boundCamera?.cameraControl?.enableTorch(true)
+            }
         }
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
@@ -114,12 +121,16 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                         hasFlash = camera.cameraInfo.hasFlashUnit()
                         canSwitch = available.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) && available.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
                         if (!hasFlash) flash = false
+                        boundCamera = camera
                         ready = true
                     } catch (error: Exception) { vm.error(cameraErrorOpen) }
                 }
             }, executor)
         }
-        onDispose { disposed = true; provider?.unbind(preview, imageCapture) }
+        onDispose { disposed = true; boundCamera = null; provider?.unbind(preview, imageCapture) }
+    }
+    LaunchedEffect(flash, boundCamera, hasFlash) {
+        boundCamera?.cameraControl?.enableTorch(flash && hasFlash)
     }
     CameraContent(onBack = onBack, onHelp = { help = true },
         onGallery = { gallery.launch(arrayOf("image/jpeg", "image/png", "image/webp", "image/bmp")) },
@@ -128,7 +139,8 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
         switchAvailable = canSwitch && ready && !capturing, flashOn = flash, showGuide = permitted,
         onCapture = capture@{
             capturing = true
-            imageCapture.flashMode = if (flash && hasFlash) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
+            // The flashlight already lights the scene; a capture flash on top would overexpose it.
+            imageCapture.flashMode = ImageCapture.FLASH_MODE_OFF
             previewView.display?.let { imageCapture.targetRotation = it.rotation }
             val file = try {
                 File.createTempFile("capture-", ".jpg", context.cacheDir)
@@ -197,7 +209,7 @@ fun CameraContent(onBack: () -> Unit, onHelp: () -> Unit, onGallery: () -> Unit,
                         Text(stringResource(R.string.camera_guide_subtitle), color = Color.White, fontSize = 13.sp, lineHeight = 18.sp, textAlign = TextAlign.Center)
                     }
                     Column(Modifier.align(Alignment.TopEnd).padding(10.dp)) {
-                        RoundIconButton(R.drawable.v3_flash, if (flashOn) stringResource(R.string.flash_on_desc) else stringResource(R.string.flash_off_desc), onFlash, flashAvailable, true)
+                        FlashlightButton(flashOn, flashAvailable, onFlash)
                         RoundIconButton(R.drawable.v3_switch_camera, stringResource(R.string.switch_camera_desc), onSwitch, switchAvailable, true)
                     }
                 }
@@ -213,6 +225,22 @@ fun CameraContent(onBack: () -> Unit, onHelp: () -> Unit, onGallery: () -> Unit,
                 }
             }
             Text(stringResource(R.string.camera_tip), Modifier.fillMaxWidth().padding(bottom = 20.dp), textAlign = TextAlign.Center, fontSize = 13.sp, color = LeafColors.Muted)
+        }
+    }
+}
+
+/** Flashlight toggle: lit (white, dark icon) while on, so its state is visible at a glance. */
+@Composable
+private fun FlashlightButton(on: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val description = stringResource(if (on) R.string.flash_on_desc else R.string.flash_off_desc)
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp).semantics {
+        contentDescription = description
+        stateDescription = if (on) "Ligada" else "Desligada"
+    }) {
+        Box(Modifier.size(40.dp).background(if (on) Color.White else Color(0x880D1B0F), CircleShape)
+            .border(1.dp, if (on) Color.White else Color.White.copy(alpha = .5f), CircleShape), contentAlignment = Alignment.Center) {
+            Icon(if (on) Icons.Filled.FlashlightOn else Icons.Filled.FlashlightOff, null, Modifier.size(22.dp),
+                tint = if (on) LeafColors.Text else Color.White.copy(alpha = if (enabled) 1f else .45f))
         }
     }
 }

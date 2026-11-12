@@ -62,8 +62,8 @@
     <string name="camera_help_desc">Como tirar a foto</string>
     <string name="camera_guide_title">Coloque a folha em foco</string>
     <string name="camera_guide_subtitle">Mantenha a região afetada dentro da moldura</string>
-    <string name="flash_on_desc">Desligar flash</string>
-    <string name="flash_off_desc">Ligar flash</string>
+    <string name="flash_on_desc">Desligar lanterna</string>
+    <string name="flash_off_desc">Ligar lanterna</string>
     <string name="switch_camera_desc">Alternar câmera</string>
     <string name="gallery_button_desc_camera">Abrir galeria</string>
     <string name="capture_button_desc">Fotografar</string>

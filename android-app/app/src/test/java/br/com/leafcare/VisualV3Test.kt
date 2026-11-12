@@ -194,6 +194,21 @@ class VisualV3Test {
         compose.onNodeWithContentDescription("Fotografar").performClick()
         assertTrue(helped && gallery && captured)
     }
+    @Test fun flashlightShowsItsStateAndToggles() {
+        val on = androidx.compose.runtime.mutableStateOf(false)
+        compose.setContent { LeafCareTheme { CameraContent({}, {}, {}, {}, { on.value = !on.value }, {}, true, true, true, true, on.value, true) {
+            Image(painterResource(R.drawable.v3_example_dark), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } } }
+        compose.onNodeWithContentDescription("Ligar lanterna").assertIsEnabled().performClick()
+        compose.onNodeWithContentDescription("Desligar lanterna").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Ligada"))
+        capture("camera-lanterna-ligada")
+        compose.onNodeWithContentDescription("Desligar lanterna").performClick()
+        compose.onNodeWithContentDescription("Ligar lanterna").assertExists()
+    }
+    @Test fun flashlightIsDisabledWithoutFlashUnit() {
+        compose.setContent { LeafCareTheme { CameraContent({}, {}, {}, {}, {}, {}, true, true, false, true, false, true) {} } }
+        compose.onNodeWithContentDescription("Ligar lanterna").assertIsNotEnabled()
+    }
     @Test fun resultDetailsAndNavigation() {
         var navigated = false
         compose.activity.imageLoader.memoryCache?.clear()
