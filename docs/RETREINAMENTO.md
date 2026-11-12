@@ -124,7 +124,9 @@ Etapas, todas gravadas em `runs/<ciclo>/`:
 
 Se o comando parar no meio, rode de novo com o mesmo nome: as etapas prontas são reaproveitadas. Se alguma foto do ciclo tiver saído do conjunto nesse meio-tempo, o ciclo recusa continuar e pede um nome novo.
 
-Tempo esperado: o aluno atual levou 79 s numa GTX 1650 de 4 GB. O professor ViT-B leva bem mais, e em CPU tudo é bem mais lento. Com mais fotos de campo, o tempo cresce na mesma proporção.
+Tempo medido no primeiro ciclo real (12/11/2026, GTX 1650 de 4 GB): professor em cerca de 6 min, aluno em menos de 1 min, e conversão e replay em poucos minutos. Na primeira vez, o download dos pesos pré-treinados soma alguns minutos. Em CPU tudo é bem mais lento, e o tempo cresce com o número de fotos de campo.
+
+No replay, uma imagem cuja confiança fica a até 1e-4 do limiar pode mudar de aceita para inconclusiva, ou o contrário. Isso é tolerado e registrado em `threshold_borderline_flips`. Qualquer outra diferença interrompe o ciclo.
 
 ## Decidir e promover
 
@@ -161,6 +163,19 @@ LEAFCARE_TRAINING_SMOKE=1 .cache/retrain-venv/bin/python -m pytest -q tests/test
 ```
 
 Para o banco: `bash supabase/tests/run-local.sh` (Postgres em Docker) cobre cada regra da tabela acima em `training-pool.sql`.
+
+## Primeiro ciclo real (12/11/2026)
+
+`2026-11-retreino-1`: TLA + 1 foto de campo (1 pessoa, classe `healthy`).
+
+| Teste TLA (103) | Modelo atual | Candidato |
+| --- | ---: | ---: |
+| Top-1 | 85,44% | 83,50% |
+| Macro-F1 | 0,8083 | 0,7922 |
+| Top-3 | 97,09% | 97,09% |
+| Cobertura / acerto entre aceitas | 87,4% / 90,0% | 99,0% / 84,3% |
+
+Não recomendado: ainda não existe `field_test`, porque há menos de 5 pessoas. Não foi promovido. O ciclo provou o pipeline com dados reais: sincronização, professor, aluno, TFLite com paridade e replay. O ganho real só vai aparecer com mais fotos revisadas de mais pessoas.
 
 ## Riscos e limites
 

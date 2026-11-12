@@ -21,6 +21,7 @@
 - [x] 3.4 Professor DINOv2-B treinado no ciclo, aluno com a receita atual, TFLite com paridade, replay e recomendação
 - [x] 3.5 Remover experimentos, benchmarks, Keras/ensemble, exportador de 30 dias e systemd
 - [x] 3.6 Testes unitários, de fumaça e CI com `requirements.txt` leve
+- [x] 3.7 Replay tolera só mudanças de aceitação de imagens a até 1e-4 do limiar (achado no primeiro ciclo real)
 
 ## 4. Documentação
 
@@ -29,5 +30,5 @@
 
 ## 5. Primeiro ciclo real
 
-- [ ] 5.1 Importar o TLA em `data/raw/` e recriar `.cache/retrain-venv` com GPU
-- [ ] 5.2 Revisar as cópias de treino e rodar `retrain.py run`
+- [x] 5.1 Importar o TLA em `data/raw/` (696 imagens conferidas com o manifesto) e recriar `.cache/retrain-venv` com GPU
+- [x] 5.2 Primeiro ciclo real `2026-11-retreino-1` (TLA + 1 foto de campo): concluído, não recomendado por falta de teste de campo e não promovido

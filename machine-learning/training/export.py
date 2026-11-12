@@ -32,6 +32,7 @@ from training.train import Classifier, Images, clear_attention_cache, load_stude
 PRODUCTION = ROOT / "artifacts"
 SAMPLE = ROOT.parent / "samples/reference_frog_eye.jpg"
 MAX_ERROR = 1e-4
+THRESHOLD_KEYS = ("coverage", "accepted_accuracy")
 
 
 class MobileInput(torch.nn.Module):
@@ -118,6 +119,14 @@ def convert(run: Path) -> dict:
     return metadata
 
 
+def acceptance_flips(probabilities, expected, threshold) -> np.ndarray:
+    """Images whose acceptance changed in the replay; allowed only within the parity tolerance of the threshold."""
+    flipped = (probabilities.max(1) >= threshold) != (expected.max(1) >= threshold)
+    if np.any(flipped & (np.abs(expected.max(1) - threshold) > MAX_ERROR)):
+        raise ValueError("Aceitação mudou no replay longe do limiar.")
+    return flipped
+
+
 def replay(run: Path) -> dict:
     """Replay candidate and production with the app preprocessing; writes replay.json and comparison.json."""
     config = read_json(run / "experiment_config.json")
@@ -143,14 +152,18 @@ def replay(run: Path) -> dict:
             error = float(np.max(np.abs(probabilities - expected)))
             if error > MAX_ERROR or not np.array_equal(probabilities.argmax(1), expected.argmax(1)):
                 raise ValueError(f"Replay com o pré-processamento do app divergiu em {split}: erro {error:.2e}.")
-            metrics = thresholded(classification_metrics(truth, probabilities, classes), truth, probabilities,
-                                  np.float32(config["threshold"]))
+            threshold = np.float32(config["threshold"])
+            metrics = thresholded(classification_metrics(truth, probabilities, classes), truth, probabilities, threshold)
+            flipped = acceptance_flips(probabilities, expected, threshold)
             trained = read_json(run / f"{split}_metrics.json")
             for key in SUMMARY:
+                if key in THRESHOLD_KEYS and flipped.any():
+                    continue
                 if trained[key] is not None and abs(metrics[key] - trained[key]) > 1e-9:
                     raise ValueError(f"{split}: {key} do replay ({metrics[key]}) difere do treino ({trained[key]}).")
             results["candidate"][split] = {**metrics, "split": split, "model_sha256": export["sha256"],
-                                           "app_preprocessing_max_abs_error": error, "test_used_for_selection": False}
+                                           "app_preprocessing_max_abs_error": error, "test_used_for_selection": False,
+                                           "threshold_borderline_flips": int(flipped.sum())}
             if split != "validation":
                 scores = np.array([production.scores(x)[0] for x in inputs])
                 results["production"][split] = {
