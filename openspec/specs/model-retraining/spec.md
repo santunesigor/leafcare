@@ -1,7 +1,7 @@
 # model-retraining Specification
 
 ## Purpose
-TBD - created by archiving change cumulative-training-dataset. Update Purpose after archive.
+Retreinar o modelo do app com um conjunto que parte do TLA e acumula as fotos do app aprovadas por revisão humana, com sincronização local que respeita revogações e exclusões, ciclo completo com um comando e promoção ao app somente por decisão explícita. Guia: [Retreinar o modelo](../../../docs/RETREINAMENTO.md).
 
 ## Requirements
 
