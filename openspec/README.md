@@ -10,9 +10,9 @@ openspec/
 │   ├── model-bundle/
 │   ├── account-data-sync/
 │   ├── photo-training-consent/
+│   ├── model-retraining/
 │   └── superadmin/
 └── changes/
-    ├── cumulative-training-dataset/  # plano ativo: conjunto acumulado e retreino
     └── archive/      # histórico de trabalho concluído
 
 .agents/skills/       # seis workflows gerados para Codex
