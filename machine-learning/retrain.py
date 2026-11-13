@@ -73,7 +73,14 @@ def cmd_sync(args) -> None:
     use(TRAIN_PYTHON, ("yaml", "PIL", "numpy"))
     from leafcare.common import load_config
     from training import sync
-    show(sync.sync(sync.Supabase(*sync.credentials()), load_config()))
+    client = sync.Supabase(*sync.credentials())
+    show({"tla": sync.ensure_tla(client), **sync.sync(client, load_config())})
+
+
+def cmd_tla_upload(args) -> None:
+    use(TRAIN_PYTHON, ())
+    from training import sync
+    show(sync.upload_tla(sync.Supabase(*sync.credentials())))
 
 
 def export_step(run: Path) -> dict:
@@ -98,7 +105,8 @@ def run_cycle(run: Path, teacher: Path | None = None, do_sync: bool = True, devi
     from training import sync, train
     config = load_config()
     if do_sync:
-        show({"sync": sync.sync(sync.Supabase(*sync.credentials()), config)})
+        client = sync.Supabase(*sync.credentials())
+        show({"tla": sync.ensure_tla(client), "sync": sync.sync(client, config)})
     sync.prune_expired()
     if not (run / "dataset.json").exists():
         built = cycle.build(config)
@@ -148,7 +156,7 @@ def cmd_export(args) -> None:
 
 def parser() -> argparse.ArgumentParser:
     main = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    commands = main.add_subparsers(dest="command", required=True, metavar="{setup,status,sync,run,promote}")
+    commands = main.add_subparsers(dest="command", required=True, metavar="{setup,status,sync,run,promote,tla-upload}")
 
     setup = commands.add_parser("setup", help="Cria/atualiza os dois ambientes (Python 3.12, uv).",
                                 description="Cria .cache/retrain-venv (treino; PyTorch com CUDA quando houver GPU) e "
@@ -164,7 +172,8 @@ def parser() -> argparse.ArgumentParser:
     sync = commands.add_parser("sync", help="Atualiza o espelho local data/field/ com as fotos prontas.",
                                description="Baixa fotos novas em estado ready, apaga as que saíram de ready (revogadas, "
                                            "excluídas, revisadas como incertas/rejeitadas ou vencidas) e atualiza "
-                                           "rótulos revisados sem novo download.")
+                                           "rótulos revisados sem novo download, uma pasta por doença. Também baixa "
+                                           "do bucket tla-dataset as imagens do TLA que faltarem em data/raw/.")
     sync.set_defaults(func=cmd_sync)
 
     run = commands.add_parser("run", help="Executa um ciclo completo (retoma etapas já concluídas).",
@@ -187,6 +196,11 @@ def parser() -> argparse.ArgumentParser:
     promote.add_argument("--allow-unrecommended", action="store_true",
                          help="Promove mesmo sem recomendação automática; só com decisão registrada da equipe.")
     promote.set_defaults(func=cmd_promote)
+
+    upload = commands.add_parser("tla-upload", help="Envia o TLA de data/raw/ para o bucket privado tla-dataset (uma vez).",
+                                 description="Confere data/raw/ com o manifesto e envia cada imagem para tla-dataset, "
+                                             "uma pasta por doença; imagens que já estão no bucket não são substituídas.")
+    upload.set_defaults(func=cmd_tla_upload)
 
     internal = commands.add_parser("_export")  # invoked by `run` inside the export environment
     internal.add_argument("--run-dir", type=Path, required=True)

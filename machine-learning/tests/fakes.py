@@ -35,10 +35,24 @@ def row(analysis, user, label="frog_eye", state="ready", status="confirmed", exp
 
 
 class FakeSupabase:
-    """Serves training_pool() rows and photo bytes; records downloads."""
+    """Serves training_pool() rows, photo bytes and a TLA bucket; records downloads and uploads."""
 
-    def __init__(self, rows, photos):
+    def __init__(self, rows, photos, tla=None):
         self.rows, self.photos, self.downloads = rows, photos, []
+        self.tla, self.uploads = dict(tla or {}), []
+
+    def object(self, bucket, path):
+        assert bucket == "tla-dataset"
+        self.downloads.append(f"{bucket}/{path}")
+        return self.tla[path]
+
+    def upload(self, bucket, path, data):
+        assert bucket == "tla-dataset"
+        if path in self.tla:
+            return False
+        self.tla[path] = data
+        self.uploads.append(path)
+        return True
 
     def pool(self):
         return list(self.rows)

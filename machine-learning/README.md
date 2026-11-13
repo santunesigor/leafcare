@@ -11,7 +11,7 @@ Modelo do app: **MobileNetV4 Small destilado** de um professor DINOv2-B, TFLite 
 | `training/` | Pipeline: `sync` (espelho das fotos), `dataset` (TLA + campo), `train` (professor e aluno), `export` (TFLite, paridade e replay), `promote` (recomendação e instalação), `metrics`. |
 | `leafcare/`, `predict.py`, `validate_bundle.py` | Pré-processamento e inferência com o contrato do app; previsão local e validação do bundle Android. |
 | `config.yaml` | Política do ciclo: seed, proporções do split de campo, mínimo de grupos, quase-duplicatas, tamanho mínimo, critério de promoção. |
-| `data/prepared/`, `data/groups.csv`, `data/import_report.json`, `import_tla.py`, `tla_class_map.yaml` | TLA: split histórico fixo (489/104/103) e proveniência. As imagens não são redistribuídas: importe uma vez com `import_tla.py` para `data/raw/`. |
+| `data/prepared/`, `data/groups.csv`, `data/import_report.json`, `import_tla.py`, `tla_class_map.yaml` | TLA: split histórico fixo (489/104/103) e proveniência. As imagens ficam no bucket privado `tla-dataset` (uma pasta por doença) e `sync` as baixa para `data/raw/`; `import_tla.py` só recria o bucket a partir dos ZIPs originais. |
 | `requirements*.txt` | `requirements.txt` (CI e testes), `requirements-train.txt` (treino), `requirements-export.txt` (conversão TFLite). |
 | `tests/` | Contrato, espelho, dataset, CLI e o ciclo completo de fumaça (opt-in). |
 
@@ -24,7 +24,7 @@ Python 3.12 e [uv](https://docs.astral.sh/uv/). Credenciais só pelo ambiente: `
 ```bash
 python retrain.py setup                       # cria .cache/retrain-venv e .cache/retrain-export-venv
 python retrain.py status                      # pool no servidor e espelho local; não baixa nada
-python retrain.py sync                        # atualiza data/field/
+python retrain.py sync                        # baixa o TLA que faltar e atualiza data/field/
 python retrain.py run --name 2026-12-retreino # ciclo completo; retoma etapas concluídas
 python retrain.py promote --name 2026-12-retreino --model-name mobilenetv4-2026-12
 ```
@@ -41,7 +41,7 @@ As cópias do bucket privado `training-photos` ficam no servidor até revogaçã
 data/field/            (modo 700)
   .secret              chave HMAC local (modo 600); se for apagada, o espelho é refeito e os grupos mudam
   manifest.json        por foto: rótulo revisado, grupo da pessoa, validade, hashes e tamanho
-  <chave>.jpg          JPEG recodificado, sem EXIF
+  <doença>/<chave>.jpg JPEG recodificado, sem EXIF, na pasta da doença revisada
 ```
 
 Nomes e manifesto não têm IDs de conta ou análise: a chave da foto e o grupo da pessoa são HMAC-SHA256 com o segredo local, estáveis entre ciclos. A chave de serviço nunca entra no APK, em arquivos versionados ou em logs.

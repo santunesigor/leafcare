@@ -13,6 +13,7 @@ def test_subcommands_are_wired():
     assert parse("setup").func is retrain.cmd_setup
     assert parse("status").func is retrain.cmd_status
     assert parse("sync").func is retrain.cmd_sync
+    assert parse("tla-upload").func is retrain.cmd_tla_upload
     args = parse("run", "--name", "2026-12-retreino", "--teacher", "t.safetensors", "--no-sync", "--device", "cpu")
     assert (args.func, args.name, args.teacher.name, args.no_sync, args.device) == (
         retrain.cmd_run, "2026-12-retreino", "t.safetensors", True, "cpu")

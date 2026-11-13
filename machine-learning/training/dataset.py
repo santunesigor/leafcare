@@ -23,8 +23,8 @@ from leafcare.common import ROOT, classes_hash, read_json, sha256, text_sha256
 from training import sync
 
 SCHEMA = "leafcare-cycle-dataset-v2"
-BASE_MANIFEST = ROOT / "data/prepared/manifest.json"
-TLA_ROOT = ROOT / "data/raw"
+BASE_MANIFEST = sync.TLA_MANIFEST
+TLA_ROOT = sync.TLA_ROOT
 SPLITS = ("train", "validation", "test", "field_test")
 
 
@@ -158,7 +158,7 @@ def load_dataset(path: Path, now: datetime | None = None):
                if not (roots[r["source"]] / r["path"]).is_file() or sha256(roots[r["source"]] / r["path"]) != r["sha256"]]
     if missing:
         raise FileNotFoundError(f"{len(missing)} imagens ausentes ou alteradas, por exemplo {missing[:3]}. "
-                                "O TLA fica em data/raw (import_tla.py) e as fotos de campo em data/field (sync).")
+                                "Rode `retrain.py sync`: ele baixa o TLA (bucket tla-dataset) para data/raw e as fotos de campo para data/field.")
     return dataset, roots
 
 

@@ -18,6 +18,8 @@ Release reunindo tudo desde a 1.7.1. Durante a preparação, a versão do app fi
 - `machine-learning/retrain.py`, ponto de entrada único: `setup`, `status`, `sync`, `run` e `promote`. O conjunto parte do TLA (split histórico) e soma todas as fotos prontas, espelhadas em `data/field/` sem identificadores nem EXIF, com pessoas fixas no mesmo split entre ciclos. Cada ciclo treina o professor DINOv2-B, destila o aluno com a receita atual, converte para TFLite com paridade, compara com o modelo em uso e só muda o app com `promote`.
 - Admin: bloco "Treinamento do modelo" no Resumo, selo "Treino" (com "· N dias" só para cópias v1.4) e filtro "Só cópias de treino"; a fila mostra primeiro as cópias pendentes que vencem antes.
 - Repositório enxuto: saem os experimentos, benchmarks e o pipeline Keras/ensemble (preservados na tag `v1.7.1`), o exportador de 30 dias, o timer systemd, o catálogo antigo e código Android sem uso. A CI de Python usa LiteRT em vez de TensorFlow.
+- Conjunto completo no Supabase: o TLA (696 imagens, uma pasta por doença) fica no bucket privado `tla-dataset` (migration `20261113120000_tla_dataset_bucket`, aplicada e preenchida em produção). `retrain.py sync` reconstrói `data/raw/` em qualquer computador, conferindo cada imagem com o manifesto, e a cópia local das fotos do app passa a ficar numa pasta por doença.
+- O replay tolera só imagens a até 1e-4 do limiar mudando de aceita para inconclusiva (achado no primeiro ciclo real); teste de login por convite deixou de ser intermitente.
 - Plano único em [Retreinar o modelo](docs/RETREINAMENTO.md).
 
 ### Conta e estabilidade

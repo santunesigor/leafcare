@@ -84,6 +84,10 @@ Documentos v1.5: as cópias de treino passam a formar um conjunto acumulado. `ac
 
 Ordem de publicação: aplicar a migration e publicar a função antes de distribuir o APK com documentos v1.5; o aceite v1.4 deixa de ser aceito.
 
+### `20261113120000_tla_dataset_bucket.sql`
+
+Bucket privado `tla-dataset` com as 696 imagens do TLA, uma pasta por doença, igual a `machine-learning/data/raw/`. Não tem política de Storage: o app não lê nem grava; só o pipeline de retreino com a chave de serviço (`retrain.py sync` baixa, `retrain.py tla-upload` preenche). É separado de `training-photos` porque a limpeza diária apaga lá os objetos sem análise. Teste: `supabase/tests/tla-dataset.sql`. Aplicado e preenchido em produção em 13/11/2026.
+
 ## RLS
 
 `profiles` e `analyses` usam Row Level Security.

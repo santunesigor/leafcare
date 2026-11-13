@@ -25,7 +25,7 @@ Classes e sua ordem continuam em `artifacts/classes.json`; catálogo em `artifac
 
 ## Dataset, treino e destilação
 
-696 imagens TV3 do [TLA](https://doi.org/10.3389/fpls.2024.1333236), 16 classes, seed 42 e separação por grupos: treino 489, validação 104, teste 103. Os dados brutos completos não são redistribuídos. Manifesto, mapa de classes, auditoria e proveniência permanecem nos caminhos de `machine-learning/data/`, `tla_class_map.yaml` e `docs/legal/`.
+696 imagens TV3 do [TLA](https://doi.org/10.3389/fpls.2024.1333236), 16 classes, seed 42 e separação por grupos: treino 489, validação 104, teste 103. Os dados brutos não ficam no Git nem são redistribuídos: ficam no bucket privado `tla-dataset` do Supabase, e `retrain.py sync` os baixa para `machine-learning/data/raw/`. Manifesto, mapa de classes, auditoria e proveniência permanecem nos caminhos de `machine-learning/data/`, `tla_class_map.yaml` e `docs/legal/`.
 
 O aluno parte de pesos ImageNet e probe logística, usa AdamW, batch 8, três épocas de aquecimento e quinze de ajuste; BatchNorm congelada. A perda combina 50% entropia cruzada ponderada e 50% KL com o professor DINOv2-B, temperatura de destilação 4 (distinta da temperatura de calibração). Os logits do professor são usados somente no treino. A época é selecionada por Macro-F1/Top-1/Top-3 na validação; o teste não escolhe checkpoint nem limiar.
 

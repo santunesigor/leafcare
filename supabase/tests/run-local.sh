@@ -21,6 +21,7 @@ docker exec "$test_container" psql -U postgres -v ON_ERROR_STOP=1 -f /workspace/
 docker exec "$test_container" psql -U postgres -v ON_ERROR_STOP=1 -f /workspace/tests/legal-acceptance.sql >/dev/null
 docker exec "$test_container" psql -U postgres -v ON_ERROR_STOP=1 -f /workspace/tests/training-consent.sql >/dev/null
 docker exec "$test_container" psql -U postgres -v ON_ERROR_STOP=1 -f /workspace/tests/training-pool.sql >/dev/null
+docker exec "$test_container" psql -U postgres -v ON_ERROR_STOP=1 -f /workspace/tests/tla-dataset.sql >/dev/null
 # Validate the parameterized first-admin bootstrap and an idempotent repeat.
 docker exec "$test_container" psql -U postgres -v ON_ERROR_STOP=1 -c "INSERT INTO auth.users(id,email,email_confirmed_at) VALUES('00000000-0000-0000-0000-000000000009','bootstrap@test.local',now())" >/dev/null
 for attempt in 1 2; do

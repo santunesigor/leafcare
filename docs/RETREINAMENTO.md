@@ -17,6 +17,20 @@ App: análise conclusiva
                                 └─ retrain.py promote (decisão da equipe) → APK
 ```
 
+## Onde as fotos ficam
+
+Tudo fica no Supabase, em dois buckets privados que só o pipeline acessa, com a chave de serviço:
+
+| O quê | No Supabase | No computador (cópia, fora do Git) |
+| --- | --- | --- |
+| TLA, 696 imagens fixas | `tla-dataset/<doença>/<arquivo>` | `machine-learning/data/raw/<doença>/<arquivo>` |
+| Fotos do app | `training-photos/<conta>/<análise>.jpg`, com a classe revisada no banco | `machine-learning/data/field/<doença>/<código>.jpg` |
+
+- **O TLA já é organizado por doença** nas pastas, como sempre foi.
+- **As fotos do app ficam por conta no servidor.** O app envia cada foto para a pasta da conta; é isso que permite revogar e apagar o que é de cada pessoa, e o rótulo pode mudar numa nova revisão. A doença fica no banco (`photo_reviews`). Na cópia local, o `sync` coloca cada foto na pasta da doença revisada e a move se o rótulo mudar.
+- **Os dois buckets são separados de propósito.** A limpeza diária apaga do `training-photos` tudo o que não tem análise, o que incluiria o TLA.
+- **Em outro computador**, `retrain.py sync` (ou `run`) baixa os dois e confere cada imagem do TLA com o hash do manifesto.
+
 - **Ponto de partida: o TLA.** As 696 imagens do dataset público, com o split histórico (treino 489, validação 104, teste 103), estão em todos os ciclos. Assim as métricas continuam comparáveis com todos os modelos anteriores.
 - **Fotos de campo acumuladas.** Toda foto revisada como confirmada ou corrigida entra no conjunto e fica nele nos ciclos seguintes. Cada ciclo usa o TLA mais tudo o que já foi revisado até ali.
 - **O que sai do conjunto:**
@@ -52,15 +66,13 @@ O comando cria `.cache/retrain-venv` (treino, com PyTorch e CUDA quando houver G
 
 Se `.cache/retrain-venv` já existir com o PyTorch de CPU, apague a pasta e rode `setup` de novo para usar a GPU.
 
-### 2. TLA em `data/raw/`
+### 2. TLA (automático)
 
-As imagens do TLA não ficam no Git. Baixe os arquivos públicos do artigo ([doi:10.3389/fpls.2024.1333236](https://doi.org/10.3389/fpls.2024.1333236)), o ZIP do TLA e o do TTDD, e importe uma vez:
+O TLA não fica no Git. O primeiro `sync` ou `run` baixa as 696 imagens do bucket `tla-dataset` para `data/raw/` e confere cada uma com o hash do manifesto `data/prepared/manifest.json`. Arquivo ausente ou alterado é baixado de novo; download que não confere com o manifesto é recusado.
 
-```bash
-.cache/retrain-venv/bin/python import_tla.py --tla /caminho/TLA.zip --ttdd /caminho/TTDD.zip
-```
+O bucket foi preenchido em 13/11/2026 com `python retrain.py tla-upload`. Só é preciso repetir se ele se perder. Nesse caso, importe os ZIPs públicos do artigo ([doi:10.3389/fpls.2024.1333236](https://doi.org/10.3389/fpls.2024.1333236)) com `import_tla.py --tla TLA.zip --ttdd TTDD.zip` e rode `tla-upload`.
 
-Cada ciclo confere cada imagem com o hash do manifesto `data/prepared/manifest.json` e recusa arquivos diferentes.
+Três arquivos do TLA têm caracteres chineses no nome (`副本`, "cópia"), e o Storage só aceita nomes ASCII. No bucket, esses caracteres viram o código Unicode (`u526fu672c`); em `data/raw/` o nome continua o original.
 
 ### 3. Chave de serviço do Supabase
 
@@ -162,7 +174,7 @@ O teste de fumaça usa imagens sintéticas e um professor pequeno com pesos alea
 LEAFCARE_TRAINING_SMOKE=1 .cache/retrain-venv/bin/python -m pytest -q tests/test_smoke.py
 ```
 
-Para o banco: `bash supabase/tests/run-local.sh` (Postgres em Docker) cobre cada regra da tabela acima em `training-pool.sql`.
+Para o banco: `bash supabase/tests/run-local.sh` (Postgres em Docker) cobre cada regra da tabela acima em `training-pool.sql`, e `tla-dataset.sql` confirma que o app não lê nem altera o TLA.
 
 ## Primeiro ciclo real (12/11/2026)
 
@@ -191,8 +203,10 @@ Não recomendado: ainda não existe `field_test`, porque há menos de 5 pessoas.
 | --- | --- |
 | `machine-learning/retrain.py` | Ponto de entrada: `setup`, `status`, `sync`, `run`, `promote` |
 | `machine-learning/training/` | Espelho, conjunto, treino, conversão/replay, promoção e métricas |
-| `machine-learning/data/field/` | Espelho local das fotos de campo (fora do Git) |
+| `machine-learning/data/raw/` | Cópia local do TLA, uma pasta por doença (fora do Git) |
+| `machine-learning/data/field/` | Espelho local das fotos do app, uma pasta por doença (fora do Git) |
 | `machine-learning/runs/` | Ciclos (fora do Git) |
 | `supabase/migrations/20261112120000_training_pool.sql` | `training_pool()` e dados de treino no painel |
 | `supabase/migrations/20261112180000_legal_documents_v1_5_permanent_training.sql` | Aceite v1.5, retenção por cópia e `training_photos_to_delete()` |
+| `supabase/migrations/20261113120000_tla_dataset_bucket.sql` | Bucket privado `tla-dataset` |
 | `supabase/functions/cleanup-training-photos/` | Limpeza diária das cópias que precisam sair |

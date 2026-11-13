@@ -16,7 +16,7 @@ NOW = datetime(2026, 11, 12, tzinfo=timezone.utc)
 
 
 def mirror_files(mirror):
-    return sorted(p.name for p in mirror.glob("*.jpg"))
+    return sorted(p.relative_to(mirror).as_posix() for p in mirror.rglob("*.jpg"))
 
 
 def test_first_sync_downloads_ready_photos_without_metadata_or_ids(tmp_path):
@@ -154,3 +154,55 @@ def test_missing_credentials_stop_without_echoing_values(monkeypatch):
     with pytest.raises(SystemExit) as error:
         sync.credentials()
     assert "do-not-print" not in str(error.value)
+
+
+def test_photos_live_in_their_disease_folder_and_move_on_relabel(tmp_path):
+    mirror = tmp_path / "field"
+    photos = {"a": jpeg(picture(1)), "b": jpeg(picture(2))}
+    sync.sync(FakeSupabase([row("a", "u1"), row("b", "u2", label="healthy")], photos), CONFIG, mirror, NOW)
+    assert [name.split("/")[0] for name in mirror_files(mirror)] == ["frog_eye", "healthy"]
+
+    sync.sync(FakeSupabase([row("a", "u1", label="tmv", status="corrected")], photos), CONFIG, mirror, NOW)
+    manifest = json.loads((mirror / "manifest.json").read_text())["photos"]
+    (photo,) = manifest.values()
+    assert photo["image"].startswith("tmv/") and mirror_files(mirror) == [photo["image"]]
+    assert not (mirror / "frog_eye").exists() and not (mirror / "healthy").exists(), "empty folders are removed"
+
+
+def tla_manifest(tmp_path, images):
+    import hashlib
+    rows = [{"path": path, "sha256": hashlib.sha256(data).hexdigest()} for path, data in images.items()]
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps({"rows": rows}))
+    return path
+
+
+def test_tla_is_restored_from_the_bucket_and_checked_against_the_manifest(tmp_path):
+    images = {"frog_eye/IMG_1.JPG": jpeg(picture(1)), "healthy/IMG_2 - 副本.JPG": jpeg(picture(2))}
+    manifest, raw = tla_manifest(tmp_path, images), tmp_path / "raw"
+    (raw / "healthy").mkdir(parents=True)
+    (raw / "healthy/IMG_2 - 副本.JPG").write_bytes(b"altered")
+    client = FakeSupabase([], {}, tla={sync.tla_key(p): data for p, data in images.items()})
+    assert "healthy/IMG_2 - u526fu672c.JPG" in client.tla, "storage keys are ASCII"
+    assert sync.ensure_tla(client, manifest, raw) == {"tla_images": 2, "restored": 2}
+    assert all((raw / p).read_bytes() == data for p, data in images.items())
+    assert sync.ensure_tla(client, manifest, raw)["restored"] == 0 and len(client.downloads) == 2
+
+    (raw / "frog_eye/IMG_1.JPG").unlink()
+    with pytest.raises(ValueError):
+        sync.ensure_tla(FakeSupabase([], {}, tla={**client.tla, "frog_eye/IMG_1.JPG": b"tampered"}), manifest, raw)
+    assert not (raw / "frog_eye/IMG_1.JPG").exists(), "a mismatched download is never written"
+
+
+def test_tla_upload_keeps_existing_objects_and_refuses_a_different_local_copy(tmp_path):
+    images = {"frog_eye/IMG_1.JPG": jpeg(picture(1)), "healthy/IMG_2.JPG": jpeg(picture(2))}
+    manifest, raw = tla_manifest(tmp_path, images), tmp_path / "raw"
+    for path, data in images.items():
+        (raw / path).parent.mkdir(parents=True, exist_ok=True)
+        (raw / path).write_bytes(data)
+    client = FakeSupabase([], {}, tla={"frog_eye/IMG_1.JPG": images["frog_eye/IMG_1.JPG"]})
+    assert sync.upload_tla(client, manifest, raw) == {"tla_images": 2, "uploaded": 1, "already_in_bucket": 1}
+    assert client.uploads == ["healthy/IMG_2.JPG"]
+    (raw / "healthy/IMG_2.JPG").write_bytes(b"changed")
+    with pytest.raises(SystemExit):
+        sync.upload_tla(client, manifest, raw)

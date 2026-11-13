@@ -6,6 +6,13 @@ reconciles the mirror with the server: new ready photos are downloaded, photos
 that left ``ready`` (revoked, deleted, relabeled as uncertain/rejected, expired)
 are deleted, and relabels only update the label.
 
+The mirror is organised like data/raw: one folder per disease
+(``data/field/<class_id>/<key>.jpg``); a relabel moves the file to its new folder.
+
+The TLA base set lives in the private bucket ``tla-dataset`` with the same layout
+as data/raw; ``ensure_tla`` restores any missing or altered image, checked against
+the sha256 of the frozen manifest, and ``upload_tla`` seeds the bucket once.
+
 Privacy: images are decoded like the app and re-encoded (no EXIF); file names and
 the manifest carry no account or analysis ids, only HMAC-SHA256 keys derived with
 a local secret (``data/field/.secret``, mode 600, never versioned). The keys are
@@ -32,8 +39,11 @@ from pathlib import Path
 from leafcare.common import ROOT
 
 MIRROR = ROOT / "data/field"
+TLA_MANIFEST = ROOT / "data/prepared/manifest.json"
+TLA_ROOT = ROOT / "data/raw"
 SCHEMA = "leafcare-field-mirror-v1"
 BUCKET = "training-photos"
+TLA_BUCKET = "tla-dataset"
 REVIEWED = ("confirmed", "corrected")
 
 
@@ -43,9 +53,9 @@ class Supabase:
     def __init__(self, url: str, key: str):
         self.url, self._key = url.rstrip("/"), key
 
-    def _request(self, path: str, body: dict | None = None) -> bytes:
-        headers = {"apikey": self._key, "Authorization": f"Bearer {self._key}"}
-        data = None
+    def _request(self, path: str, body: dict | None = None, data: bytes | None = None,
+                 extra: dict | None = None) -> bytes:
+        headers = {"apikey": self._key, "Authorization": f"Bearer {self._key}", **(extra or {})}
         if body is not None:
             headers["Content-Type"] = "application/json"
             data = json.dumps(body).encode()
@@ -63,8 +73,23 @@ class Supabase:
                 return rows
             rows.extend(page)
 
+    def object(self, bucket: str, path: str) -> bytes:
+        return self._request(f"/storage/v1/object/authenticated/{bucket}/{urllib.parse.quote(path, safe='/')}")
+
     def photo(self, object_path: str) -> bytes:
-        return self._request(f"/storage/v1/object/authenticated/{BUCKET}/{urllib.parse.quote(object_path, safe='/')}")
+        return self.object(BUCKET, object_path)
+
+    def upload(self, bucket: str, path: str, data: bytes) -> bool:
+        """Create an object; False when it already exists (never overwritten)."""
+        try:
+            self._request(f"/storage/v1/object/{bucket}/{urllib.parse.quote(path, safe='/')}", data=data,
+                          extra={"Content-Type": "image/jpeg" if path.lower().endswith((".jpg", ".jpeg")) else "image/png",
+                                 "x-upsert": "false"})
+            return True
+        except urllib.error.HTTPError as error:
+            if error.code in (400, 409) and b"exist" in error.read().lower():
+                return False
+            raise
 
 
 def credentials() -> tuple[str, str]:
@@ -137,6 +162,23 @@ def _remove(mirror: Path, manifest: dict, key: str) -> None:
     (mirror / manifest["photos"].pop(key)["image"]).unlink(missing_ok=True)
 
 
+def _place(mirror: Path, photo: dict, key: str) -> bool:
+    """Keep each photo in its disease folder, like data/raw; True when the file moved."""
+    target = f"{photo['class_id']}/{key}.jpg"
+    if photo["image"] == target:
+        return False
+    (mirror / photo["class_id"]).mkdir(exist_ok=True)
+    (mirror / photo["image"]).replace(mirror / target)
+    photo["image"] = target
+    return True
+
+
+def _drop_empty_folders(mirror: Path) -> None:
+    for folder in mirror.iterdir():
+        if folder.is_dir() and not any(folder.iterdir()):
+            folder.rmdir()
+
+
 def prune_expired(mirror: Path = MIRROR, now: datetime | None = None) -> int:
     """Delete local copies past their v1.4 deadline, even without contacting the server."""
     now = now or datetime.now(timezone.utc)
@@ -146,6 +188,7 @@ def prune_expired(mirror: Path = MIRROR, now: datetime | None = None) -> int:
         _remove(mirror, manifest, key)
     if stale:
         save_mirror(mirror, manifest)
+        _drop_empty_folders(mirror)
     return len(stale)
 
 
@@ -199,8 +242,8 @@ def sync(client: Supabase, config: dict, mirror: Path = MIRROR, now: datetime | 
         manifest["rejected"] = {}
     manifest["secret_check"] = check
     known = {photo["image"] for photo in manifest["photos"].values()}
-    for leftover in mirror.glob("*.jpg"):  # interrupted downloads never reached the manifest
-        if leftover.name not in known:
+    for leftover in mirror.rglob("*.jpg"):  # interrupted downloads never reached the manifest
+        if leftover.relative_to(mirror).as_posix() not in known:
             leftover.unlink()
 
     rows = client.pool()
@@ -218,6 +261,7 @@ def sync(client: Supabase, config: dict, mirror: Path = MIRROR, now: datetime | 
             photo.update(class_id=row["label_class_id"], review_status=row["review_status"])
             report["relabeled"] += 1
         photo["expires_at"] = row.get("expires_at")
+        _place(mirror, photo, key)
     contents = {photo["sha256"] for photo in manifest["photos"].values()}
     rejected = Counter()
     try:
@@ -238,11 +282,12 @@ def sync(client: Supabase, config: dict, mirror: Path = MIRROR, now: datetime | 
             if digest in contents:  # re-encoding is deterministic: same pixels, same bytes
                 rejected["duplicate"] += 1
                 continue
-            image = mirror / f"{key}.jpg"
+            image = mirror / row["label_class_id"] / f"{key}.jpg"
+            image.parent.mkdir(exist_ok=True)
             image.write_bytes(content)
             contents.add(digest)
             manifest["photos"][key] = {
-                "image": image.name, "class_id": row["label_class_id"], "review_status": row["review_status"],
+                "image": image.relative_to(mirror).as_posix(), "class_id": row["label_class_id"], "review_status": row["review_status"],
                 "group": keyed(secret, "person", row["user_id"], 16), "expires_at": row.get("expires_at"),
                 "sha256": digest, **describe(image),
             }
@@ -250,6 +295,48 @@ def sync(client: Supabase, config: dict, mirror: Path = MIRROR, now: datetime | 
     finally:
         manifest["synced_at"] = now.isoformat()
         save_mirror(mirror, manifest)
+        _drop_empty_folders(mirror)
     return {"added": report["added"], "removed": report["removed"], "relabeled": report["relabeled"],
             "not_added": dict(sorted(rejected.items())), "pool": pool_status(rows, now, config["expiring_soon_days"]),
             "mirror": mirror_status(mirror, now)}
+
+
+def tla_key(path: str) -> str:
+    """Storage keys must be ASCII: a few TLA names contain Chinese ("副本", copy), stored as uXXXX."""
+    return "".join(ch if ord(ch) < 128 else f"u{ord(ch):04x}" for ch in path)
+
+
+def _tla_rows(manifest: Path) -> list[dict]:
+    return json.loads(manifest.read_text(encoding="utf-8"))["rows"]
+
+
+def _matches(path: Path, digest: str) -> bool:
+    return path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == digest
+
+
+def ensure_tla(client: Supabase, manifest: Path = TLA_MANIFEST, raw: Path = TLA_ROOT) -> dict:
+    """Restore missing or altered TLA images from the private bucket, verified against the manifest."""
+    restored = 0
+    for row in _tla_rows(manifest):
+        path = raw / row["path"]
+        if _matches(path, row["sha256"]):
+            continue
+        data = client.object(TLA_BUCKET, tla_key(row["path"]))
+        if hashlib.sha256(data).hexdigest() != row["sha256"]:
+            raise ValueError(f"{TLA_BUCKET}/{row['path']} difere do manifesto; não foi gravado.")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(path.name + ".tmp")
+        temporary.write_bytes(data)
+        temporary.replace(path)
+        restored += 1
+    return {"tla_images": len(_tla_rows(manifest)), "restored": restored}
+
+
+def upload_tla(client: Supabase, manifest: Path = TLA_MANIFEST, raw: Path = TLA_ROOT) -> dict:
+    """Seed the private bucket with data/raw (one folder per disease); existing objects are kept."""
+    rows = _tla_rows(manifest)
+    wrong = [row["path"] for row in rows if not _matches(raw / row["path"], row["sha256"])]
+    if wrong:
+        raise SystemExit(f"{len(wrong)} imagens de data/raw ausentes ou diferentes do manifesto, ex.: {wrong[:3]}.")
+    sent = sum(client.upload(TLA_BUCKET, tla_key(row["path"]), (raw / row["path"]).read_bytes()) for row in rows)
+    return {"tla_images": len(rows), "uploaded": sent, "already_in_bucket": len(rows) - sent}
