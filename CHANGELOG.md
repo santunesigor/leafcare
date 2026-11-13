@@ -1,5 +1,11 @@
 # Changelog — LeafCare
 
+## [1.8.1] - em preparação
+
+Correções de bugs sobre a 1.8.0 (versionCode atual: 28).
+
+- Voltar ao app depois de mais de 1 h não derruba mais o acesso administrativo nem o aceite dos termos: o token expirado é renovado antes da chamada.
+
 ## [1.8.0] - 2026-11-13
 
 Release reunindo tudo desde a 1.7.1. APK 1.8.0 (versionCode 27).
