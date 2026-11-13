@@ -1,8 +1,8 @@
 # Changelog — LeafCare
 
-## [1.8.0] - em preparação
+## [1.8.0] - 2026-11-13
 
-Release reunindo tudo desde a 1.7.1. Durante a preparação, a versão do app fica em 1.8.0 e só o `versionCode` sobe a cada APK de teste (atual: 27).
+Release reunindo tudo desde a 1.7.1. APK 1.8.0 (versionCode 27).
 
 ### Termos v1.4 e treinamento
 - Termos de Uso e Política de Privacidade v1.4: o uso das fotos analisadas para treinamento passa a ser condição de uso, registrada no servidor junto com o aceite; sem aceite, o app não pode ser usado (offline, só para quem já aceitou no aparelho). A tela de aceite serve para contas novas e antigas e explica quando o servidor ainda não foi atualizado.
