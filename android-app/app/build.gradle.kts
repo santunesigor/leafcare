@@ -30,14 +30,12 @@ android {
         applicationId = "br.com.leafcare"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "1.7.1"
+        versionCode = 27
+        versionName = "1.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // BuildConfig fields for Supabase configuration (from local.properties)
         buildConfigField("String", "SUPABASE_URL", "\"https://nhkqfanjfcivcbndivav.supabase.co\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
-        // Legacy alias for backward compatibility
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabasePublishableKey\"")
     }
     buildFeatures {
         compose = true
@@ -79,13 +77,10 @@ tasks.matching { it.name == "assembleDebug" }.configureEach { dependsOn(distribu
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
-    androidTestImplementation(composeBom)
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.navigation:navigation-compose:2.8.5")
@@ -121,8 +116,6 @@ dependencies {
     testImplementation("androidx.test:core:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
-    androidTestImplementation("androidx.room:room-testing:2.6.1")
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
@@ -143,7 +136,7 @@ val verifyModelAssets by tasks.registering {
     doLast {
         val assets = file("src/main/assets")
         val model = assets.resolve("leafcare.tflite")
-        check(model.isFile) { "Modelo ausente: execute o pipeline Python e export_tflite.py." }
+        check(model.isFile) { "Modelo ausente: promova um ciclo com machine-learning/retrain.py promote." }
         val meta = JsonSlurper().parse(assets.resolve("model_metadata.json")) as Map<*, *>
         val classes = JsonSlurper().parse(assets.resolve("classes.json")) as List<*>
         fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

@@ -8,6 +8,10 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
+import android.util.Size
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.*
@@ -27,8 +31,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -47,7 +49,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import br.com.leafcare.data.TRAINING_UPLOADS_ENABLED
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,31 +57,49 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val cameraErrorOpen = stringResource(R.string.camera_error_open)
-    var permitted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
+    val cameraErrorCapture = stringResource(R.string.camera_error_capture)
+    val cameraErrorStorage = stringResource(R.string.camera_error_storage)
+    // Saveable: a rotation must not reset the lens nor ask for the permission again.
+    var permitted by rememberSaveable { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
+    var asked by rememberSaveable { mutableStateOf(false) }
     var help by remember { mutableStateOf(false) }
+    // Flashlight (torch): continuous light while framing and capturing, so the
+    // person sees the lighting the photo will have.
     var flash by remember { mutableStateOf(false) }
     var hasFlash by remember { mutableStateOf(false) }
+    var boundCamera by remember { mutableStateOf<Camera?>(null) }
     var canSwitch by remember { mutableStateOf(false) }
-    var lens by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
+    var lens by rememberSaveable { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
+    // False once the screen leaves: a capture interrupted by that is not an error.
+    val active = remember { java.util.concurrent.atomic.AtomicBoolean(true) }
+    DisposableEffect(Unit) { active.set(true); onDispose { active.set(false) } }
     var ready by remember { mutableStateOf(false) }
     var capturing by remember { mutableStateOf(false) }
-    var pendingImage by remember { mutableStateOf<Pair<Uri, File?>?>(null) }
-    var authorizeTraining by remember { mutableStateOf(false) }
-    val consent by vm.trainingConsent.collectAsState()
-    val trainingConsentActive = TRAINING_UPLOADS_ENABLED && consent?.granted == true && consent?.termsVersion == br.com.leafcare.data.TRAINING_TERMS_VERSION && consent?.userId == vm.currentConsentUserId()
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER; implementationMode = PreviewView.ImplementationMode.COMPATIBLE } }
-    val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
+    // Capped near 12 MP so a capture never exceeds the 16 MP decoder limit.
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .setResolutionSelector(ResolutionSelector.Builder()
+                .setResolutionStrategy(ResolutionStrategy(Size(4032, 3024), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER))
+                .build())
+            .build()
+    }
     val executor = remember { ContextCompat.getMainExecutor(context) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permitted = it }
-    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { authorizeTraining = false; pendingImage = it to null } }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { vm.analyze(it) } }
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) permitted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            if (event == Lifecycle.Event.ON_RESUME) {
+                permitted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                // The camera closes in the background and turns the light off; restore it.
+                if (flash && hasFlash) boundCamera?.cameraControl?.enableTorch(true)
+            }
         }
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
-    LaunchedEffect(Unit) { if (!permitted) permission.launch(Manifest.permission.CAMERA) }
+    LaunchedEffect(Unit) { if (!permitted && !asked) { asked = true; permission.launch(Manifest.permission.CAMERA) } }
     DisposableEffect(permitted, lens, owner) {
         var disposed = false
         var provider: ProcessCameraProvider? = null
@@ -98,73 +117,53 @@ fun CameraScreen(vm: LeafCareViewModel, onBack: () -> Unit) {
                         hasFlash = camera.cameraInfo.hasFlashUnit()
                         canSwitch = available.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) && available.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
                         if (!hasFlash) flash = false
+                        boundCamera = camera
                         ready = true
-                    } catch (error: Exception) { vm.error(cameraErrorOpen + " ${error.message.orEmpty()}") }
+                    } catch (error: Exception) { vm.error(cameraErrorOpen) }
                 }
             }, executor)
         }
-        onDispose { disposed = true; provider?.unbind(preview, imageCapture) }
+        onDispose { disposed = true; boundCamera = null; provider?.unbind(preview, imageCapture) }
+    }
+    LaunchedEffect(flash, boundCamera, hasFlash) {
+        boundCamera?.cameraControl?.enableTorch(flash && hasFlash)
     }
     CameraContent(onBack = onBack, onHelp = { help = true },
         onGallery = { gallery.launch(arrayOf("image/jpeg", "image/png", "image/webp", "image/bmp")) },
         onFlash = { flash = !flash }, onSwitch = { lens = if (lens == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK },
         enabled = ready && !capturing, galleryEnabled = !capturing, flashAvailable = hasFlash && ready && !capturing,
         switchAvailable = canSwitch && ready && !capturing, flashOn = flash, showGuide = permitted,
-        onCapture = {
+        onCapture = capture@{
             capturing = true
-            imageCapture.flashMode = if (flash && hasFlash) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
+            // The flashlight already lights the scene; a capture flash on top would overexpose it.
+            imageCapture.flashMode = ImageCapture.FLASH_MODE_OFF
             previewView.display?.let { imageCapture.targetRotation = it.rotation }
-            val file = File.createTempFile("capture-", ".jpg", context.cacheDir)
+            val file = try {
+                File.createTempFile("capture-", ".jpg", context.cacheDir)
+            } catch (error: java.io.IOException) {
+                capturing = false
+                vm.error(cameraErrorStorage)
+                return@capture
+            }
             imageCapture.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), executor,
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        capturing = false; authorizeTraining = false; pendingImage = Uri.fromFile(file) to file
+                        capturing = false; vm.analyze(Uri.fromFile(file), file)
                     }
                     override fun onError(error: ImageCaptureException) {
-                        capturing = false; file.delete(); vm.error("Falha na captura: ${error.message}")
+                        capturing = false; file.delete()
+                        // Leaving the screen unbinds the camera and fails the pending capture.
+                        if (active.get() && error.imageCaptureError != ImageCapture.ERROR_CAMERA_CLOSED) vm.error(cameraErrorCapture)
                     }
                 })
         }) {
         if (permitted) AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
         else Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(R.string.permission_denied_title), color = Color.White)
-            Button(onClick = { permission.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.permission_allow_button)) }
+            Text(stringResource(R.string.permission_denied_title), color = Color.White, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(16.dp))
+            LeafButton(stringResource(R.string.permission_allow_button), { permission.launch(Manifest.permission.CAMERA) })
             TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) }) { Text(stringResource(R.string.permission_settings_button), color = Color.White) }
         }
-    }
-    pendingImage?.let { (uri, temporary) ->
-        AlertDialog(
-            onDismissRequest = { temporary?.delete(); pendingImage = null },
-            title = { Text("Analisar fotografia") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (trainingConsentActive) "A análise funciona normalmente. A contribuição para treinamento é opcional e exige sua escolha para esta foto." else "A análise funciona normalmente. Para contribuir com fotos, leia e aceite a política de treinamento no Perfil.")
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = authorizeTraining,
-                            enabled = trainingConsentActive,
-                            onCheckedChange = { authorizeTraining = it },
-                            modifier = Modifier.semantics {
-                                contentDescription = "Autorização individual desta foto para treinamento"
-                                stateDescription = if (!trainingConsentActive) {
-                                    "Não autorizada: ative o consentimento geral no Perfil para escolher esta foto"
-                                } else if (authorizeTraining) {
-                                    "Autorizada"
-                                } else {
-                                    "Não autorizada"
-                                }
-                            },
-                        )
-                        Text("Também autorizo esta foto para treinamento", color = if (trainingConsentActive) LeafColors.Text else LeafColors.Muted)
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = {
-                vm.analyze(uri, temporary, authorizeTraining && trainingConsentActive)
-                pendingImage = null
-            }) { Text("Analisar", color = LeafColors.Green) } },
-            dismissButton = { TextButton(onClick = { temporary?.delete(); pendingImage = null }) { Text("Cancelar", color = LeafColors.Muted) } }
-        )
     }
     if (help) HelpSheet(onDismiss = { help = false })
 }
@@ -206,7 +205,7 @@ fun CameraContent(onBack: () -> Unit, onHelp: () -> Unit, onGallery: () -> Unit,
                         Text(stringResource(R.string.camera_guide_subtitle), color = Color.White, fontSize = 13.sp, lineHeight = 18.sp, textAlign = TextAlign.Center)
                     }
                     Column(Modifier.align(Alignment.TopEnd).padding(10.dp)) {
-                        RoundIconButton(R.drawable.v3_flash, if (flashOn) stringResource(R.string.flash_on_desc) else stringResource(R.string.flash_off_desc), onFlash, flashAvailable, true)
+                        FlashlightButton(flashOn, flashAvailable, onFlash)
                         RoundIconButton(R.drawable.v3_switch_camera, stringResource(R.string.switch_camera_desc), onSwitch, switchAvailable, true)
                     }
                 }
@@ -222,6 +221,22 @@ fun CameraContent(onBack: () -> Unit, onHelp: () -> Unit, onGallery: () -> Unit,
                 }
             }
             Text(stringResource(R.string.camera_tip), Modifier.fillMaxWidth().padding(bottom = 20.dp), textAlign = TextAlign.Center, fontSize = 13.sp, color = LeafColors.Muted)
+        }
+    }
+}
+
+/** Flashlight toggle: lit (white, dark icon) while on, so its state is visible at a glance. */
+@Composable
+private fun FlashlightButton(on: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val description = stringResource(if (on) R.string.flash_on_desc else R.string.flash_off_desc)
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp).semantics {
+        contentDescription = description
+        stateDescription = if (on) "Ligada" else "Desligada"
+    }) {
+        Box(Modifier.size(40.dp).background(if (on) Color.White else Color(0x880D1B0F), CircleShape)
+            .border(1.dp, if (on) Color.White else Color.White.copy(alpha = .5f), CircleShape), contentAlignment = Alignment.Center) {
+            Icon(if (on) Icons.Filled.FlashlightOn else Icons.Filled.FlashlightOff, null, Modifier.size(22.dp),
+                tint = if (on) LeafColors.Text else Color.White.copy(alpha = if (enabled) 1f else .45f))
         }
     }
 }

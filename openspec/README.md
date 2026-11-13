@@ -8,7 +8,10 @@ openspec/
 ├── specs/            # contratos de referência do comportamento existente
 │   ├── offline-analysis/
 │   ├── model-bundle/
-│   └── account-data-sync/
+│   ├── account-data-sync/
+│   ├── photo-training-consent/
+│   ├── model-retraining/
+│   └── superadmin/
 └── changes/
     └── archive/      # histórico de trabalho concluído
 

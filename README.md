@@ -9,7 +9,7 @@ O resultado apresenta até três hipóteses e pode ser marcado como inconclusivo
 - Captura uma foto ou importa uma imagem da galeria e classifica a folha localmente.
 - Mantém análises e histórico no aparelho; após o primeiro acesso autenticado, essas funções ficam disponíveis offline.
 - Sincroniza com a conta as análises e as fotos elegíveis quando há conexão. Fotos de previsões inconclusivas permanecem no aparelho.
-- Oferece contribuição de fotos para treinamento como opção separada: é necessário ativar o consentimento geral e autorizar cada foto. Recusar ou revogar mantém a classificação e o histórico disponíveis.
+- Usa as fotos analisadas para treinar o modelo, como condição de uso aceita junto com os Termos e a Política (v1.5). As fotos revisadas formam um conjunto de treino que cresce a cada versão do modelo. A revogação fica em Perfil → Privacidade e fotos; depois dela, o app pede um novo aceite.
 - Abre os Termos de Uso e a Política de Privacidade dentro do app. O LeafCare não tem site; confirmações e recuperações de acesso retornam ao aplicativo por deep link.
 
 ## Baixar e instalar
@@ -64,7 +64,8 @@ O modelo só deve ser substituído após solicitação explícita e validação 
 - [Arquitetura Android](docs/ARCHITECTURE.md)
 - [Desenvolvimento e ferramentas](docs/DEVELOPMENT.md)
 - [Testes e QA](docs/TESTING.md)
-- [Machine Learning](docs/MACHINE_LEARNING.md) e [benchmarks](docs/benchmarks/BENCHMARK_MODELOS.md)
+- [Machine Learning](docs/MACHINE_LEARNING.md)
+- [Retreinar o modelo com as fotos do app](docs/RETREINAMENTO.md)
 - [Supabase, migrations e sincronização](docs/SUPABASE.md)
 - [Administração e revisão de fotos](docs/SUPERADMIN.md)
 - [Contexto de desenvolvimento e limites](docs/AI_CONTEXT.md)
@@ -75,7 +76,7 @@ O modelo só deve ser substituído após solicitação explícita e validação 
 
 ```text
 android-app/       aplicativo Android, testes e bundle TFLite
-machine-learning/  pipeline, artefatos de pesquisa e ferramentas de exportação
+machine-learning/  bundle do modelo, conjunto de treino e retreino (retrain.py)
 supabase/          migrations, funções e testes locais do backend
 docs/              arquitetura, operação, QA, proveniência e relatórios
 openspec/          especificações atuais e mudanças arquivadas

@@ -2,7 +2,6 @@ package br.com.leafcare.auth
 
 import android.app.Application
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.asLiveData
 import br.com.leafcare.LeafCareApplication
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.gotrue.Auth
@@ -86,17 +85,18 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         // Load session from storage (does not require network)
         ioScope.launch {
             try {
-                val hasSession = backend.loadFromStorage()
-                if (hasSession) {
-                    val session = backend.loadSession()
-                    if (session != null) {
-                        _session.value = session
-                        _user.value = session.user
-                    }
+                // Reads storage only: an expired token must not block startup
+                // (offline, GoTrue's refresh below retries indefinitely).
+                val session = backend.loadSession()
+                if (session != null) {
+                    _session.value = session
+                    _user.value = session.user
                 }
             } finally {
                 _sessionChecked.value = true
             }
+            // Imports and refreshes in the background; results arrive via sessionStatus.
+            runCatching { backend.loadFromStorage() }
         }
 
         // Observe session status changes
@@ -217,7 +217,13 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         _infoMessage.value = null
 
         return try {
-            backend.signOut()
+            try {
+                backend.signOut()
+            } catch (e: Exception) {
+                // GoTrue skips its local cleanup when /logout fails (offline):
+                // the user still asked to leave, so sign out locally.
+                backend.clearLocalSession()
+            }
             _session.value = null
             _user.value = null
             Result.success(Unit)
@@ -433,7 +439,14 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             val raw = original.lowercase().replace('_', ' ')
             if (raw.contains("already registered")) return "Este e-mail já está cadastrado"
             if (raw.contains("weak password")) return "Senha muito fraca. Use pelo menos 6 caracteres."
-            if (raw.contains("invalid email")) return "E-mail inválido"
+            // GoTrue: "same_password" / "New password should be different from the old password."
+            if (raw.contains("same password") || raw.contains("different from the old password")) {
+                return "A nova senha deve ser diferente da atual."
+            }
+            // GoTrue: "email_address_invalid" / Email address "x" is invalid (rejected domain or format).
+            if (raw.contains("invalid email") || raw.contains("email address invalid") ||
+                Regex("email address .* is invalid").containsMatchIn(raw)
+            ) return "E-mail inválido. Confira o endereço digitado."
             if (raw.contains("invalid credentials") || raw.contains("invalid login")) {
                 return "E-mail ou senha incorretos"
             }
@@ -687,6 +700,8 @@ internal interface AuthBackend {
     )
     suspend fun signInWithEmail(email: String, password: String)
     suspend fun signOut()
+    /** Clears the local session without contacting the server. */
+    suspend fun clearLocalSession()
     suspend fun requestPasswordRecovery(email: String, redirectUrl: String)
     suspend fun exchangeLinkCode(code: String)
     suspend fun importLinkTokens(accessToken: String, refreshToken: String)
@@ -731,6 +746,10 @@ internal class SupabaseAuthBackend(private val auth: Auth) : AuthBackend {
 
     override suspend fun signOut() {
         auth.signOut(SignOutScope.GLOBAL)
+    }
+
+    override suspend fun clearLocalSession() {
+        auth.clearSession()
     }
 
     override suspend fun requestPasswordRecovery(email: String, redirectUrl: String) {

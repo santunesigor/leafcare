@@ -27,12 +27,12 @@ class AuthNavigationTest {
 
     @Test fun noSession_navigatesToAuth() {
         assertEquals(
-            AuthNavigationEvent.NavigateToAuth(),
+            AuthNavigationEvent.NavigateToAuth,
             navigationForSessionRestore(false)
         )
     }
 
     @Test fun signOut_navigatesToAuth() {
-        assertEquals(AuthNavigationEvent.NavigateToAuth(), navigationAfterSignOut())
+        assertEquals(AuthNavigationEvent.NavigateToAuth, navigationAfterSignOut())
     }
 }

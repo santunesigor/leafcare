@@ -1,9 +1,0 @@
-{
-  "split": "validation",
-  "n_images": 104,
-  "top1_agreement": 1.0,
-  "max_abs_error": 6.794929504394531e-06,
-  "numpy_formula_max_abs_error": 2.205371856689453e-06,
-  "max_abs_error_limit": 0.0001,
-  "passed": true
-}

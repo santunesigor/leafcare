@@ -1,11 +1,16 @@
 package br.com.leafcare.ui.auth
 
+import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.BorderStroke
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,7 +29,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,7 +43,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -61,9 +70,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.leafcare.R
 import br.com.leafcare.auth.AuthScreen
 import br.com.leafcare.auth.AuthViewModel
+import br.com.leafcare.auth.LEGAL_DOCUMENT_PUBLICATION_DATE
 import br.com.leafcare.auth.LegalAcceptanceState
+import br.com.leafcare.auth.TERMS_OF_USE_VERSION
 import br.com.leafcare.ui.FigmaIcon
+import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
+import br.com.leafcare.ui.LeafDialog
 
 /**
  * Auth flow host. MainActivity is the auth gate (session != null -> app),
@@ -91,7 +104,6 @@ fun AuthNavHost(viewModel: AuthViewModel) {
             onBack = { viewModel.requestCancelRecovery() },
             confirmCancelRecovery = true
         )
-        AuthScreen.Profile -> ProfileScreen(viewModel, onBack = { viewModel.setScreen(AuthScreen.Login) })
     }
 }
 
@@ -99,16 +111,20 @@ fun AuthNavHost(viewModel: AuthViewModel) {
 private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
     val state by viewModel.legalAcceptance.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
-    AuthScaffold(onBack = { viewModel.continueOfflineWithoutAccepting() }) {
-        AuthHeader(logoSize = 56, title = "Documentos atualizados", subtitle = "Leia e escolha se deseja continuar")
+    AuthScaffold(onBack = { viewModel.signOut() }) {
+        // Shown to accounts created outside the app (invites) and to accounts that accepted an older version.
+        AuthHeader(logoSize = 56, title = "Termos de Uso", subtitle = "Aceite para usar o LeafCare")
         Spacer(Modifier.height(12.dp))
         Text(
-            "Atualizamos os Termos de Uso e a Política de Privacidade. Leia as versões 1.3, publicadas em 19/10/2026, e confirme para continuar usando os recursos conectados.",
+            "Leia e aceite os Termos de Uso e a Política de Privacidade (versão $TERMS_OF_USE_VERSION, publicada em $LEGAL_DOCUMENT_PUBLICATION_DATE).",
             style = MaterialTheme.typography.bodyMedium,
             color = LeafColors.Text,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(12.dp))
+        // LGPD art. 8º §1º and 9º §3º: a condition of use must be highlighted, not only written inside the documents.
+        TrainingConditionCard()
+        Spacer(Modifier.height(4.dp))
         AuthLinkButton("Ler Termos de Uso") { viewModel.setScreen(AuthScreen.TermsOfUse) }
         AuthLinkButton("Ler Política de Privacidade") { viewModel.setScreen(AuthScreen.PrivacyPolicy) }
         if (error != null) AuthMessages(error, null)
@@ -119,18 +135,50 @@ private fun ExistingAccountLegalAcceptanceScreen(viewModel: AuthViewModel) {
             onClick = viewModel::acceptCurrentLegalDocuments
         )
         Spacer(Modifier.height(8.dp))
-        TextButton(
-            onClick = viewModel::continueOfflineWithoutAccepting,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Continuar offline sem aceitar", color = LeafColors.Green)
+        TextButton(onClick = { viewModel.signOut() }, modifier = Modifier.fillMaxWidth()) {
+            Text("Sair da conta", color = LeafColors.Muted)
         }
         Text(
-            "Sem aceite confirmado, os recursos que dependem de conexão podem ficar indisponíveis. A análise local continua disponível; o app perguntará novamente quando voltar a ficar online.",
+            "O aceite precisa de conexão.",
             style = MaterialTheme.typography.bodySmall,
             color = LeafColors.Muted,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+@Composable
+internal fun TrainingConditionCard() {
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = LeafColors.Tint,
+        border = BorderStroke(1.dp, LeafColors.Green.copy(alpha = 0.3f))
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                Box(Modifier.size(36.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.PhotoLibrary, null, tint = LeafColors.Green, modifier = Modifier.size(20.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Suas fotos ajudam a treinar o modelo", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = LeafColors.Text)
+                    Text("Ao aceitar, você autoriza esse uso. Ele é condição para usar o LeafCare.", style = MaterialTheme.typography.bodySmall, color = LeafColors.Text)
+                }
+            }
+            Column(Modifier.padding(start = 48.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                TrainingPoint("Ficam em área privada e passam por revisão humana")
+                TrainingPoint("Ficam no conjunto de treino até você revogar")
+                TrainingPoint("Revogue quando quiser em Perfil → Privacidade e fotos")
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrainingPoint(text: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+        Icon(Icons.Outlined.Check, null, tint = LeafColors.Green, modifier = Modifier.padding(top = 1.dp).size(16.dp))
+        Text(text, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
     }
 }
 
@@ -262,7 +310,7 @@ private fun AuthButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = LeafColors.Green,
             contentColor = Color.White,
-            disabledContainerColor = LeafColors.Pale,
+            disabledContainerColor = LeafColors.Border,
             disabledContentColor = LeafColors.Muted
         )
     ) {
@@ -437,6 +485,11 @@ fun SignUpScreen(viewModel: AuthViewModel) {
                     ) { viewModel.setScreen(AuthScreen.PrivacyPolicy) }) {
                         append("Política de Privacidade")
                     }
+                    append(", ")
+                    // LGPD art. 9º, §3º: training is a condition of use, so it is stated prominently.
+                    withStyle(SpanStyle(color = LeafColors.Text, fontWeight = FontWeight.SemiBold)) {
+                        append("incluindo o uso das fotos analisadas para treinar o modelo de IA")
+                    }
                     append(".")
                 },
                 style = MaterialTheme.typography.bodySmall,
@@ -528,7 +581,7 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
 
         AuthButton(
             label = when {
-                sending -> "Enviando..."
+                sending -> "Enviando…"
                 cooldownSeconds > 0 -> "Enviar novamente em ${cooldownSeconds}s"
                 recoveryRequestSent -> "Enviar novamente"
                 else -> "Enviar e-mail"
@@ -592,20 +645,14 @@ fun NewPasswordScreen(
     }
 
     if (confirmCancelRecovery && showCancelDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissCancelDialog() },
-            confirmButton = {
-                TextButton(onClick = { viewModel.dismissCancelDialog() }) {
-                    Text("Continuar recuperação", color = LeafColors.Green, fontWeight = FontWeight.SemiBold)
-                }
+        LeafDialog(
+            title = "Cancelar recuperação?",
+            onDismiss = { viewModel.dismissCancelDialog() },
+            message = "Se você sair agora, será necessário solicitar um novo link de recuperação por e-mail.",
+            actions = {
+                LeafButton("Continuar", { viewModel.dismissCancelDialog() })
+                LeafButton("Sair", { viewModel.cancelRecovery() }, secondary = true, danger = true)
             },
-            dismissButton = {
-                TextButton(onClick = { viewModel.cancelRecovery() }) {
-                    Text("Sair", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            title = { Text("Cancelar recuperação?") },
-            text = { Text("Se você sair agora, será necessário solicitar um novo link de recuperação por e-mail.") }
         )
     }
 }
@@ -620,18 +667,10 @@ fun ProfileScreen(
     val displayName = viewModel.getDisplayName()
     val email = viewModel.getEmail()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var pendingSignOut by remember { mutableStateOf<Int?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .statusBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        AuthTopBar(onBack)
-        Spacer(Modifier.weight(1f))
-
+    AuthScaffold(onBack = onBack) {
         FigmaIcon(R.drawable.v3_logo, "LeafCare", 64)
         Spacer(Modifier.height(16.dp))
         Text(
@@ -659,52 +698,30 @@ fun ProfileScreen(
         )
         Spacer(Modifier.height(32.dp))
 
-        Button(
-            onClick = onTrainingPrivacy,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, LeafColors.Border),
-            colors = ButtonDefaults.buttonColors(containerColor = LeafColors.Pale, contentColor = LeafColors.Text)
-        ) { Text("Privacidade e uso de fotos", fontWeight = FontWeight.SemiBold) }
+        LeafButton("Privacidade e uso de fotos", onTrainingPrivacy, secondary = true)
         Spacer(Modifier.height(12.dp))
-
-        Button(
-            onClick = onChangePassword,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, LeafColors.Border),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = LeafColors.Pale,
-                contentColor = LeafColors.Text
-            )
-        ) {
-            Text("Alterar senha", fontWeight = FontWeight.SemiBold)
-        }
+        LeafButton("Alterar senha", onChangePassword, secondary = true)
         Spacer(Modifier.height(12.dp))
-
-        Button(
-            onClick = { viewModel.signOut() },
-            enabled = !isLoading,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, LeafColors.Border),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = LeafColors.Pale,
-                contentColor = MaterialTheme.colorScheme.error,
-                disabledContainerColor = LeafColors.Pale,
-                disabledContentColor = LeafColors.Muted
-            )
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp)
-            } else {
-                Text("Sair da conta", fontWeight = FontWeight.SemiBold)
+        LeafButton(if (isLoading) "Saindo…" else "Sair da conta", {
+            scope.launch {
+                val unsynced = viewModel.unsyncedAnalysesCount()
+                if (unsynced > 0) pendingSignOut = unsynced else viewModel.signOut()
             }
-        }
-        Spacer(Modifier.weight(1f))
+        }, secondary = true, danger = true, enabled = !isLoading)
+    }
+    pendingSignOut?.let { count ->
+        LeafDialog(
+            title = "Sair com análises não enviadas?",
+            onDismiss = { pendingSignOut = null },
+            message = unsyncedSignOutMessage(count),
+            actions = {
+                LeafButton("Sair", { pendingSignOut = null; viewModel.signOut() }, danger = true)
+                LeafButton("Cancelar", { pendingSignOut = null }, secondary = true)
+            },
+        )
     }
 }
+
+internal fun unsyncedSignOutMessage(count: Int): String =
+    if (count == 1) "1 análise ainda não foi enviada para sua conta. Ela continua neste aparelho, mas será apagada se outra conta entrar aqui."
+    else "$count análises ainda não foram enviadas para sua conta. Elas continuam neste aparelho, mas serão apagadas se outra conta entrar aqui."

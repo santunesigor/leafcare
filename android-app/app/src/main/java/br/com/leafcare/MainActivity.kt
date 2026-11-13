@@ -44,7 +44,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        handleRecoveryIntent(intent)
+        // Recreation (rotation, process restore) re-delivers the original link:
+        // reprocessing it would revoke a recovery already in progress.
+        if (savedInstanceState == null) handleRecoveryIntent(intent)
         setContent {
             LeafCareTheme { LeafCareApp() }
         }
@@ -75,10 +77,10 @@ fun LeafCareApp(authViewModel: AuthViewModel = viewModel()) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         authViewModel.onSessionRestored()
     }
-    LaunchedEffect(legalAcceptance) {
-        if (legalAcceptance == br.com.leafcare.auth.LegalAcceptanceState.REQUIRED) {
-            authViewModel.setScreen(br.com.leafcare.auth.AuthScreen.LegalAcceptance)
-        }
+    // Keyed on bootstrap too: the acceptance must open when a recovery/invite
+    // ends with the new password, and be left once it is no longer required.
+    LaunchedEffect(legalAcceptance, bootstrap) {
+        authViewModel.syncLegalAcceptanceScreen()
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -114,7 +116,7 @@ fun LoadingScreen() {
         ) {
             CircularProgressIndicator(Modifier.size(48.dp))
             Spacer(Modifier.height(16.dp))
-            Text("Carregando...", style = MaterialTheme.typography.bodyLarge)
+            Text("Carregando…", style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
@@ -129,11 +131,16 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
     val admin: AdminViewModel = viewModel()
     val adminState by admin.state.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
     LaunchedEffect(user?.id) { admin.bind(user?.id); vm.bindTrainingConsent(user?.id) }
     DisposableEffect(lifecycleOwner, user?.id) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) admin.bind(user?.id) }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); admin.clear() }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            // Rotation keeps the AdminViewModel: only a real exit/account change clears it.
+            if (activity?.isChangingConfigurations != true) admin.clear()
+        }
     }
     LaunchedEffect(vm) { vm.results.collect { id ->
         nav.navigate("result/$id") { popUpTo("history"); launchSingleTop = true } } }
@@ -158,7 +165,7 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                 popExitTransition = { leafExitTransition }
             ) {
                 composable("history") {
-                    HistoryScreen(vm, { nav.navigate("camera") }, { nav.navigate("result/$it") }, { nav.navigate("profile") }, displayNameOf(user),
+                    HistoryScreen(vm, { nav.navigate("camera") { launchSingleTop = true } }, { nav.navigate("result/$it") { launchSingleTop = true } }, { nav.navigate("profile") }, displayNameOf(user),
                         onAdmin = if (adminState.allowed) ({ nav.navigate("admin") }) else null)
                 }
                 composable("profile") {
@@ -168,11 +175,19 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                     ProfileScreen(
                         authViewModel,
                         onBack = { nav.popBackStack() },
-                        onChangePassword = { nav.navigate("change-password") },
+                        onChangePassword = {
+                            // Messages from an earlier attempt must not greet a new change.
+                            authViewModel.clearError()
+                            authViewModel.clearInfo()
+                            nav.navigate("change-password") { launchSingleTop = true }
+                        },
                         onTrainingPrivacy = { nav.navigate("training-privacy") }
                     )
                 }
-                composable("training-privacy") { TrainingConsentScreen(vm, onBack = { nav.popBackStack() }) }
+                composable("training-privacy") {
+                    // Revoking leaves the app: the gate asks for the documents again.
+                    TrainingConsentScreen(vm, onBack = { nav.popBackStack() }, onRevoked = { authViewModel.refreshLegalAcceptance(force = true) })
+                }
                 composable("admin") { AdminScreen(admin, onBack = { nav.popBackStack() }) }
                 composable("change-password") {
                     NewPasswordScreen(
@@ -186,19 +201,15 @@ fun MainAppNavHost(authViewModel: AuthViewModel) {
                 composable("result/{id}") { entry ->
                     ResultScreen(requireNotNull(entry.arguments?.getString("id")), vm,
                         onBack = { nav.popBackStack("history", false) },
-                        onCamera = { nav.navigate("camera") { popUpTo("history") } }) }
+                        onCamera = { nav.navigate("camera") { popUpTo("history"); launchSingleTop = true } }) }
             }
             if (state.busy) {
-                AlertDialog(onDismissRequest = {}, confirmButton = {},
-                    title = { Text(stringResource(R.string.analyzing_title)) },
-                    text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        CircularProgressIndicator(Modifier.size(30.dp))
-                        Text(stringResource(R.string.analyzing_message)) } })
+                LeafProgressDialog(stringResource(R.string.analyzing_title), stringResource(R.string.analyzing_message))
             }
             state.error?.let { message ->
-                AlertDialog(onDismissRequest = vm::clearError,
-                    title = { Text(stringResource(R.string.error_dialog_title)) }, text = { Text(message) },
-                    confirmButton = { TextButton(onClick = vm::clearError) { Text(stringResource(R.string.error_button)) } }) }
+                LeafDialog(title = stringResource(R.string.error_dialog_title), onDismiss = vm::clearError, message = message,
+                    actions = { LeafButton(stringResource(R.string.error_button), vm::clearError) })
+            }
         }
     }
 }

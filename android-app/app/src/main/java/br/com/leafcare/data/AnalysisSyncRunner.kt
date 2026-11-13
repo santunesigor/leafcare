@@ -3,6 +3,7 @@ package br.com.leafcare.data
 import kotlinx.coroutines.CancellationException
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 
 /** Outcome of one sync pass. Never throws for backend failures. */
@@ -20,8 +21,10 @@ internal sealed interface SyncRunResult {
  * - Uploads pending rows with idempotent upsert on the local UUID.
  * - Uploads photos only for remotely confirmed analyses, then associates
  *   the remote path on the row. Same deterministic path on every retry.
+ * - Training withdrawals (consent, authorizations, training copies) run first,
+ *   with or without an upload policy, even while uploads are paused.
  * - Deletes tombstoned rows remotely (photo first), then removes them
- *   (and the photo) locally.
+ *   (and the photo) locally; a paused or unknown policy keeps them pending.
  * - A failed delete keeps its tombstone and retries through the delete path,
  *   so a deleted analysis can never be resurrected by a later upsert.
  * - Network/auth failures never touch local data beyond the ERROR state.
@@ -39,51 +42,26 @@ internal class AnalysisSyncRunner(
     private val photoFile: (photoName: String) -> File = { throw IllegalStateException("no photo storage") },
     private val consentDao: TrainingConsentDao? = null,
     private val trainingApi: TrainingConsentSyncApi? = null,
+    /** Signed-in user right now; restore aborts when it no longer matches the pass. */
+    private val sessionUserId: (() -> String?)? = null,
 ) {
     suspend fun syncOnce(userId: String?): SyncRunResult {
         if (userId == null) return SyncRunResult.SkippedNoAuth
-
-        val policy = try { uploadPolicy() }
-        catch (e: CancellationException) { throw e }
-        catch (_: Exception) { return SyncRunResult.Completed(1) }
         var failures = 0
 
-        // Consent/revocation is a hard gate, processed before history and all photo queues.
-        val localConsent = consentDao?.get(userId)
-        val photoAuthorizations = consentDao?.getAllPhotos(userId).orEmpty()
-        val consentApi = trainingApi
-        var trainingAllowed = false
-        val consentActive = TRAINING_UPLOADS_ENABLED && localConsent?.granted == true && localConsent.termsVersion == TRAINING_TERMS_VERSION
-        if (localConsent != null && consentApi != null) {
-            try {
-                consentApi.saveConsent(userId, localConsent.copy(granted = consentActive))
-                    consentDao.markConsentSynced(userId)
-                trainingAllowed = policy.enabled && consentActive
-                if (!consentActive) {
-                    consentDao.revokeAllPhotos(userId)
-                    photoAuthorizations.forEach { authorization ->
-                        consentApi.saveAuthorization(userId, authorization.copy(authorized = false))
-                        consentApi.delete(listOf(trainingPhotoPath(userId, authorization.analysisId)))
-                        consentDao.markPhotoSynced(userId, authorization.analysisId)
-                    }
-                }
-            } catch (e: CancellationException) { throw e }
-            catch (_: Exception) { failures++ }
-        }
+        // Withdrawals first and unconditionally: they need no upload policy and
+        // are accepted by the server even while uploads are paused.
+        val consent = syncConsent(userId)
+        failures += consent.failures
+        failures += syncRevocations(userId)
 
-        if (trainingAllowed && consentApi != null && consentDao != null) {
-            consentDao.getPendingPhotos(userId).filter { it.authorized && it.userId == userId && it.termsVersion == localConsent?.termsVersion }.forEach { authorization ->
-                try {
-                    consentApi.saveAuthorization(userId, authorization)
-                    val analysis = dao.get(authorization.analysisId)
-                    requireNotNull(analysis) { "analysis missing" }
-                    consentApi.upload(trainingPhotoPath(userId, authorization.analysisId), photoFile(analysis.photoName).readBytes())
-                    consentDao.markPhotoSynced(userId, authorization.analysisId)
-                } catch (e: CancellationException) { throw e }
-                catch (_: Exception) { failures++ }
-            }
-        }
-
+        // Unknown policy (offline, or null while the account deletion is pending)
+        // fails closed like a pause: tombstones and uploads wait.
+        val policy = try { uploadPolicy() }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { null }
+        failures += syncDeletes(userId, removeAnalyses = policy?.enabled == true)
+        if (policy == null) return SyncRunResult.Completed(failures + 1)
         if (!policy.enabled) return SyncRunResult.Completed(failures)
 
         dao.getPendingUploads().forEach { entity ->
@@ -102,6 +80,10 @@ internal class AnalysisSyncRunner(
             }
         }
 
+        // After the history upserts: the server only accepts training copies
+        // of analyses that already exist remotely.
+        if (consent.trainingAllowed) failures += uploadTrainingPhotos(userId, consent.termsVersion, policy)
+
         dao.getPendingPhotoUploads().forEach { entity ->
             if (!policy.includes(entity.createdAt)) {
                 dao.markPhotoLocalOnly(entity.id)
@@ -111,7 +93,7 @@ internal class AnalysisSyncRunner(
             try {
                 val path = remotePhotoPath(userId, entity.id)
                 api.uploadPhoto(path, photoFile(entity.photoName).readBytes())
-                api.updatePhotoPath(entity.id, path)
+                check(api.updatePhotoPath(entity.id, path)) { "photo path not applied" }
                 dao.markPhotoSynced(entity.id)
             } catch (e: CancellationException) {
                 throw e
@@ -122,9 +104,24 @@ internal class AnalysisSyncRunner(
             }
         }
 
+        return SyncRunResult.Completed(failures)
+    }
+
+    /**
+     * Tombstoned rows. The training copy is always removed (also while paused);
+     * the analysis photo and the remote tombstone only when [removeAnalyses]
+     * (uploads enabled): a paused account keeps them pending until release.
+     */
+    private suspend fun syncDeletes(userId: String, removeAnalyses: Boolean): Int {
+        var failures = 0
         dao.getPendingDeletes().forEach { entity ->
             try {
-                if (entity.photoSyncStatus == PhotoSyncState.SYNCED ||
+                removeTrainingCopy(userId, entity.id, requireSettled = removeAnalyses)
+                if (!removeAnalyses) return@forEach
+                // Any conclusive photo may have been uploaded (even if a later step
+                // failed); deleting a missing object is harmless.
+                if (entity.canUploadPhoto() ||
+                    entity.photoSyncStatus == PhotoSyncState.SYNCED ||
                     entity.photoSyncStatus == PhotoSyncState.REMOTE_ONLY
                 ) {
                     try {
@@ -137,7 +134,11 @@ internal class AnalysisSyncRunner(
                     }
                 }
                 val deletedAt = entity.deletedAt ?: System.currentTimeMillis()
-                api.markRemoteDeleted(entity.id, Instant.fromEpochMilliseconds(deletedAt).toString())
+                if (!api.markRemoteDeleted(entity.id, Instant.fromEpochMilliseconds(deletedAt).toString())) {
+                    // 0 rows: fine when the row never reached the server (or is already
+                    // tombstoned); an active remote row means the update was refused.
+                    check(!api.isRemoteActive(entity.id)) { "remote tombstone not applied" }
+                }
                 dao.delete(entity.id)
                 photoDeleter(entity.photoName)
             } catch (e: CancellationException) {
@@ -147,8 +148,142 @@ internal class AnalysisSyncRunner(
                 failures++
             }
         }
+        return failures
+    }
 
+    /**
+     * A local authorization is revoked through [syncRevocations] (already run in
+     * this pass); without one the copy may come from another device, so the
+     * object is deleted directly.
+     */
+    private suspend fun removeTrainingCopy(userId: String, analysisId: String, requireSettled: Boolean) {
+        val consentDao = consentDao ?: return
+        val consentApi = trainingApi ?: return
+        val authorization = consentDao.getPhoto(userId, analysisId)
+        if (authorization == null) {
+            consentApi.delete(listOf(trainingPhotoPath(userId, analysisId)))
+        } else if (requireSettled) {
+            check(authorization.syncState != "PENDING") { "training revocation pending" }
+        }
+    }
+
+    private data class ConsentPass(val failures: Int, val trainingAllowed: Boolean, val termsVersion: String?)
+
+    /**
+     * Withdrawals only (consent, photo authorizations, training copies of deleted
+     * analyses): used while the legal documents await re-acceptance and on logout.
+     * Never uploads and never touches the analysis history.
+     */
+    suspend fun syncTrainingRevocationOnly(userId: String?): SyncRunResult {
+        if (userId == null) return SyncRunResult.SkippedNoAuth
+        var failures = 0
+        val local = consentDao?.get(userId)
+        if (local != null && !isConsentActive(local)) failures += syncConsent(userId).failures
+        failures += syncRevocations(userId)
+        failures += syncDeletes(userId, removeAnalyses = false)
         return SyncRunResult.Completed(failures)
+    }
+
+    private fun isConsentActive(consent: TrainingConsentEntity?): Boolean =
+        TRAINING_UPLOADS_ENABLED && consent?.granted == true && consent.termsVersion == TRAINING_TERMS_VERSION
+
+    private suspend fun syncConsent(userId: String): ConsentPass {
+        val consentDao = consentDao ?: return ConsentPass(0, false, null)
+        val consentApi = trainingApi ?: return ConsentPass(0, false, null)
+        val localConsent = consentDao.get(userId) ?: return ConsentPass(0, false, null)
+        val consentActive = isConsentActive(localConsent)
+        // Local first: the photo revocations are pushed even if this request fails.
+        if (!consentActive) consentDao.revokeAllPhotos(userId)
+        try {
+            // A granted decision already synced is never re-sent: an old device
+            // must not overwrite a revocation made elsewhere. Revocations always are.
+            if (localConsent.syncState == "PENDING" || !consentActive) {
+                consentApi.saveConsent(userId, localConsent.copy(granted = consentActive))
+                consentDao.markConsentSynced(userId)
+            }
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { return ConsentPass(1, false, null) }
+        return ConsentPass(0, consentActive, localConsent.termsVersion)
+    }
+
+    /**
+     * Settles authorizations that can never be honored, then pushes every pending
+     * revocation whatever the current consent (a re-acceptance must not drop them).
+     */
+    private suspend fun syncRevocations(userId: String): Int {
+        val consentDao = consentDao ?: return 0
+        trainingApi ?: return 0
+        dao.getPendingDeletes().forEach { consentDao.revokePhoto(userId, it.id) }
+        consentDao.getPendingPhotos(userId).filter { it.authorized }.forEach { authorization ->
+            val analysis = dao.get(authorization.analysisId)
+            when {
+                // Excluded by the cutoff: it never reaches the server, nothing to record there.
+                analysis?.syncStatus == SyncState.LOCAL_ONLY ->
+                    consentDao.deletePhoto(userId, authorization.analysisId)
+                // Deleted or inconclusive analyses are never used for training.
+                analysis == null || analysis.deletedAt != null || analysis.inconclusive ->
+                    consentDao.revokePhoto(userId, authorization.analysisId)
+            }
+        }
+        var failures = 0
+        // Each photo on its own: one failure must not keep other copies on the server.
+        consentDao.getPendingRevocations(userId).forEach { if (!revokeRemotely(userId, it)) failures++ }
+        return failures
+    }
+
+    /** Sends authorized=false and removes the training copy. True once settled locally. */
+    private suspend fun revokeRemotely(userId: String, authorization: TrainingPhotoAuthorizationEntity): Boolean {
+        val consentDao = consentDao ?: return true
+        val consentApi = trainingApi ?: return true
+        val saved = try {
+            consentApi.saveAuthorization(userId, authorization.copy(authorized = false))
+            true
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { false }
+        // Rejected because the analysis never reached the server (or is gone there):
+        // there is no remote authorization to update, so retrying would fail forever.
+        val moot = !saved && try { !api.isRemoteActive(authorization.analysisId) }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { false }
+        val removed = try {
+            consentApi.delete(listOf(trainingPhotoPath(userId, authorization.analysisId)))
+            true
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { false }
+        if (!removed) return false
+        when {
+            saved -> consentDao.markPhotoSynced(userId, authorization.analysisId)
+            moot -> consentDao.deletePhoto(userId, authorization.analysisId)
+            else -> return false
+        }
+        return true
+    }
+
+    private suspend fun uploadTrainingPhotos(userId: String, termsVersion: String?, policy: UploadPolicy): Int {
+        val consentDao = consentDao ?: return 0
+        val consentApi = trainingApi ?: return 0
+        var failures = 0
+        consentDao.getPendingPhotos(userId).filter { it.authorized && it.userId == userId && it.termsVersion == termsVersion }.forEach { authorization ->
+            val analysis = dao.get(authorization.analysisId)
+            // Only active, conclusive analyses already on the server; the others were
+            // settled by the revocation pass or wait for their own upload.
+            if (analysis == null || analysis.deletedAt != null || analysis.inconclusive ||
+                analysis.syncStatus != SyncState.SYNCED
+            ) return@forEach
+            if (!policy.includes(analysis.createdAt)) {
+                // Same cutoff as the analysis photo: captured before the release, never sent.
+                consentDao.revokePhoto(userId, authorization.analysisId)
+                if (!revokeRemotely(userId, authorization)) failures++
+                return@forEach
+            }
+            try {
+                consentApi.saveAuthorization(userId, authorization)
+                consentApi.upload(trainingPhotoPath(userId, authorization.analysisId), photoFile(analysis.photoName).readBytes())
+                consentDao.markPhotoSynced(userId, authorization.analysisId)
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { failures++ }
+        }
+        return failures
     }
 
     /**
@@ -161,7 +296,8 @@ internal class AnalysisSyncRunner(
      * - remote tombstone + no local row -> skipped, never imported as active;
      * - remote tombstone + local SYNCED row -> local row and photo removed;
      * - remote tombstone + local pending/tombstone -> kept as is.
-     * Malformed remote rows are skipped without failing the restore.
+     * Malformed remote rows are skipped without failing the restore; the pass
+     * stops when the signed-in account changes after the fetch.
      */
     suspend fun restoreOnce(userId: String?): SyncRunResult {
         if (userId == null) return SyncRunResult.SkippedNoAuth
@@ -175,7 +311,10 @@ internal class AnalysisSyncRunner(
         }
 
         rows.forEach { row ->
+            // Logout or account switch after the fetch: never write rows as another account.
+            if (sessionUserId != null && sessionUserId.invoke() != userId) return SyncRunResult.Completed(0)
             try {
+                if (row["user_id"]?.jsonPrimitive?.content != userId) return@forEach
                 val entity = row.toAnalysisEntity()
                 val local = dao.get(entity.id)
                 if (entity.deletedAt != null) {

@@ -49,7 +49,8 @@ interface AnalysisDao {
     @Query("SELECT * FROM analyses WHERE syncStatus = 'PENDING_DELETE' OR (syncStatus = 'ERROR' AND deletedAt IS NOT NULL)")
     suspend fun getPendingDeletes(): List<AnalysisEntity>
 
-    @Query("UPDATE analyses SET syncStatus = 'SYNCED' WHERE id = :id")
+    // A delete during the upload keeps its tombstone (PENDING_DELETE).
+    @Query("UPDATE analyses SET syncStatus = 'SYNCED' WHERE id = :id AND deletedAt IS NULL")
     suspend fun markSynced(id: String)
 
     @Query("UPDATE analyses SET syncStatus = 'ERROR' WHERE id = :id")
@@ -86,6 +87,9 @@ interface AnalysisDao {
     @Query("SELECT COUNT(*) FROM analyses")
     suspend fun count(): Int
 
+    @Query("SELECT COUNT(*) FROM analyses WHERE deletedAt IS NULL AND syncStatus <> 'SYNCED'")
+    suspend fun countUnsynced(): Int
+
     @Query("DELETE FROM analyses")
     suspend fun deleteAll()
 }
@@ -118,12 +122,18 @@ interface TrainingConsentDao {
     @Query("SELECT * FROM training_photo_authorizations WHERE userId = :userId") suspend fun getAllPhotos(userId: String): List<TrainingPhotoAuthorizationEntity>
     @Query("UPDATE training_photo_authorizations SET authorized = 0, syncState = 'PENDING' WHERE userId = :userId AND authorized = 1") suspend fun revokeAllPhotos(userId: String)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun savePhoto(authorization: TrainingPhotoAuthorizationEntity)
+    // Revocations are synced regardless of the current consent: a re-acceptance never drops them.
+    @Query("SELECT * FROM training_photo_authorizations WHERE userId = :userId AND syncState = 'PENDING' AND authorized = 0") suspend fun getPendingRevocations(userId: String): List<TrainingPhotoAuthorizationEntity>
+    @Query("SELECT * FROM training_photo_authorizations WHERE userId = :userId AND analysisId = :id") suspend fun getPhoto(userId: String, id: String): TrainingPhotoAuthorizationEntity?
+    @Query("UPDATE training_photo_authorizations SET authorized = 0, syncState = 'PENDING' WHERE userId = :userId AND analysisId = :id AND authorized = 1") suspend fun revokePhoto(userId: String, id: String)
+    @Query("DELETE FROM training_photo_authorizations WHERE userId = :userId AND analysisId = :id") suspend fun deletePhoto(userId: String, id: String)
     @Query("UPDATE training_consent SET syncState = 'SYNCED' WHERE userId = :userId") suspend fun markConsentSynced(userId: String)
     @Query("UPDATE training_photo_authorizations SET syncState = 'SYNCED' WHERE userId = :userId AND analysisId = :id") suspend fun markPhotoSynced(userId: String, id: String)
     @Query("SELECT EXISTS(SELECT 1 FROM training_consent)") suspend fun hasConsentRows(): Boolean
 }
 
-const val TRAINING_TERMS_VERSION = "1.1"
+/** Training consent given by accepting the legal documents (v1.4 or later). */
+const val TRAINING_TERMS_VERSION = "1.2"
 /** Disabled until a monitored privacy channel and automated retention cleanup are configured. */
 const val TRAINING_UPLOADS_ENABLED = true
 

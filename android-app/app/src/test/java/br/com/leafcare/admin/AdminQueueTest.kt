@@ -193,6 +193,14 @@ class AdminQueueTest {
         dispatcher.scheduler.advanceUntilIdle()
         assertTrue(vm.state.value.allowed)
     }
+    @Test fun nullPolicyForAccountPendingDeletionDeniesWithoutRetrying() {
+        api.policyNull = true
+        api.policyCalls = 0
+        vm.checkAccess()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertFalse(vm.state.value.allowed)
+        assertEquals(1, api.policyCalls)
+    }
     @Test fun explicitPolicyDenialAndAccountChangeClearPreviouslyVerifiedEntry() {
         api.policyFailure = AdminAccessException("Revogado")
         vm.checkAccess()
@@ -309,6 +317,8 @@ class AdminQueueTest {
         var policyFailure: Exception? = null
         var policyFailuresRemaining = 0
         var policyRole = "superadmin"
+        var policyNull = false
+        var policyCalls = 0
         var invitationFailure = false
         var photoRequests = 0
         var photoGate: kotlinx.coroutines.CompletableDeferred<ByteArray>? = null
@@ -317,6 +327,9 @@ class AdminQueueTest {
             repeat(count) { rows += JSONObject().put("id", "photo-$it").put("class_id", "frog_eye").put("review_status", status).put("review_version", 0) }
         }
         override suspend fun policy(): JSONObject {
+            policyCalls++
+            // Production parses the RPC body: `null` for an account pending deletion.
+            if (policyNull) return JSONObject("null")
             policyFailure?.let { throw it }
             if (policyFailuresRemaining > 0) { policyFailuresRemaining--; error("Sem conexão") }
             return JSONObject().put("role", policyRole).put("hierarchy_version", 1).put("user_id", "current-account")

@@ -2,6 +2,7 @@ package br.com.leafcare.data
 
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.BucketApi
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
@@ -94,14 +95,17 @@ internal interface AnalysisSyncApi {
     /** Idempotent insert-or-update keyed by the analysis UUID. */
     suspend fun upsertAnalysis(row: JsonObject)
 
-    /** Tombstone a remote row; no photo upload in this phase. */
-    suspend fun markRemoteDeleted(id: String, deletedAtIso: String)
+    /** Tombstones a remote row. False when no row was updated (absent, or refused by RLS). */
+    suspend fun markRemoteDeleted(id: String, deletedAtIso: String): Boolean
 
     /** Idempotent photo upload to the deterministic remote path. */
     suspend fun uploadPhoto(path: String, bytes: ByteArray)
 
-    /** Associates the uploaded photo path on the remote row. Only the path. */
-    suspend fun updatePhotoPath(id: String, photoPath: String)
+    /** Associates the uploaded photo path on the remote row. False when no row was updated. */
+    suspend fun updatePhotoPath(id: String, photoPath: String): Boolean
+
+    /** Whether the row is visible remotely and not tombstoned. */
+    suspend fun isRemoteActive(id: String): Boolean
 
     /** Removes remote photo objects. Missing objects are the caller's check. */
     suspend fun deleteRemotePhotos(paths: List<String>)
@@ -125,29 +129,41 @@ internal class PostgrestAnalysisSyncApi(
         table.upsert(row, onConflict = "id")
     }
 
-    override suspend fun markRemoteDeleted(id: String, deletedAtIso: String) {
+    // PATCH answers 204 even when RLS filters every row: ask for the rows back.
+    override suspend fun markRemoteDeleted(id: String, deletedAtIso: String): Boolean =
         table.update({
             set("deleted_at", deletedAtIso)
         }) {
+            select(Columns.list("id"))
             filter {
                 eq("id", id)
             }
-        }
-    }
+        }.data.rowCount() > 0
 
     override suspend fun uploadPhoto(path: String, bytes: ByteArray) {
         bucket.upload(path, bytes, upsert = true)
     }
 
-    override suspend fun updatePhotoPath(id: String, photoPath: String) {
+    override suspend fun updatePhotoPath(id: String, photoPath: String): Boolean =
         table.update({
             set("photo_path", photoPath)
         }) {
+            select(Columns.list("id"))
             filter {
                 eq("id", id)
             }
+        }.data.rowCount() > 0
+
+    override suspend fun isRemoteActive(id: String): Boolean {
+        val data = table.select(Columns.list("id", "deleted_at")) {
+            filter { eq("id", id) }
+        }.data
+        return Json.parseToJsonElement(data).jsonArray.any { row ->
+            row.jsonObject["deleted_at"].let { it == null || it is JsonNull }
         }
     }
+
+    private fun String.rowCount(): Int = if (isBlank()) 0 else Json.parseToJsonElement(this).jsonArray.size
 
     override suspend fun deleteRemotePhotos(paths: List<String>) {
         bucket.delete(paths)

@@ -9,17 +9,17 @@ function fixture() {
   let authorized = true;
   let authenticated = true;
   let listingFails = false;
-  let objects: { name: string }[] = [];
+  const objects: Record<string, { name: string }[]> = { 'analysis-photos': [], 'training-photos': [] };
   let gone = false;
   let linkFails = false;
   let revokeAfterLink = false;
   let role = 'owner';
   let targetRole = 'user';
-  const bucket = {
+  const bucket = (id: string) => ({
     download: (path: string) => { external.push(`download:${path}`); return { data: new Blob(['photo'], { type: 'image/jpeg' }), error: null }; },
-    list: () => { external.push('list'); return { data: objects, error: listingFails ? { message: 'offline' } : null }; },
-    remove: (paths: string[]) => { external.push(`remove:${paths.join(',')}`); objects = []; return { error: null }; },
-  };
+    list: () => { external.push(`list:${id}`); return { data: objects[id], error: listingFails ? { message: 'offline' } : null }; },
+    remove: (paths: string[]) => { external.push(`remove:${id}:${paths.join(',')}`); objects[id] = []; return { error: null }; },
+  });
   const client = {
     auth: {
       getUser: () => ({ data: { user: authenticated ? { id: 'verified-user' } : null }, error: null }),
@@ -48,7 +48,7 @@ function fixture() {
         : args.operation === 'delete_begin' ? { gone } : {};
       return { data, error: null };
     },
-    storage: { from: () => bucket },
+    storage: { from: (id: string) => bucket(id) },
   };
   const handler = makeHandler({ client: client as unknown as Dependencies['client'] });
   const request = (operation: string, payload = {}, token = 'valid') => handler(new Request('http://local/admin', {
@@ -58,7 +58,7 @@ function fixture() {
   return { calls, external, request, handler,
     deny: () => { authorized = false; }, logout: () => { authenticated = false; },
     failListing: () => { listingFails = true; },
-    setObjects: (value: typeof objects) => { objects = value; },
+    setObjects: (value: { name: string }[], bucketId = 'analysis-photos') => { objects[bucketId] = value; },
     deleted: () => { gone = true; },
     failLink: () => { linkFails = true; }, revokeAfterLink: () => { revokeAfterLink = true; },
     asRole: (value: string, target = 'user') => { role = value; targetRole = target; },
@@ -135,6 +135,15 @@ Deno.test('deletion batches objects before deleting auth; retries are idempotent
   f.deleted(); const count = f.external.length;
   assert((await (await f.request('delete', { id: 'target' })).json()).pending === false);
   assert(f.external.length === count);
+});
+Deno.test('deletion also removes training copies before the account', async () => {
+  const f = fixture(); f.setObjects([{ name: 'a.jpg' }]); f.setObjects([{ name: 'b.jpg' }], 'training-photos');
+  assert((await (await f.request('delete', { id: 'target' })).json()).pending === true);
+  assert((await (await f.request('delete', { id: 'target' })).json()).pending === true);
+  assert(f.external.includes('remove:training-photos:target/b.jpg'));
+  assert(!f.external.some(c => c.startsWith('delete:')));
+  assert((await (await f.request('delete', { id: 'target' })).json()).pending === false);
+  assert(f.external.indexOf('delete:target') > f.external.indexOf('remove:training-photos:target/b.jpg'));
 });
 Deno.test('partial deletion stays resumable and logs failure', async () => {
   const f = fixture(); f.failListing();

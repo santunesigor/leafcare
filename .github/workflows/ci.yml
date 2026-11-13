@@ -70,6 +70,9 @@ jobs:
       - name: Validate bundle (with model)
         run: python validate_bundle.py --require-model
 
+      - name: Predict the reference sample with the app model
+        run: python predict.py ../samples/reference_frog_eye.jpg
+
   android-tests:
     name: Android Unit Tests & Build
     runs-on: ubuntu-latest

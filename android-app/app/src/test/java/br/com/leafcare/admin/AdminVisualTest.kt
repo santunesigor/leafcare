@@ -108,15 +108,51 @@ class AdminVisualTest {
         adminButton.performClick(); cameraButton.performClick()
         assertTrue(admin && camera)
     }
-    @Test fun dashboardOpensTriagePanelAndKeepsNavigation() {
+    @Test fun dashboardOpensPendingQueueAndKeepsNavigation() {
         var section = ""; var filters = JSONObject()
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, dashboard = JSONObject("""{"users":2,"photos":11,"reviewed":3,"paused":0,"statuses":{"pending":8,"confirmed":2,"corrected":1},"classes":{"frog_eye":5,"healthy":2},"models":{"modelo-exemplo":11}}""")),
             actions(load = { s, p -> section = s; filters = p }))
         compose.onNodeWithText("8").assertIsDisplayed()
         capture("admin-resumo")
-        compose.onNodeWithText("Abrir painel de triagem").performClick()
-        assertEquals("triage", section); assertFalse(filters.has("status"))
+        compose.onNodeWithText("Avaliar").performClick()
+        assertEquals("photos", section); assertEquals("pending", filters.getString("status"))
+        compose.onNode(hasText("Triagem") and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).performClick(); assertEquals("triage", section)
         compose.onNode(hasText("Usuários") and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)).performClick(); assertEquals("users", section)
+    }
+    @Test fun trainingSummaryOpensPendingTrainingCopies() {
+        var section = ""; var query = JSONObject()
+        show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, dashboard = JSONObject("""{"users":2,"photos":11,"reviewed":3,"statuses":{"pending":8,"confirmed":2,"corrected":1},"models":{},"training":{"copies":6,"ready":2,"awaiting_review":3,"excluded":1,"expiring_soon":1,"ready_classes":{"frog_eye":2}}}""")),
+            actions(load = { s, p -> section = s; query = p }))
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Treinamento do modelo"))
+        compose.onNodeWithText("1 vencendo").assertIsDisplayed()
+        capture("admin-resumo-treinamento")
+        compose.onNodeWithText("Revisar cópias").performClick()
+        assertEquals("photos", section); assertEquals("true", query.getString("training")); assertEquals("pending", query.getString("status"))
+    }
+    @Test fun trainingCopyShowsDaysLeftInReview() {
+        val now = java.time.Instant.parse("2026-11-12T00:00:00Z")
+        assertEquals(10, trainingDaysLeft(JSONObject().put("training_expires_at", "2026-11-21T12:00:00.123+00:00"), now))
+        assertNull(trainingDaysLeft(JSONObject().put("training_expires_at", JSONObject.NULL), now))
+        assertNull(trainingDaysLeft(JSONObject(), now))
+        val row = photo().put("training_expires_at", java.time.Instant.now().plus(java.time.Duration.ofDays(10)).toString())
+        show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "photos", rows = listOf(row)))
+        compose.onNodeWithText("Treino · 10 dias").assertIsDisplayed()
+    }
+    @Test fun permanentTrainingCopyShowsBadgeWithoutDays() {
+        assertTrue(isTrainingCopy(JSONObject().put("training_state", "ready").put("training_expires_at", JSONObject.NULL)))
+        assertFalse(isTrainingCopy(photo()))
+        val row = photo().put("training_state", "awaiting_review").put("training_expires_at", JSONObject.NULL)
+        show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "photos", rows = listOf(row)))
+        compose.onNodeWithText("Treino").assertIsDisplayed()
+        compose.onNodeWithText("Treino ·", substring = true).assertDoesNotExist()
+    }
+    @Test fun filterCanLimitToTrainingCopies() {
+        var query = JSONObject()
+        show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "photos", rows = listOf(photo())), actions(load = { _, p -> query = p }))
+        compose.onNodeWithContentDescription("Filtrar fotos").performClick()
+        compose.onNodeWithText("Só cópias de treino").performScrollTo().performClick()
+        compose.onNodeWithText("Aplicar filtros").performClick()
+        assertEquals("true", query.getString("training"))
     }
     @Test fun photoQueueOpensDirectlyAndFiltersStayInPanel() {
         var skipped = false
@@ -155,7 +191,6 @@ class AdminVisualTest {
         var section = ""; var query = JSONObject()
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "triage", dashboard = JSONObject("""{"photos":11,"reviewed":3,"classes":{"frog_eye":5}}""")),
             actions(load = { s, p -> section = s; query = p }))
-        compose.onNodeWithText("Painel de triagens").assertIsDisplayed()
         compose.onNodeWithText("3 de 11 fotos revisadas").assertIsDisplayed()
         capture("admin-painel-triagens")
         compose.onNodeWithText("Avaliar pendentes").performClick()
@@ -173,6 +208,7 @@ class AdminVisualTest {
         compose.onNodeWithText("Tentar novamente").assertIsDisplayed()
         compose.onNodeWithText("0").assertDoesNotExist()
         compose.onNodeWithText("Nenhuma pendência").assertDoesNotExist()
+        capture("admin-painel-indisponivel")
     }
     @Test fun queueReturnsToTriagePanel() {
         var section = ""
@@ -184,7 +220,7 @@ class AdminVisualTest {
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "triage", dashboard = JSONObject("""{"photos":11,"reviewed":11}""")))
         compose.onNodeWithText("100%").assertIsDisplayed()
         compose.onNodeWithText("Nenhuma pendência").assertIsNotEnabled()
-        compose.onNodeWithText("Ver todas as fotos").performScrollTo().assertIsEnabled()
+        compose.onNodeWithText("Ver todas").performScrollTo().assertIsEnabled()
     }
     @Test fun dashboardLoadingDoesNotLookLikeAnEmptyQueue() {
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "triage", busy = true))
@@ -236,7 +272,7 @@ class AdminVisualTest {
     @Test fun invitationCanBeSharedThroughAppsAfterEnteringRecipientEmail() {
         var operation = ""; var email = ""
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "users"), actions(action = { op, data -> operation = op; email = data.getString("email") }))
-        compose.onNodeWithText("Convidar usuário").performClick()
+        compose.onNodeWithText("Convidar").performClick()
         compose.onNodeWithText("Compartilhar convite").assertIsNotEnabled()
         compose.onNodeWithText("Enviar por e-mail").assertIsNotEnabled()
         compose.onNode(hasSetTextAction() and hasText("E-mail da pessoa")).performTextInput("pessoa@exemplo.com")
@@ -247,7 +283,7 @@ class AdminVisualTest {
     @Test fun emailInvitationRemainsAvailable() {
         var operation = ""
         show(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "users"), actions(action = { op, _ -> operation = op }))
-        compose.onNodeWithText("Convidar usuário").performClick()
+        compose.onNodeWithText("Convidar").performClick()
         compose.onNode(hasSetTextAction() and hasText("E-mail da pessoa")).performTextInput("pessoa@exemplo.com")
         compose.onNodeWithText("Enviar por e-mail").performClick()
         assertEquals("invite", operation)
@@ -393,14 +429,14 @@ class AdminVisualTest {
         }))
         compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasText("Excluir conta e dados"))
         compose.onNodeWithText("Excluir conta e dados").performClick()
-        compose.onNodeWithText("Excluir conta").assertIsNotEnabled()
+        compose.onNodeWithText("Excluir").assertIsNotEnabled()
         capture("admin-confirmar-exclusao")
-        val email = compose.onNode(hasSetTextAction() and hasText("E-mail da conta"))
+        val email = compose.onNode(hasSetTextAction() and hasText("Digite o e-mail para confirmar"))
         email.performTextInput("errado@exemplo.com")
-        compose.onNodeWithText("Excluir conta").assertIsNotEnabled()
+        compose.onNodeWithText("Excluir").assertIsNotEnabled()
         assertEquals("", action)
         email.performTextReplacement("igor@exemplo.com")
-        compose.onNodeWithText("Excluir conta").assertIsEnabled().performClick()
+        compose.onNodeWithText("Excluir").assertIsEnabled().performClick()
         assertEquals("delete", action)
     }
     private fun capture(name: String) {

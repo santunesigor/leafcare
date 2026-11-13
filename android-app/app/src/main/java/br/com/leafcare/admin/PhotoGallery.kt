@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -19,7 +18,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,7 +38,9 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
 import br.com.leafcare.data.DiseaseCatalog
+import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
+import br.com.leafcare.ui.percent
 import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
@@ -46,21 +51,16 @@ import org.json.JSONObject
     val back = { if (!state.busy) actions.load(state.galleryOrigin, JSONObject()) }
     BackHandler(enabled = state.selected == null, onBack = back)
     Column(Modifier.fillMaxSize().background(LeafColors.Pale)) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = back, enabled = !state.busy) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar da galeria") }
-            Column(Modifier.weight(1f)) {
-                Text("Consultar fotos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(reviewStatuses[state.photoFilterStatus] ?: "Todas", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-            }
-            IconButton(onClick = { filtersOpen = true }, enabled = !state.busy) { Icon(Icons.Outlined.Tune, "Filtrar fotos") }
-            IconButton(onClick = actions.refresh, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "Atualizar galeria") }
+        AdminTopBar("Consultar fotos", reviewStatuses[state.photoFilterStatus] ?: "Todas", back, "Voltar da galeria", state.busy, backEnabled = !state.busy) {
+            IconButton(onClick = { filtersOpen = true }, enabled = !state.busy) { Icon(Icons.Outlined.Tune, "Filtrar fotos", tint = LeafColors.Green) }
+            IconButton(onClick = actions.refresh, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "Atualizar galeria", tint = LeafColors.Green) }
         }
-        if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         key(state.page, state.photoQuery) {
             LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.weight(1f).fillMaxWidth().testTag("photo-gallery"),
-                contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item(span = { GridItemSpan(2) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (query.optString("training") == "true") AdminBadge("Cópias de treino", LeafColors.Info)
                         if (query.optString("class_id").isNotBlank()) AdminBadge(catalog.get(query.getString("class_id")).name)
                         if (query.optString("model").isNotBlank()) AdminBadge("Modelo ${shortId(query.getString("model"))}")
                         if (query.optString("from").isNotBlank() || query.optString("until").isNotBlank()) Text("Período UTC: ${query.optString("from").ifBlank { "início" }} até ${query.optString("until").ifBlank { "hoje" }}", style = MaterialTheme.typography.bodySmall)
@@ -74,13 +74,7 @@ import org.json.JSONObject
                 if (state.rows.isEmpty()) item(span = { GridItemSpan(2) }) {
                     AdminEmpty(if (state.busy) "Carregando fotos…" else "Sem fotos nesta seleção", "Ajuste os filtros ou atualize a consulta.", Icons.Outlined.PhotoLibrary)
                 }
-                item(span = { GridItemSpan(2) }) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { actions.page(-1) }, enabled = state.page > 0 && !state.busy) { Text("Anterior") }
-                        Text("Página ${state.page + 1}", style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = { actions.page(1) }, enabled = state.rows.size == 20 && !state.busy) { Text("Próxima") }
-                    }
-                }
+                item(span = { GridItemSpan(2) }) { AdminPager(state.page, state.rows.size == 20, state.busy, actions.page) }
             }
         }
     }
@@ -100,19 +94,22 @@ import org.json.JSONObject
         catch (_: Exception) { null }
         finally { loading = false }
     }
-    Surface(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(18.dp), color = androidx.compose.ui.graphics.Color.White,
+    Surface(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(14.dp), color = androidx.compose.ui.graphics.Color.White,
         border = BorderStroke(1.dp, LeafColors.Border), modifier = Modifier.fillMaxWidth().testTag("gallery-$id")) {
         Column {
             Box(Modifier.fillMaxWidth().aspectRatio(1f).background(LeafColors.Border), contentAlignment = Alignment.Center) {
                 val image = bitmap
                 if (image != null) Image(image.asImageBitmap(), "Foto: ${catalog.get(row.getString("class_id")).name}", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 else if (loading) CircularProgressIndicator(Modifier.size(26.dp), strokeWidth = 2.dp)
-                else TextButton(onClick = { attempt++ }, enabled = enabled) { Icon(Icons.Outlined.Refresh, null, Modifier.size(16.dp)); Text("Tentar foto", style = MaterialTheme.typography.labelSmall) }
+                else TextButton(onClick = { attempt++ }, enabled = enabled) { Icon(Icons.Outlined.Refresh, null, Modifier.size(16.dp)); Text("Recarregar", style = MaterialTheme.typography.labelSmall) }
             }
-            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                AdminBadge(reviewLabel(row.optString("review_status")))
+            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
+                    TrainingBadge(row, short = true)
+                }
                 Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text("${"%.1f".format(row.optDouble("confidence") * 100)}% · previsão original", style = MaterialTheme.typography.labelSmall, color = LeafColors.Muted)
+                Text("${percent(row.optDouble("confidence").toFloat())} · previsão original", style = MaterialTheme.typography.labelSmall, color = LeafColors.Muted)
                 if (!row.isNull("reviewed_class")) Text("Revisão: ${catalog.get(row.getString("reviewed_class")).name}", style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, color = LeafColors.Green)
             }
         }
@@ -144,28 +141,40 @@ import org.json.JSONObject
         item {
             AdminPanel {
                 AdminSectionTitle("Previsão original")
-                Text(catalog.get(row.getString("class_id")).name, fontWeight = FontWeight.SemiBold)
-                Text("${"%.1f".format(row.optDouble("confidence") * 100)}% de confiança")
-                val top3 = row.optJSONArray("top3") ?: JSONArray()
-                repeat(top3.length()) { i -> val p = top3.getJSONObject(i)
-                    Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${"%.1f".format(p.optDouble("confidence") * 100)}%", style = MaterialTheme.typography.bodySmall)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("${catalog.get(row.getString("class_id")).name} · ${percent(row.optDouble("confidence").toFloat())} de confiança", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    val top3 = row.optJSONArray("top3") ?: JSONArray()
+                    repeat(top3.length()) { i -> val p = top3.getJSONObject(i)
+                        Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${percent(p.optDouble("confidence").toFloat())}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+                    }
                 }
             }
         }
         item {
             AdminPanel {
-                AdminSectionTitle("Avaliação humana")
-                AdminBadge(reviewLabel(row.optString("review_status")))
-                if (!row.isNull("reviewed_class")) Text(catalog.get(row.getString("reviewed_class")).name)
-                if (!row.isNull("reviewed_at")) Text(adminDate(row.getString("reviewed_at")), style = MaterialTheme.typography.bodySmall)
-                if (!row.isNull("reviewer_id")) Text("Revisor: ${shortId(row.getString("reviewer_id"))}", style = MaterialTheme.typography.bodySmall)
-                if (!row.isNull("note") && row.optString("note").isNotBlank()) Text(row.getString("note"))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    AdminSectionTitle("Avaliação humana")
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        TrainingBadge(row)
+                        AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (!row.isNull("reviewed_class")) Text(catalog.get(row.getString("reviewed_class")).name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    if (!row.isNull("note") && row.optString("note").isNotBlank()) Text(row.getString("note"), style = MaterialTheme.typography.bodyMedium)
+                    val meta = listOfNotNull(
+                        row.optString("reviewed_at").takeIf { !row.isNull("reviewed_at") }?.let(::adminDate),
+                        row.optString("reviewer_id").takeIf { !row.isNull("reviewer_id") }?.let { "Revisor: ${shortId(it)}" },
+                    )
+                    if (meta.isNotEmpty()) Text(meta.joinToString("  ·  "), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+                }
             }
         }
         item { Text("Enviada por: ${row.label("email")}\n${adminDate(row.label("created_at"))}\nModelo: ${shortId(row.label("model_sha256"))}", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted) }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable internal fun PhotoFilterSheet(state: AdminState, classes: List<String>, catalog: DiseaseCatalog, close: () -> Unit, apply: (JSONObject) -> Unit) {
     val query = remember(state.photoQuery) { JSONObject(state.photoQuery) }
     var status by rememberSaveable(state.photoQuery) { mutableStateOf(state.photoFilterStatus) }
@@ -174,35 +183,104 @@ import org.json.JSONObject
     var user by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("user_id")) }
     var from by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("from")) }
     var until by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("until")) }
+    var trainingOnly by rememberSaveable(state.photoQuery) { mutableStateOf(query.optString("training") == "true") }
     var advanced by rememberSaveable(state.photoQuery) { mutableStateOf(model.isNotBlank() || user.isNotBlank()) }
+    val invalidDate = from == "!invalid!" || until == "!invalid!"
+    val inverted = !invalidDate && from.isNotBlank() && until.isNotBlank() && from > until
     AdminSheet("Filtrar fotos", close, footer = {
-        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = close) { Text("Cancelar") }
-            Button(onClick = { close(); apply(JSONObject().put("status", status).put("class_id", classFilter).put("model", model.trim()).put("user_id", user.trim()).put("from", from.trim()).put("until", until.trim())) },
-                enabled = !state.busy && from != "!invalid!" && until != "!invalid!", modifier = Modifier.weight(1f)) { Text("Aplicar filtros") }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LeafButton("Limpar", {
+                status = "pending"; classFilter = ""; model = ""; user = ""; from = ""; until = ""; trainingOnly = false
+            }, secondary = true, modifier = Modifier.weight(1f), enabled = !state.busy)
+            LeafButton("Aplicar filtros", {
+                close(); apply(JSONObject().put("status", status).put("class_id", classFilter).put("model", model.trim()).put("user_id", user.trim()).put("from", from.trim()).put("until", until.trim()).put("training", if (trainingOnly) "true" else ""))
+            }, modifier = Modifier.weight(1.6f), enabled = !state.busy && !invalidDate && !inverted)
         }
     }) {
-        item { Choice("Situação", status, reviewStatuses) { status = it } }
-        item { Choice("Classe prevista", classFilter, linkedMapOf("" to "Todas") + classes.associateWith { catalog.get(it).name }) { classFilter = it } }
-        item { AdminDateField("De", from) { from = it } }
-        item { AdminDateField("Até", until) { until = it } }
-        item { TextButton(onClick = { advanced = !advanced }) { Text(if (advanced) "Menos filtros" else "Mais filtros") } }
+        item {
+            FilterSection("Situação") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    reviewStatuses.forEach { (key, name) -> StatusChip(name, key == status) { status = key } }
+                }
+            }
+        }
+        item {
+            FilterSection("Treinamento") {
+                StatusChip("Só cópias de treino", trainingOnly, Role.Checkbox) { trainingOnly = !trainingOnly }
+            }
+        }
+        item {
+            FilterSection("Classe prevista") {
+                Choice("Classe", classFilter, linkedMapOf("" to "Todas") + classes.associateWith { catalog.get(it).name }) { classFilter = it }
+            }
+        }
+        item {
+            FilterSection("Período") {
+                AdminDateField("De", from) { from = it }
+                AdminDateField("Até", until, error = if (inverted) "A data final é anterior à inicial." else null) { until = it }
+            }
+        }
+        item {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { advanced = !advanced }.padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(if (advanced) "Menos filtros" else "Mais filtros", color = LeafColors.Green, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Icon(if (advanced) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null, tint = LeafColors.Green, modifier = Modifier.size(20.dp))
+            }
+        }
         if (advanced) {
-            item { OutlinedTextField(user, { user = it }, label = { Text("Identificador do usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(model, { model = it }, label = { Text("Identificador do modelo") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(user, { user = it }, label = { Text("Identificador do usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = leafFieldColors())
+                    OutlinedTextField(model, { model = it }, label = { Text("Identificador do modelo") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = leafFieldColors())
+                }
+            }
         }
     }
 }
 
+@Composable private fun FilterSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = LeafColors.Text)
+        content()
+    }
+}
+
+/** Same selection language as the history filter: Pale + green label + check. */
+@Composable private fun StatusChip(label: String, selected: Boolean, role: Role = Role.RadioButton, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        Modifier.heightIn(min = 40.dp).clip(shape)
+            .background(if (selected) LeafColors.Tint else Color.White)
+            .border(1.dp, if (selected) LeafColors.Green else LeafColors.Border, shape)
+            .selectable(selected = selected, role = role, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (selected) Icon(Icons.Outlined.Check, null, tint = LeafColors.Green, modifier = Modifier.size(16.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) LeafColors.Green else LeafColors.Text,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+    }
+}
+
+@Composable internal fun leafFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = LeafColors.Green, unfocusedBorderColor = LeafColors.Border,
+    focusedLabelColor = LeafColors.Green, unfocusedLabelColor = LeafColors.Muted,
+    unfocusedContainerColor = Color.White, focusedContainerColor = Color.White, cursorColor = LeafColors.Green,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun AdminDateField(label: String, isoDate: String, onDateChange: (String) -> Unit) {
-    val displayFormat = DateTimeFormatter.ofPattern("dd/MM/uuuu")
+@Composable private fun AdminDateField(label: String, isoDate: String, error: String? = null, onDateChange: (String) -> Unit) {
+    val displayFormat = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT)
     val isoFormat = DateTimeFormatter.ISO_LOCAL_DATE.withResolverStyle(ResolverStyle.STRICT)
     fun parse(value: String): LocalDate? = runCatching { LocalDate.parse(value, isoFormat) }.getOrNull()
+    // The field shows DD/MM/AAAA: typed text is parsed in that format, not ISO.
+    fun parseTyped(value: String): LocalDate? = runCatching { LocalDate.parse(value, displayFormat) }.getOrNull()
     var text by remember { mutableStateOf(parse(isoDate)?.format(displayFormat).orEmpty()) }
     LaunchedEffect(isoDate) { if (isoDate != "!invalid!") text = parse(isoDate)?.format(displayFormat).orEmpty() }
     var showPicker by remember { mutableStateOf(false) }
-    val selected = parse(isoDate) ?: parse(text)
+    val selected = parse(isoDate) ?: parseTyped(text)
     OutlinedTextField(
         value = text,
         onValueChange = { input ->
@@ -213,15 +291,18 @@ import org.json.JSONObject
                     append(char)
                 }
             }
-            onDateChange(parse(text)?.format(isoFormat) ?: if (text.isEmpty()) "" else "!invalid!")
+            onDateChange(parseTyped(text)?.format(isoFormat) ?: if (text.isEmpty()) "" else "!invalid!")
         },
         label = { Text(label) },
         placeholder = { Text("DD/MM/AAAA") },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         trailingIcon = { IconButton(onClick = { showPicker = true }) { Icon(Icons.Outlined.CalendarMonth, "Escolher data") } },
+        isError = isoDate == "!invalid!" || error != null,
+        supportingText = (if (isoDate == "!invalid!") "Use o formato DD/MM/AAAA com uma data válida." else error)?.let { message -> { Text(message) } },
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp)
+        shape = RoundedCornerShape(14.dp),
+        colors = leafFieldColors()
     )
     if (showPicker) {
         val pickerState = rememberDatePickerState(initialSelectedDateMillis = selected?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli())

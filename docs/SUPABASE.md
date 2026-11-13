@@ -66,6 +66,28 @@ As políticas permitem que cada usuário manipule somente os próprios arquivos.
 
 Revoga execução direta de funções internas por perfis públicos e recria políticas explicitamente para usuários autenticados.
 
+### `20261111120000_legal_documents_v1_4_training_by_terms.sql`
+
+Documentos v1.4: o aceite (`accept_current_legal_documents`) e o cadastro com v1.4 (`handle_new_user`) também gravam `training_consents` (`granted`, versão `1.2`). As políticas de consentimento, autorizações por foto e do bucket `training-photos` passam a exigir recibo v1.4 e consentimento 1.2; revogações (`granted=false`, `authorized=false`) são aceitas com qualquer versão. Testes: `supabase/tests/legal-acceptance.sql` e `training-consent.sql`.
+
+### `20261111150000_training_photo_rules.sql`
+
+Revogações apagam de fato as cópias de treinamento: o usuário passa a enxergar a própria pasta de `training-photos` (o Postgres aplica políticas SELECT a um DELETE com WHERE; sem isso, a exclusão removia 0 linhas). Cópias novas exigem análise ativa, conclusiva e conta liberada para envio (`can_send_training_photo`, com pausa, exclusão pendente e corte). Excluir cópias continua permitido com envios pausados; tombstones de análises seguem aguardando a liberação. A função `leafcare-admin` remove `analysis-photos` e `training-photos` antes de excluir a conta. Testes: `supabase/tests/training-consent.sql` e `supabase/functions/leafcare-admin/handler_test.ts`.
+
+### `20261112120000_training_pool.sql`
+
+Retreino com fotos de campo. `training_pool()` (somente `service_role`) lista as cópias de `training-photos` e o estado de cada uma: `ready` (análise ativa e conclusiva feita depois do aceite v1.4, consentimento e autorização 1.2 vigentes, conta fora de exclusão e revisão `confirmed`/`corrected`), `awaiting_review`, `excluded` (duvidosa/rejeitada) ou `ineligible`. O rótulo de treino é a classe revisada. `admin_command` passa a devolver no painel `training` (prontas, aguardando revisão, fora do treino e quantas vencem em 14 dias), nas fotos `training_expires_at`/`training_state` e aceita o filtro `training=true`; a fila mostra primeiro as cópias de treino pendentes que vencem antes. Testes: `supabase/tests/training-pool.sql`. Uso completo: [Retreinar o modelo](RETREINAMENTO.md).
+
+### `20261112180000_legal_documents_v1_5_permanent_training.sql`
+
+Documentos v1.5: as cópias de treino passam a formar um conjunto acumulado. `accept_current_legal_documents` só aceita 1.5/1.5; `handle_new_user` grava o consentimento 1.2 para 1.4 e 1.5. As políticas de consentimento, autorização por foto e `training-photos` usam `accepted_training_terms()` (recibo 1.4 ou 1.5), para que um APK antigo continue enviando. A retenção é calculada por cópia em `training_copy_expires_at()`: sem prazo (`expires_at` nulo) quando a análise é posterior ao primeiro aceite 1.5 da conta; caso contrário, 90 dias após o envio. `training_pool()` mantém colunas e estados, considera o primeiro aceite 1.4 ou 1.5 e deixa de cortar em 90 dias. `training_photos_to_delete()` (somente `service_role`) lista as cópias que precisam sair: vencidas, sem análise ativa e conclusiva, com consentimento ou autorização revogados ou de conta em exclusão. A função `cleanup-training-photos` (cron diário 03:12 UTC) apaga essas cópias; é a garantia de que uma revogação feita em outro aparelho também remove a cópia. Testes: `legal-acceptance.sql`, `training-consent.sql`, `training-pool.sql` e `cleanup-training-photos/handler_test.ts`.
+
+Ordem de publicação: aplicar a migration e publicar a função antes de distribuir o APK com documentos v1.5; o aceite v1.4 deixa de ser aceito.
+
+### `20261113120000_tla_dataset_bucket.sql`
+
+Bucket privado `tla-dataset` com as 696 imagens do TLA, uma pasta por doença, igual a `machine-learning/data/raw/`. Não tem política de Storage: o app não lê nem grava; só o pipeline de retreino com a chave de serviço (`retrain.py sync` baixa, `retrain.py tla-upload` preenche). É separado de `training-photos` porque a limpeza diária apaga lá os objetos sem análise. Teste: `supabase/tests/tla-dataset.sql`. Aplicado e preenchido em produção em 13/11/2026.
+
 ## RLS
 
 `profiles` e `analyses` usam Row Level Security.

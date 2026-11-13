@@ -1,5 +1,52 @@
 # Changelog — LeafCare
 
+## [1.8.0] - 2026-11-13
+
+Release reunindo tudo desde a 1.7.1. APK 1.8.0 (versionCode 27).
+
+### Termos v1.4 e treinamento
+- Termos de Uso e Política de Privacidade v1.4: o uso das fotos analisadas para treinamento passa a ser condição de uso, registrada no servidor junto com o aceite; sem aceite, o app não pode ser usado (offline, só para quem já aceitou no aparelho). A tela de aceite serve para contas novas e antigas e explica quando o servidor ainda não foi atualizado.
+- Card do uso das fotos no treinamento curto e legível; o modal "Analisar fotografia" foi removido: capturar ou escolher uma foto inicia a análise.
+- Privacidade e fotos mostra o estado da autorização e permite revogar com confirmação; depois disso, o app pede um novo aceite.
+- Revogar apaga de fato as cópias de treinamento no servidor; excluir uma análise remove sua cópia; excluir uma conta pelo painel remove também as cópias; fotos inconclusivas não são usadas para treinamento; revogações pendentes são enviadas antes de um novo aceite e ao sair da conta.
+- Migrations `20261111120000_legal_documents_v1_4_training_by_terms` e `20261111150000_training_photo_rules` e função `leafcare-admin` publicadas em produção.
+
+### Conjunto de treino acumulado e retreino (Termos v1.5)
+- Termos de Uso e Política de Privacidade v1.5 (12/11/2026): as cópias de treino formam um conjunto acumulado e ficam por tempo indeterminado, até revogação, exclusão da análise ou exclusão da conta. Cópias de fotos analisadas sob a v1.4 continuam vencendo 90 dias após o envio. Contas existentes aceitam a v1.5 para continuar.
+- Supabase (migration `20261112180000_legal_documents_v1_5_permanent_training`): aceite v1.5; envio com recibo 1.4 ou 1.5; validade por cópia (`expires_at` nulo para cópias permanentes); `training_pool()` sem corte de 90 dias; `training_photos_to_delete()` lista cópias vencidas, de análises excluídas ou inconclusivas, revogadas ou de contas em exclusão. A limpeza diária `cleanup-training-photos` passa a apagar essas cópias, inclusive as de revogações feitas em outro aparelho. Migration e função publicadas em produção em 12/11/2026.
+- `training_pool()` (migration `20261112120000_training_pool`, aplicada em produção) define em um só lugar quais cópias estão prontas: análise ativa e conclusiva após o aceite, consentimento vigente, conta fora de exclusão e revisão confirmada ou corrigida; o rótulo é a classe revisada.
+- `machine-learning/retrain.py`, ponto de entrada único: `setup`, `status`, `sync`, `run` e `promote`. O conjunto parte do TLA (split histórico) e soma todas as fotos prontas, espelhadas em `data/field/` sem identificadores nem EXIF, com pessoas fixas no mesmo split entre ciclos. Cada ciclo treina o professor DINOv2-B, destila o aluno com a receita atual, converte para TFLite com paridade, compara com o modelo em uso e só muda o app com `promote`.
+- Admin: bloco "Treinamento do modelo" no Resumo, selo "Treino" (com "· N dias" só para cópias v1.4) e filtro "Só cópias de treino"; a fila mostra primeiro as cópias pendentes que vencem antes.
+- Repositório enxuto: saem os experimentos, benchmarks e o pipeline Keras/ensemble (preservados na tag `v1.7.1`), o exportador de 30 dias, o timer systemd, o catálogo antigo e código Android sem uso. A CI de Python usa LiteRT em vez de TensorFlow.
+- Conjunto completo no Supabase: o TLA (696 imagens, uma pasta por doença) fica no bucket privado `tla-dataset` (migration `20261113120000_tla_dataset_bucket`, aplicada e preenchida em produção). `retrain.py sync` reconstrói `data/raw/` em qualquer computador, conferindo cada imagem com o manifesto, e a cópia local das fotos do app passa a ficar numa pasta por doença.
+- O replay tolera só imagens a até 1e-4 do limiar mudando de aceita para inconclusiva (achado no primeiro ciclo real); teste de login por convite deixou de ser intermitente.
+- Plano único em [Retreinar o modelo](docs/RETREINAMENTO.md).
+
+### Conta e estabilidade
+- Login não fica carregando indefinidamente (#18); abertura offline com token expirado não trava (#19); voltar ao app não reinicia a navegação nem perde a foto da galeria (#20).
+- Recuperação de senha resiste a rotação e ao encerramento do processo (#21, #24); sair sem internet desconecta localmente (#22); erro ao aceitar os termos permanece visível (#23); link de convite/recuperação não trava na tela de aceite.
+- Troca de senha sem mensagens antigas; e-mail recusado pelo servidor mostra "E-mail inválido"; o histórico da conta anterior não aparece após trocar de conta; sair avisa quando há análises ainda não enviadas.
+
+### Sincronização
+- Worker aguarda a sessão (#25), exclusões durante upload não se perdem (#26), fila não fica bloqueada (#31) e fotos de treinamento seguem o histórico (#30).
+- Revogações não são sobrescritas por consentimento antigo (#28) e sincronizam mesmo aguardando novo aceite (#29); revogações e exclusões vão antes da política de envio; atualizações recusadas ficam pendentes; a restauração não mistura contas.
+- Fotos do histórico aparecem assim que o download termina (#36).
+- Resultados inconclusivos voltam normalmente ao entrar de novo na conta (reinstalação ou troca de conta), mas a foto deles fica só no aparelho onde a análise foi feita, como diz a Política de Privacidade. Antes aparecia um quadro vazio que parecia resultado perdido; agora o histórico mostra um ícone e o resultado explica onde a foto ficou.
+
+### Câmera e resultado
+- O botão de luz da câmera vira uma lanterna de verdade: acende na hora e fica acesa enquanto você enquadra e fotografa, e volta acesa ao retornar ao app. Antes ele só armava o flash para o momento da foto, sem nenhum sinal visível, e parecia não funcionar. O botão mostra claramente se a lanterna está ligada.
+- Resolução limitada para não estourar 16 MP; permissão e câmera escolhida sobrevivem à rotação; captura sem espaço e falta de memória mostram erro em vez de fechar o app (#34); sem mensagens técnicas em inglês; o resultado volta ao histórico se a análise for apagada; limpeza de arquivos órfãos.
+
+### Visual
+- Tema completo com as cores do app, sem o lilás padrão do Material 3 (#37); áreas de toque de 48dp, ícone de perfil, textos corrigidos.
+- Modais compactos: cartão menor, título de 18sp, botões lado a lado (Cancelar à esquerda, ação principal à direita) que empilham só quando o texto não cabe; "Analisando no aparelho" como aviso compacto; ajuda da câmera no mesmo padrão; foto ampliada fecha pelo botão no canto.
+
+### Admin
+- Telas refeitas para caber sem rolagem desnecessária: cabeçalho único de 56dp (voltar, título, papel e atualizar) em todas as telas do admin e abas segmentadas em uma linha, no lugar do bloco "LEAFCARE / Administração" e dos quatro cartões de ícones.
+- Resumo sem repetir a triagem: faixa de pendentes com "Avaliar" (abre a fila direto), totais em uma linha (recebidas, revisadas, usuários e pausados), barra de resultados com legenda e modelos de origem.
+- Triagem com um único cartão de progresso e "Avaliar pendentes", situações e classes em listas agrupadas; Usuários e Atividades em listas agrupadas, sem títulos repetindo a aba, com "Convidar" ao lado do título da lista; paginação só aparece quando há outra página.
+- Painéis inferiores ocupam só a altura do conteúdo; confirmações de conta abrem em diálogo; filtro de fotos com chips de situação e rodapé Limpar/Aplicar (#38); rotação mantém o painel (#32) e datas digitadas no filtro funcionam (#33); cores de situação consistentes.
+
 ## [1.7.1] - 2026-10-19
 
 - APK 1.7.1 (versionCode 15): contato de privacidade apresentado como texto padronizado no final dos Termos de Uso e da Política de Privacidade. O usuário testou os fluxos no aparelho e confirmou que estão funcionando.
@@ -27,7 +74,7 @@
 - APK debug 1.2.0 (versionCode 7); receita, bundle atual e relatórios de integração em pastas próprias. Ensemble anterior preservado na release v1.1.2.
 
 - Experimentos isolados de MobileNetV3Small, MobileNetV4 Small, FastViT-T8 e EfficientViT-M2/M3, com cinco controles e cinco treinos com destilação de DINOv2-B. Dez exportações TFLite aprovadas; receitas, resultados e relatório em diretórios próprios, preservando o ensemble durante os experimentos.
-- [Relatório de destilação](docs/benchmarks/BENCHMARK_DESTILACAO.md): 38 testes Python passaram; classificação em aparelho dos candidatos continua pendente.
+- Relatório de destilação (`docs/benchmarks/BENCHMARK_DESTILACAO.md`, até a tag `v1.7.1`): 38 testes Python passaram; classificação em aparelho dos candidatos continua pendente.
 
 ## [1.1.2] - 2026-10-08
 

@@ -4,9 +4,9 @@
 
 O bundle atual é **MobileNetV4 Small destilado** (`mobilenetv4_conv_small.e2400_r224_in1k`), uma rede com 2.513.520 parâmetros e TFLite float32 de 10.167.768 bytes (9,70 MiB). O professor DINOv2-B não vai no APK. A classificação permanece local e offline após autenticação.
 
-O checkpoint da época 15 foi escolhido pela validação no experimento já concluído; esta integração não retreina, muda o split ou recalibra pelo teste. Receita completa, histórico, logits e hashes: [`experiment_config.json`](../machine-learning/benchmark_artifacts/distillation/mobilenetv4_small_distilled/experiment_config.json). Comparação dos dez alunos: [Benchmark de destilação](benchmarks/BENCHMARK_DESTILACAO.md).
+O checkpoint da época 15 foi escolhido pela validação. O MobileNetV4 Small venceu um benchmark de dez alunos (MobileNetV3 Small, MobileNetV4 Small, FastViT-T8, EfficientViT-M2/M3, com e sem destilação), e a receita vencedora é a usada no retreino (`machine-learning/training/train.py`). Os experimentos, os benchmarks e o ensemble anterior foram removidos do repositório e continuam disponíveis na tag `v1.7.1`.
 
-O ensemble anterior continua reproduzível no tag `v1.1.2`, com relatórios em [`model-reports/ensemble/`](model-reports/ensemble/) e resultados em `machine-learning/benchmark_artifacts/ensemble/`. Seus resultados são históricos; a integração atual tem relatórios próprios em [`model-reports/mobilenetv4-distilled/`](model-reports/mobilenetv4-distilled/).
+Relatórios do modelo atual: [`model-reports/mobilenetv4-distilled/`](model-reports/mobilenetv4-distilled/). Cada modelo promovido pelo retreino ganha a própria pasta em `model-reports/`.
 
 ## Contrato de inferência
 
@@ -21,11 +21,11 @@ O ensemble anterior continua reproduzível no tag `v1.1.2`, com relatórios em [
 
 Classes e sua ordem continuam em `artifacts/classes.json`; catálogo em `artifacts/diseases.json`. Android e CLI conferem hashes. Hash TFLite: `422ab461585a83bfabe6896d7ac7b32c726a8b285ff4ade76cb0cec54ba6da99`.
 
-`DistilledPreprocessor.kt` e `leafcare/preprocessing.py` implementam a entrada atual. `PixelPreprocessor.kt` e o resize bilinear Python permanecem para fixtures e receitas históricas. Não normalizar duas vezes e não aplicar o preprocessing antigo ao aluno.
+`DistilledPreprocessor.kt` e `leafcare/preprocessing.py` implementam a entrada atual e são conferidos pela mesma fixture (`distilled_preprocess_golden.properties`). Não normalizar duas vezes: a normalização está no grafo.
 
 ## Dataset, treino e destilação
 
-696 imagens TV3 do [TLA](https://doi.org/10.3389/fpls.2024.1333236), 16 classes, seed 42 e separação por grupos: treino 489, validação 104, teste 103. Os dados brutos completos não são redistribuídos. Manifesto, mapa de classes, auditoria e proveniência permanecem nos caminhos de `machine-learning/data/`, `tla_class_map.yaml` e `docs/legal/`.
+696 imagens TV3 do [TLA](https://doi.org/10.3389/fpls.2024.1333236), 16 classes, seed 42 e separação por grupos: treino 489, validação 104, teste 103. Os dados brutos não ficam no Git nem são redistribuídos: ficam no bucket privado `tla-dataset` do Supabase, e `retrain.py sync` os baixa para `machine-learning/data/raw/`. Manifesto, mapa de classes, auditoria e proveniência permanecem nos caminhos de `machine-learning/data/`, `tla_class_map.yaml` e `docs/legal/`.
 
 O aluno parte de pesos ImageNet e probe logística, usa AdamW, batch 8, três épocas de aquecimento e quinze de ajuste; BatchNorm congelada. A perda combina 50% entropia cruzada ponderada e 50% KL com o professor DINOv2-B, temperatura de destilação 4 (distinta da temperatura de calibração). Os logits do professor são usados somente no treino. A época é selecionada por Macro-F1/Top-1/Top-3 na validação; o teste não escolhe checkpoint nem limiar.
 
@@ -42,6 +42,10 @@ O replay da integração nas 104 imagens de validação manteve todas as classes
 
 Tempo do benchmark em desktop i5-13400, duas threads: inferência TFLite mediana 2,11 ms/P95 2,20 ms; pipeline Python mediana 3,63 ms/P95 3,91 ms. Isso não mede Android. A meta de análise completa até três segundos no Galaxy A06 segue pendente de aparelho conectado.
 
+## Retreino com fotos do app
+
+O conjunto de treino é acumulado: TLA com o split histórico mais todas as fotos analisadas no app e aprovadas por revisão humana, espelhadas localmente em `machine-learning/data/field/`. Cada ciclo treina o professor DINOv2-B e o aluno com esta receita, converte para TFLite, compara com o modelo em uso e só muda o app por promoção explícita. Plano, comandos e critérios: [Retreinar o modelo](RETREINAMENTO.md).
+
 ## Executar e validar
 
 Com Python 3.12, dentro de `machine-learning/`:
@@ -49,19 +53,11 @@ Com Python 3.12, dentro de `machine-learning/`:
 ```bash
 pip install -r requirements.txt
 python predict.py ../samples/reference_frog_eye.jpg
-python validate_bundle.py --require-model
+python validate_bundle.py
 python -m pytest -q
 ```
 
-A CLI usa TFLite e seleciona o preprocessing pelo metadata. Não existe `model.keras` correspondente ao aluno; o backend Keras é rejeitado para evitar usar um arquivo antigo local.
-
-Para reproduzir o treino e a conversão, siga [`experiments/distillation/README.md`](../machine-learning/experiments/distillation/README.md), usando seus ambientes separados. Para promover novamente o resultado já selecionado, com dataset e caches originais disponíveis:
-
-```bash
-python deploy_distilled.py --install --pixel-parity-dir /tmp/leafcare-distilled-parity
-```
-
-A promoção verifica hashes do checkpoint, TFLite, manifesto e imagens; executa replay de validação/teste antes de atualizar `artifacts/` e `assets/`. Ela não seleciona outro modelo nem altera os experimentos históricos. O checkpoint também é distribuído na release do aluno para permitir futuras reexportações.
+A CLI usa o interpretador LiteRT e o preprocessing indicado no metadata. `requirements.txt` é o conjunto leve da CI; o treino usa `requirements-train.txt` e a conversão, `requirements-export.txt` (`python retrain.py setup` cria os dois ambientes).
 
 No Android, com JDK 17 e SDK configurados:
 
@@ -69,6 +65,4 @@ No Android, com JDK 17 e SDK configurados:
 bash gradlew testDebugUnitTest verifyModelAssets lintDebug assembleDebug
 ```
 
-Fixtures sintéticas compartilhadas verificam retrato, paisagem, upscale, downsample, alpha e arredondamento de crop. O replay Kotlin das 104 imagens decodificadas pode ser habilitado com `LEAFCARE_PARITY_DIR=/tmp/leafcare-distilled-parity` após gerar as fixtures locais. Não distribua dados brutos no Git ou APK.
-
-As receitas Keras/ensemble são históricas. `train_ensemble.py`, `export_tflite.py` e `legacy/train.py` e `legacy/evaluate.py` rejeitam o bundle destilado atual; reproduza o ensemble em checkout `v1.1.2`. Mantenha ambientes/checkpoints em `.cache` ignorados. Novos experimentos devem continuar isolados do bundle distribuído até promoção explícita.
+Fixtures sintéticas compartilhadas verificam retrato, paisagem, upscale, downsample, alpha e arredondamento de crop. Não distribua dados brutos no Git ou no APK.

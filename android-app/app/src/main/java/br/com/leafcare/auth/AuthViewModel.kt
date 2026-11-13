@@ -3,12 +3,12 @@ package br.com.leafcare.auth
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import br.com.leafcare.LeafCareApplication
 import io.github.jan.supabase.gotrue.user.UserSession
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -34,7 +33,9 @@ class AuthViewModel internal constructor(
     constructor(application: Application) : this(
         application,
         AuthRepository(application),
-        legalAcceptanceApi = LegalAcceptanceRepository((application as LeafCareApplication).supabaseClientHolder)
+        legalAcceptanceApi = (application as LeafCareApplication).let {
+            LegalAcceptanceRepository(it.supabaseClientHolder, it.database.trainingConsentDao())
+        }
     )
 
     private val recoveryStore: RecoveryPendingStore =
@@ -87,10 +88,26 @@ class AuthViewModel internal constructor(
     private val _showCancelDialog = MutableStateFlow(false)
     val showCancelDialog: StateFlow<Boolean> = _showCancelDialog.asStateFlow()
 
+    private var legalCheck: Job? = null
+    private var legalCheckedUserId: String? = null
+
+    // UI state for different screens
+    private val _uiState = MutableStateFlow(AuthUiState())
+    val uiState: StateFlow<AuthUiState> = _uiState
+    private var legalDocumentReturnScreen: AuthScreen = AuthScreen.SignUp
+
     init {
         viewModelScope.launch {
             authRepository.session.collect { session ->
                 if (session == null) {
+                    legalCheck?.cancel()
+                    legalCheckedUserId = null
+                    // Session ended under the acceptance screen (e.g. refresh token
+                    // revoked): accepting needs a session, so go back to Login.
+                    if (_uiState.value.currentScreen == AuthScreen.LegalAcceptance) {
+                        setScreen(AuthScreen.Login)
+                        authRepository.setInfo("Sua sessão expirou. Entre novamente para continuar.")
+                    }
                     _legalAcceptance.value = if (legalAcceptanceApi == null) LegalAcceptanceState.CURRENT else LegalAcceptanceState.NOT_REQUIRED
                 } else if (legalAcceptanceApi != null) {
                     refreshLegalAcceptance()
@@ -101,6 +118,11 @@ class AuthViewModel internal constructor(
             authRepository.sessionChecked.first { it }
             if (_bootstrap.value == AuthBootstrapState.CHECKING) {
                 _bootstrap.value = AuthBootstrapState.READY
+            } else if (_bootstrap.value == AuthBootstrapState.RECOVERY_PENDING &&
+                authRepository.session.value != null
+            ) {
+                // Process death mid-recovery: resume on the new-password screen.
+                setScreen(AuthScreen.NewPassword, clearMessages = false)
             } else if (_bootstrap.value == AuthBootstrapState.RECOVERY_PENDING &&
                 authRepository.session.value == null
             ) {
@@ -115,57 +137,84 @@ class AuthViewModel internal constructor(
         }
     }
 
-    /** Rechecks the current receipt when the app resumes; network errors never block local inference. */
-    fun refreshLegalAcceptance() {
+    /**
+     * Rechecks the current receipt when the app resumes or the session refreshes;
+     * network errors never block local inference. A decision already made for
+     * this account is rechecked silently: showing Loading would tear down the
+     * open screen (navigation, a picked photo) on every resume.
+     */
+    fun refreshLegalAcceptance(force: Boolean = false) {
         val api = legalAcceptanceApi ?: return
-        val userId = authRepository.user.value?.id ?: return
-        _legalAcceptance.value = LegalAcceptanceState.CHECKING
-        viewModelScope.launch {
-            _legalAcceptance.value = try {
+        // The session is published before `user`, so read the id from the session
+        // itself; otherwise a fresh login could skip this check and stay on Loading.
+        val userId = currentUserId() ?: return
+        val state = _legalAcceptance.value
+        // The acceptance in flight decides: a check read before the RPC commits
+        // would overwrite CURRENT with REQUIRED.
+        if (state == LegalAcceptanceState.SUBMITTING) return
+        val silent = !force && legalCheckedUserId == userId &&
+            (state == LegalAcceptanceState.CURRENT || state == LegalAcceptanceState.UNAVAILABLE)
+        if (silent && legalCheck?.isActive == true) return
+        legalCheck?.cancel()
+        if (!silent) _legalAcceptance.value = LegalAcceptanceState.CHECKING
+        legalCheck = viewModelScope.launch {
+            val result = try {
                 if (api.hasCurrentAcceptance()) LegalAcceptanceState.CURRENT else LegalAcceptanceState.REQUIRED
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
-                // A cached, authenticated app must remain usable offline. No receipt is fabricated.
-                LegalAcceptanceState.UNAVAILABLE
+                if (silent) return@launch
+                // Offline: an account that accepted on this device keeps working
+                // locally; without that, the app cannot be used until accepting.
+                if (runCatching { api.hasLocalConsent() }.getOrDefault(false)) LegalAcceptanceState.UNAVAILABLE
+                else LegalAcceptanceState.REQUIRED
             }
-            if (authRepository.user.value?.id != userId) {
-                _legalAcceptance.value = LegalAcceptanceState.NOT_REQUIRED
-            }
+            // Another account signed in meanwhile: its own check decides.
+            if (currentUserId() != userId) return@launch
+            legalCheckedUserId = userId
+            _legalAcceptance.value = result
         }
     }
 
     fun acceptCurrentLegalDocuments() {
         val api = legalAcceptanceApi ?: return
         if (_legalAcceptance.value != LegalAcceptanceState.REQUIRED) return
+        legalCheck?.cancel()
+        _legalAcceptance.value = LegalAcceptanceState.SUBMITTING
         viewModelScope.launch {
-            _legalAcceptance.value = LegalAcceptanceState.SUBMITTING
             try {
                 api.acceptCurrentDocuments()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 _legalAcceptance.value = LegalAcceptanceState.REQUIRED
-                authRepository.setError("Não foi possível registrar seu aceite. Confira a conexão e tente novamente.")
+                authRepository.setError(
+                    if (e is LegalVersionUnsupportedException) "O servidor ainda não foi atualizado para esta versão dos termos. Tente novamente mais tarde."
+                    else "Não foi possível registrar seu aceite. Confira a conexão e tente novamente."
+                )
                 return@launch
             }
+            legalCheckedUserId = currentUserId()
             _legalAcceptance.value = LegalAcceptanceState.CURRENT
             (getApplication<Application>() as? LeafCareApplication)?.scheduleSync()
         }
     }
 
-    fun continueOfflineWithoutAccepting() {
-        if (_legalAcceptance.value == LegalAcceptanceState.REQUIRED ||
-            _legalAcceptance.value == LegalAcceptanceState.UNAVAILABLE
-        ) _legalAcceptance.value = LegalAcceptanceState.UNAVAILABLE
+    /**
+     * Keeps the auth screen in step with the acceptance requirement (called by
+     * the gate whenever the acceptance or bootstrap state changes). During a
+     * recovery/invite the new password comes first; once accepted, the user
+     * always leaves the acceptance screen.
+     */
+    fun syncLegalAcceptanceScreen() {
+        val target = legalAcceptanceScreenFor(
+            _uiState.value.currentScreen,
+            _legalAcceptance.value,
+            _bootstrap.value
+        ) ?: return
+        setScreen(target)
     }
 
-    /**
-     * Authenticated user's display name from user metadata, or null when
-     * unavailable. Home greeting falls back to a plain greeting in that case.
-     */
-    fun getAuthDisplayName(): String? = displayNameOf(user.value)
-
-    // UI state for different screens
-    private val _uiState = MutableStateFlow(AuthUiState())
-    val uiState: StateFlow<AuthUiState> = _uiState
-    private var legalDocumentReturnScreen: AuthScreen = AuthScreen.SignUp
+    private fun currentUserId(): String? =
+        authRepository.session.value?.user?.id ?: authRepository.user.value?.id
 
     // Navigation events
     private val _navigation = Channel<AuthNavigationEvent>(Channel.BUFFERED)
@@ -255,12 +304,12 @@ class AuthViewModel internal constructor(
                 setScreen(AuthScreen.VerifyEmail)
                 return@launch
             }
+            onAuthenticated(result)
             val destination = navigationForAuthResult(result.isSuccess)
             if (destination != null) {
                 clearForms()
                 _navigation.send(destination)
             }
-            onAuthenticated(result)
         }
     }
 
@@ -272,12 +321,14 @@ class AuthViewModel internal constructor(
                 email = state.email.trim(),
                 password = state.password
             )
+            // Isolate before navigating: the app must never open over the
+            // previous account's local data.
+            onAuthenticated(result)
             val destination = navigationForAuthResult(result.isSuccess)
             if (destination != null) {
                 clearForms()
                 _navigation.send(destination)
             }
-            onAuthenticated(result)
         }
     }
 
@@ -298,6 +349,12 @@ class AuthViewModel internal constructor(
     /** Sign out action: always back to the initial Auth screen. */
     fun signOut() {
         viewModelScope.launch {
+            (getApplication<Application>() as? LeafCareApplication)?.let { app ->
+                // A withdrawal saved offline gets one short chance to reach the
+                // server while the session still exists; the queue then stops.
+                currentUserId()?.let { app.pushPendingTrainingRevocation(it) }
+                app.cancelSync()
+            }
             authRepository.signOut()
             clearForms()
             clearRecoveryPending()
@@ -387,15 +444,6 @@ class AuthViewModel internal constructor(
         val wasPending = _bootstrap.value == AuthBootstrapState.RECOVERY_PENDING
         _bootstrap.value = AuthBootstrapState.PROCESSING_DEEPLINK
         processDeeplink(link, wasPending)
-    }
-
-    /**
-     * Handles an auth deep-link return (`leafcare://auth/...`): signup
-     * confirmation opens the app directly; password recovery opens the
-     * new-password screen. See [noteDeeplink]. No browser/WebView.
-     */
-    fun handleAuthDeeplink(url: String) {
-        noteDeeplink(url)
     }
 
     private fun processDeeplink(link: AuthDeeplink, wasPending: Boolean) {
@@ -542,6 +590,10 @@ class AuthViewModel internal constructor(
     fun getEmail(): String? {
         return user.value?.email
     }
+
+    /** Analyses that exist only on this device (pending upload, failed or kept local by a pause). */
+    suspend fun unsyncedAnalysesCount(): Int =
+        (getApplication<Application>() as? LeafCareApplication)?.database?.analysisDao()?.countUnsynced() ?: 0
 }
 
 /**
@@ -580,8 +632,7 @@ enum class AuthScreen {
     LegalAcceptance,
     VerifyEmail,
     ForgotPassword,
-    NewPassword,
-    Profile
+    NewPassword
 }
 
 /**
@@ -643,7 +694,8 @@ internal fun parseAuthDeeplink(url: String): AuthDeeplink? {
 }
 
 /** Navigation events for auth flow */
-sealed interface AuthNavigationEvent {    data class NavigateToAuth(val initialScreen: AuthScreen = AuthScreen.Login) : AuthNavigationEvent
+sealed interface AuthNavigationEvent {
+    data object NavigateToAuth : AuthNavigationEvent
     object NavigateToApp : AuthNavigationEvent
 }
 
@@ -701,11 +753,34 @@ internal fun navigationForAuthResult(authenticated: Boolean): AuthNavigationEven
 
 /** After startup restore: existing session goes to App, otherwise to Auth. */
 internal fun navigationForSessionRestore(hasSession: Boolean): AuthNavigationEvent =
-    if (hasSession) AuthNavigationEvent.NavigateToApp else AuthNavigationEvent.NavigateToAuth()
+    if (hasSession) AuthNavigationEvent.NavigateToApp else AuthNavigationEvent.NavigateToAuth
+
+/**
+ * Auth screen the acceptance requirement asks for, or null to stay. Recovery
+ * keeps the new-password form (the acceptance follows it); REQUIRED opens the
+ * acceptance unless it or one of its documents is open; an acceptance that is
+ * no longer required never keeps the user on that screen.
+ */
+internal fun legalAcceptanceScreenFor(
+    current: AuthScreen,
+    acceptance: LegalAcceptanceState,
+    bootstrap: AuthBootstrapState
+): AuthScreen? = when {
+    bootstrap == AuthBootstrapState.RECOVERY_PENDING ->
+        if (current == AuthScreen.LegalAcceptance) AuthScreen.NewPassword else null
+    bootstrap != AuthBootstrapState.READY -> null
+    acceptance == LegalAcceptanceState.REQUIRED ->
+        if (current == AuthScreen.LegalAcceptance || current == AuthScreen.TermsOfUse ||
+            current == AuthScreen.PrivacyPolicy
+        ) null else AuthScreen.LegalAcceptance
+    (acceptance == LegalAcceptanceState.CURRENT || acceptance == LegalAcceptanceState.UNAVAILABLE) &&
+        current == AuthScreen.LegalAcceptance -> AuthScreen.Login
+    else -> null
+}
 
 /** After sign-out: always back to Auth. */
 internal fun navigationAfterSignOut(): AuthNavigationEvent =
-    AuthNavigationEvent.NavigateToAuth()
+    AuthNavigationEvent.NavigateToAuth
 
 /** Extracts the producer display name from a GoTrue user, or null when absent. */
 internal fun displayNameOf(user: io.github.jan.supabase.gotrue.user.UserInfo?): String? =

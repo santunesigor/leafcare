@@ -10,7 +10,6 @@ output-metadata.json
 
 # Android Studio / IntelliJ
 .idea/
-.serena/
 *.iml
 misc.xml
 deploymentTargetDropDown.xml
@@ -27,17 +26,8 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Datasets and training checkpoints
+# TLA dataset (imported locally with import_tla.py, not redistributed)
 machine-learning/data/raw/
-machine-learning/data/external/
-machine-learning/experiments/dinov2/.cache/
-machine-learning/experiments/vision/.cache/
-machine-learning/experiments/ensemble/.cache/
-machine-learning/experiments/distillation/.cache/
-*.keras
-*.h5
-*.weights.h5
-machine-learning/artifacts/saved_model/
 
 # Local and generated files
 *.log
@@ -51,7 +41,12 @@ key.properties
 *.hprof
 .DS_Store
 Thumbs.db
-/project-source/
 
-# Fotos autorizadas exportadas para triagem local (dados sensíveis)
-machine-learning/data/authorized_training/
+# Retraining: local mirror of field photos and its secret (sensitive data), cycles (checkpoints and
+# candidate TFLites) and environments/caches (venvs, weights, teachers)
+machine-learning/data/field/
+machine-learning/runs/
+machine-learning/.cache/
+
+# Supabase CLI link cache
+supabase/.temp/

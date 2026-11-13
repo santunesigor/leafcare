@@ -1,30 +1,16 @@
+"""App contract mirrored in Python: decoding, distilled preprocessing, ranking and config."""
 import hashlib
-import json
 from pathlib import Path
+
 import numpy as np
 import pytest
 from PIL import Image
+
 from leafcare.common import classes_hash, load_config
-from leafcare.preprocessing import preprocess, decode_rgb, resize_rgb
 from leafcare.inference import rank
+from leafcare.preprocessing import decode_rgb, preprocess, resize_distilled_rgb
 
-
-def test_constant_image_remains_constant():
-    pixels = np.full((51, 99, 3), (10, 120, 250), dtype=np.uint8)
-    expected = np.broadcast_to(np.array([10, 120, 250]), (224, 224, 3))
-    np.testing.assert_array_equal(resize_rgb(pixels), expected)
-
-
-def test_center_crop_excludes_outer_columns():
-    pixels = np.zeros((2, 6, 3), np.uint8)
-    pixels[:, 2:4] = 130
-    assert (resize_rgb(pixels) == 130).all()
-
-
-def test_known_bilinear_interpolation():
-    pixels = np.repeat(np.array([[0, 100], [100, 200]], dtype=np.uint8)[..., None], 3, axis=2)
-    expected = np.array([[0, 25, 75, 100], [25, 50, 100, 125], [75, 100, 150, 175], [100, 125, 175, 200]])
-    np.testing.assert_array_equal(resize_rgb(pixels, 4)[..., 0], expected)
+REPO = Path(__file__).resolve().parents[2]
 
 
 def test_transparency_is_composited_on_white(tmp_path):
@@ -38,14 +24,30 @@ def test_transparency_is_composited_on_white(tmp_path):
                                                   (7, [[4, 2], [3, 1]]), (8, [[2, 4], [1, 3]])])
 def test_exif_is_respected(tmp_path, orientation, expected):
     image = Image.fromarray(np.repeat(np.array([[1, 2], [3, 4]], np.uint8)[..., None], 3, 2))
-    exif = Image.Exif(); exif[274] = orientation
-    path = tmp_path / "oriented.png"; image.save(path, exif=exif)
+    exif = Image.Exif()
+    exif[274] = orientation
+    path = tmp_path / "oriented.png"
+    image.save(path, exif=exif)
     np.testing.assert_array_equal(decode_rgb(path)[..., 0], expected)
 
 
+def test_pillow_resize_matches_the_android_golden_file():
+    fixture = REPO / "android-app/app/src/test/resources/distilled_preprocess_golden.properties"
+    props = dict(line.split("=", 1) for line in fixture.read_text().splitlines() if line and not line.startswith("#"))
+    for name in props["cases"].split(","):
+        width, height = map(int, props[f"{name}.size"].split(","))
+        y, x = np.indices((height, width))
+        rgb = np.stack([(x * 37 + y * 13) % 256, (x * 11 + y * 43) % 256, (x * 53 + y * 7) % 256], axis=-1)
+        if name == "alpha":
+            a = ((x * 17 + y * 31) % 256)[..., None]
+            rgb = (rgb * a + 255 * (255 - a) + 127) // 255
+        result = resize_distilled_rgb(rgb.astype(np.uint8))
+        assert result.shape == (224, 224, 3)
+        assert hashlib.sha256(result.astype(np.uint8).tobytes()).hexdigest() == props[f"{name}.sha256"]
+
+
 def test_actual_reference_image_can_be_preprocessed():
-    image = Path(__file__).resolve().parents[2] / "samples/reference_frog_eye.jpg"
-    tensor = preprocess(image)
+    tensor = preprocess(REPO / "samples/reference_frog_eye.jpg")
     assert tensor.shape == (1, 224, 224, 3) and tensor.dtype == np.float32
     assert np.isfinite(tensor).all() and 0 <= tensor.min() <= tensor.max() <= 255
 
@@ -63,18 +65,18 @@ def test_threshold_exact_boundary():
 
 @pytest.mark.parametrize("scores", [[float("nan"), 0, 1], [2, 0, 0], [.1, .1, .1], [-.1, .1, 1]])
 def test_invalid_probability_vectors_rejected(scores):
-    with pytest.raises(ValueError): rank(scores, ["a", "b", "c"], .7)
+    with pytest.raises(ValueError):
+        rank(scores, ["a", "b", "c"], .7)
 
 
 def test_hash_is_order_sensitive():
     assert classes_hash(["a", "b", "c"]) != classes_hash(["b", "a", "c"])
 
 
-def test_shared_golden_fixture():
-    root = Path(__file__).resolve().parents[2]
-    fixture = json.loads((root / "samples/preprocess_golden.json").read_text())
-    rgba = np.array(fixture["rgba"], dtype=np.uint32).reshape(fixture["height"], fixture["width"], 4)
-    a = rgba[..., 3:4]
-    rgb = ((rgba[..., :3] * a + 255 * (255 - a) + 127) // 255).astype(np.uint8)
-    result = resize_rgb(rgb).astype(np.uint8)
-    assert hashlib.sha256(result.tobytes()).hexdigest() == fixture["resized_rgb_sha256"]
+def test_repository_config_is_valid_and_rejects_bad_ratios(tmp_path):
+    config = load_config()
+    assert list(config["field_split"]) == ["train", "validation", "field_test"]
+    bad = tmp_path / "config.yaml"
+    bad.write_text((Path(__file__).resolve().parents[1] / "config.yaml").read_text().replace("0.70", "0.60"))
+    with pytest.raises(ValueError, match="somar 1"):
+        load_config(bad)

@@ -6,7 +6,6 @@ import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.Insert
 import androidx.room.PrimaryKey
-import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.test.core.app.ApplicationProvider
@@ -221,6 +220,37 @@ class AnalysisSyncDaoTest {
         }
     }
 
+    @Test fun countUnsyncedOnlyCountsActiveRowsMissingFromTheServer() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
+        try {
+            val dao = db.analysisDao()
+            dao.insert(entity()) // PENDING_UPLOAD
+            dao.insert(entity().copy(id = "a-2", syncStatus = SyncState.LOCAL_ONLY))
+            dao.insert(entity().copy(id = "a-3", syncStatus = SyncState.ERROR))
+            dao.insert(entity().copy(id = "a-4", syncStatus = SyncState.SYNCED))
+            dao.insert(entity().copy(id = "a-5", syncStatus = SyncState.PENDING_DELETE, deletedAt = 1L))
+            assertEquals(3, dao.countUnsynced())
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test fun deleteDuringUploadKeepsTombstone() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries().build()
+        try {
+            val dao = db.analysisDao()
+            dao.insert(entity())
+            dao.markDeleted("a-1", deletedAt = 99)
+            dao.markSynced("a-1") // upsert started before the delete returns now
+            val row = dao.get("a-1")
+            assertEquals(SyncState.PENDING_DELETE, row?.syncStatus)
+            assertEquals("a-1", dao.getPendingDeletes().single().id)
+        } finally {
+            db.close()
+        }
+    }
+
     @Test fun trainingConsentAndRevocationAreIsolatedPerAccount() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries().build()
@@ -234,6 +264,29 @@ class AnalysisSyncDaoTest {
             assertTrue(requireNotNull(dao.get("account-b")).granted)
             assertTrue(dao.getAllPhotos("account-a").single().authorized.not())
             assertTrue(dao.getAllPhotos("account-b").single().authorized)
+        } finally { db.close() }
+    }
+
+    @Test fun pendingRevocationQueueIgnoresConsentAndSettledRows() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries().build()
+        try {
+            val dao = db.trainingConsentDao()
+            dao.save(TrainingConsentEntity("account-a", granted = true, decidedAt = 1, syncState = "SYNCED"))
+            dao.savePhoto(TrainingPhotoAuthorizationEntity("account-a", "revoked", TRAINING_TERMS_VERSION, false, 2))
+            dao.savePhoto(TrainingPhotoAuthorizationEntity("account-a", "settled", TRAINING_TERMS_VERSION, false, 3, "SYNCED"))
+            dao.savePhoto(TrainingPhotoAuthorizationEntity("account-a", "granted", TRAINING_TERMS_VERSION, true, 4, "SYNCED"))
+            dao.savePhoto(TrainingPhotoAuthorizationEntity("account-b", "other", TRAINING_TERMS_VERSION, false, 5))
+            assertEquals(listOf("revoked"), dao.getPendingRevocations("account-a").map { it.analysisId })
+
+            dao.revokePhoto("account-a", "granted")
+            assertEquals(setOf("revoked", "granted"), dao.getPendingRevocations("account-a").map { it.analysisId }.toSet())
+            dao.revokePhoto("account-a", "settled")
+            assertEquals("SYNCED", dao.getPhoto("account-a", "settled")?.syncState)
+
+            dao.deletePhoto("account-a", "revoked")
+            assertNull(dao.getPhoto("account-a", "revoked"))
+            assertNotNull(dao.getPhoto("account-b", "other"))
         } finally { db.close() }
     }
 

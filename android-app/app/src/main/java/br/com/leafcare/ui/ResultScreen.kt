@@ -2,7 +2,10 @@ package br.com.leafcare.ui
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.HideImage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
@@ -11,8 +14,8 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.*
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.leafcare.R
 import br.com.leafcare.data.*
@@ -28,15 +31,29 @@ fun ResultScreen(id: String, vm: LeafCareViewModel, onBack: () -> Unit, onCamera
     val flow = remember(id) { vm.observeAnalysis(id) }
     val row by flow.collectAsStateWithLifecycle(initialValue = null)
     var confirmDelete by remember { mutableStateOf(false) }
-    val analysis = row
-    if (analysis == null) Column(Modifier.padding(24.dp)) {
-        Text(stringResource(R.string.loading_analysis))
-        TextButton(onClick = onBack) { Text(stringResource(R.string.button_back)) }
+    val loaded = row?.takeIf { it.deletedAt == null }
+    // Once shown, an analysis that disappears (deleted here or by sync) returns to the history.
+    var wasLoaded by remember(id) { mutableStateOf(false) }
+    LaunchedEffect(loaded == null) {
+        if (loaded != null) wasLoaded = true
+        else if (wasLoaded) onBack()
+    }
+    val analysis = loaded
+    if (analysis == null) Column(Modifier.fillMaxSize().background(Color.White).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
+        CircularProgressIndicator(color = LeafColors.Green)
+        Text(stringResource(R.string.loading_analysis), style = MaterialTheme.typography.bodyMedium, color = LeafColors.Muted)
+        LeafButton(stringResource(R.string.button_back), onBack, secondary = true)
     } else ResultContent(analysis, vm.getDiseaseInfo(analysis.classId), vm.getPhoto(analysis.photoName), onBack, onCamera, { confirmDelete = true })
-    if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text(stringResource(R.string.delete_dialog_title)) },
-        text = { Text(stringResource(R.string.delete_dialog_message)) },
-        confirmButton = { TextButton(onClick = { confirmDelete = false; vm.delete(id, onBack) }) { Text(stringResource(R.string.button_confirm_delete)) } },
-        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.button_cancel)) } })
+    if (confirmDelete) LeafDialog(
+        title = stringResource(R.string.delete_dialog_title),
+        onDismiss = { confirmDelete = false },
+        message = stringResource(R.string.delete_dialog_message),
+        actions = {
+            LeafButton(stringResource(R.string.button_confirm_delete), { confirmDelete = false; vm.delete(id, onBack) }, danger = true)
+            LeafButton(stringResource(R.string.button_cancel), { confirmDelete = false }, secondary = true)
+        },
+    )
 }
 
 @Composable
@@ -46,10 +63,21 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
     var enlarged by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().background(Color.White).verticalScroll(rememberScrollState())) {
         Box(Modifier.fillMaxWidth().height(256.dp).background(Color(0xFF1E3521))) {
-            AsyncImage(photo, stringResource(R.string.cd_photo_analyzed), Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            val unavailable = rememberPhotoUnavailable(analysis, photo)
+            if (unavailable) {
+                Column(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)) {
+                    Icon(androidx.compose.material.icons.Icons.Outlined.HideImage, null, Modifier.size(36.dp), tint = Color.White.copy(alpha = .85f))
+                    Text(stringResource(R.string.photo_unavailable_title), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                    Text(stringResource(if (analysis.inconclusive) R.string.photo_unavailable_inconclusive else R.string.photo_unavailable_local),
+                        color = Color.White.copy(alpha = .8f), fontSize = 13.sp, lineHeight = 18.sp, textAlign = TextAlign.Center)
+                }
+            } else {
+                AsyncImage(rememberAnalysisPhoto(analysis, photo), stringResource(R.string.cd_photo_analyzed), Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(0f to Color(0x61050F06), .38f to Color.Transparent, 1f to Color(0x40050F06))))
             Box(Modifier.padding(start = 16.dp, top = 18.dp)) { RoundIconButton(R.drawable.v3_back_light, stringResource(R.string.camera_back_desc), onBack, dark = true) }
-            Text(stringResource(R.string.cd_photo_analyzed), Modifier.align(Alignment.TopEnd).padding(top = 31.dp, end = 22.dp), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            if (!unavailable) Text(stringResource(R.string.cd_photo_analyzed), Modifier.align(Alignment.TopEnd).padding(top = 31.dp, end = 22.dp), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
         Column(Modifier.padding(horizontal = 22.dp, vertical = 24.dp)) {
             Text(if (analysis.inconclusive) stringResource(R.string.result_inconclusive_title) else stringResource(R.string.result_identified_title), color = LeafColors.Green, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.54.sp)
@@ -64,7 +92,7 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
                     Text(percent(analysis.confidence), color = LeafColors.Green, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.confidence_label), fontSize = 12.sp, color = LeafColors.Muted)
                 }
-                Box(Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(99.dp)).background(Color(0xFFE4EBE4))) {
+                Box(Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(99.dp)).background(LeafColors.Border)) {
                     Box(Modifier.fillMaxHeight().fillMaxWidth(analysis.confidence.coerceIn(0f,1f)).background(LeafColors.Green, RoundedCornerShape(99.dp)))
                 }
             }
@@ -77,7 +105,10 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
                     Text(stringResource(R.string.disclaimer_message), color = Color(0xFF6B5714), fontSize = 13.sp, lineHeight = 19.sp)
                 }
             }
-            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) stringResource(R.string.top3_hide) else stringResource(R.string.top3_show), fontSize = 13.sp) }
+            // No horizontal inset: aligns with the content edge like the rest of the column.
+            TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp)) {
+                Text(if (expanded) stringResource(R.string.top3_hide) else stringResource(R.string.top3_show), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
             if (expanded) {
                 repeat(top3.length()) { index ->
                     val p = top3.getJSONObject(index)
@@ -103,9 +134,9 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
                 Section(stringResource(R.string.section_symptoms)) {
                     Column(Modifier.fillMaxWidth().border(1.dp, LeafColors.Border, RoundedCornerShape(15.dp))) {
                         Symptom(stringResource(R.string.symptom_appearance), disease.appearance.ifBlank { disease.symptoms.joinToString(" ") })
-                        HorizontalDivider(color = Color(0xFFE8EDE8))
+                        HorizontalDivider(color = LeafColors.Border)
                         Symptom(stringResource(R.string.symptom_region), disease.affectedRegion.ifBlank { stringResource(R.string.symptom_region_fallback) })
-                        HorizontalDivider(color = Color(0xFFE8EDE8))
+                        HorizontalDivider(color = LeafColors.Border)
                         Symptom(stringResource(R.string.symptom_evolution), disease.symptomEvolution.ifBlank { stringResource(R.string.symptom_evolution_fallback) })
                     }
                 }
@@ -126,12 +157,19 @@ fun ResultContent(analysis: AnalysisEntity, disease: DiseaseInfo, photo: Any, on
             TextButton(onClick = onDelete, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text(stringResource(R.string.button_delete), color = MaterialTheme.colorScheme.error) }
         }
     }
-    enlarged?.let { asset -> Dialog(onDismissRequest = { enlarged = null }) {
-        Surface(shape = RoundedCornerShape(16.dp)) { Column {
-            AsyncImage(asset, stringResource(R.string.cd_enlarged_reference), Modifier.fillMaxWidth().aspectRatio(1f), contentScale = ContentScale.Fit)
-            TextButton(onClick = { enlarged = null }) { Text(stringResource(R.string.button_close)) }
-        } }
-    } }
+    enlarged?.let { asset ->
+        // Photo-only dialog: tap outside, back or the corner button closes it.
+        LeafDialogWindow({ enlarged = null }) {
+            Box {
+                AsyncImage(asset, stringResource(R.string.cd_enlarged_reference), Modifier.fillMaxWidth().aspectRatio(1f).background(Color(0xFF17241B)), contentScale = ContentScale.Fit)
+                IconButton(onClick = { enlarged = null }, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                    Box(Modifier.size(36.dp).background(Color.White.copy(alpha = .92f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(androidx.compose.material.icons.Icons.Outlined.Close, stringResource(R.string.button_close), Modifier.size(20.dp), tint = LeafColors.Text)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

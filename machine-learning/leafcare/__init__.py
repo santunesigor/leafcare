@@ -1,1 +1,1 @@
-"""LeafCare: preparação, treinamento e inferência local."""
+"""LeafCare: preprocessing and local inference with the app model contract."""

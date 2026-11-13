@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -22,12 +21,17 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.leafcare.data.DiseaseCatalog
+import br.com.leafcare.ui.LeafButton
 import br.com.leafcare.ui.LeafColors
+import br.com.leafcare.ui.percent
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -36,23 +40,17 @@ import org.json.JSONObject
     val back = { if (!state.busy) actions.load("triage", JSONObject()) }
     BackHandler(onBack = back)
     Column(Modifier.fillMaxSize().background(LeafColors.Pale)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = back, enabled = !state.busy) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar ao painel de triagens") }
-            Column(Modifier.weight(1f)) {
-                Text("Avaliação", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("${reviewStatuses[state.photoFilterStatus]} · ${state.reviewedCount} salvas", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-            }
+        AdminTopBar("Avaliação", listOfNotNull(reviewStatuses[state.photoFilterStatus], "cópias de treino".takeIf { JSONObject(state.photoQuery).optString("training") == "true" }, "${state.reviewedCount} salvas").joinToString(" · "), back, "Voltar ao painel de triagens", state.busy, backEnabled = !state.busy) {
             IconButton(onClick = { filtersOpen = true }, enabled = !state.busy) { Icon(Icons.Outlined.Tune, "Filtrar fotos", tint = LeafColors.Green) }
             IconButton(onClick = actions.refresh, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "Atualizar fila", tint = LeafColors.Green) }
         }
-        Box(Modifier.fillMaxWidth().height(3.dp)) { if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = LeafColors.Green) }
         if (state.rows.isEmpty()) {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
                 state.error?.let { AdminNotice(it, error = true); TextButton(onClick = actions.retryPhoto, enabled = !state.busy) { Text("Tentar novamente") } }
                 AdminEmpty(if (state.busy) "Carregando fila…" else if (state.reviewedCount > 0) "Fila concluída!" else "Sem fotos nesta seleção",
                     if (state.busy) "Buscando fotos para revisar." else state.message ?: "Altere os filtros ou volte mais tarde.", Icons.Outlined.TaskAlt)
                 if (!state.busy) {
-                    Button(onClick = back, modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(14.dp)) { Text("Voltar ao painel") }
+                    LeafButton("Voltar ao painel", back, modifier = Modifier.padding(horizontal = 20.dp))
                     TextButton(onClick = actions.refresh) { Text("Atualizar fila") }
                 }
             }
@@ -108,11 +106,12 @@ import org.json.JSONObject
             Column(Modifier.fillMaxWidth().heightIn(max = 138.dp).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("PREVISÃO ORIGINAL", color = LeafColors.Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    AdminBadge(reviewLabel(row.optString("review_status")))
+                    TrainingBadge(row); Spacer(Modifier.width(6.dp))
+                    AdminBadge(reviewLabel(row.optString("review_status")), reviewColor(row.optString("review_status")))
                 }
                 Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${"%.1f".format(row.optDouble("confidence") * 100)}% de confiança", Modifier.weight(1f), color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
+                    Text("${percent(row.optDouble("confidence").toFloat())} de confiança", Modifier.weight(1f), color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
                     IconButton(onClick = { reviewStatus = "confirmed"; edit = true }, enabled = ready) { Icon(Icons.Outlined.EditNote, "Adicionar observação", tint = LeafColors.Green) }
                     TextButton(onClick = { details = true }, contentPadding = PaddingValues(horizontal = 8.dp)) { Icon(Icons.Outlined.Info, null, Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Detalhes", style = MaterialTheme.typography.labelMedium) }
                 }
@@ -128,8 +127,8 @@ import org.json.JSONObject
                     ReviewActionButton("Corrigir", Icons.Outlined.Edit, LeafColors.Green, ready, Modifier.weight(1f)) { reviewStatus = "corrected"; edit = true }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ReviewActionButton("Duvidosa", Icons.AutoMirrored.Outlined.HelpOutline, Color(0xFF99620A), ready, Modifier.weight(1f)) { reviewStatus = "uncertain"; edit = true }
-                    ReviewActionButton("Rejeitar", Icons.Outlined.HideImage, Color(0xFFAF3636), ready, Modifier.weight(1f)) { reviewStatus = "rejected"; edit = true }
+                    ReviewActionButton("Duvidosa", Icons.AutoMirrored.Outlined.HelpOutline, reviewColor("uncertain"), ready, Modifier.weight(1f)) { reviewStatus = "uncertain"; edit = true }
+                    ReviewActionButton("Rejeitar", Icons.Outlined.HideImage, reviewColor("rejected"), ready, Modifier.weight(1f)) { reviewStatus = "rejected"; edit = true }
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onClick = { actions.movePhoto(index - 1) }, enabled = index > 0 && !state.busy, contentPadding = PaddingValues(horizontal = 4.dp)) {
@@ -143,16 +142,18 @@ import org.json.JSONObject
         }
     }
     if (edit) AdminSheet("Sua avaliação", cancelEdit, dismissEnabled = !state.busy, footer = {
-        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = cancelEdit, enabled = !state.busy) { Text("Cancelar") }
-            Button(onClick = { submit(reviewStatus) }, enabled = ready, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) { Text("Salvar e próxima") }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Narrower inner padding keeps both labels on one line at 320dp.
+            val compact = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            LeafButton("Cancelar", cancelEdit, secondary = true, modifier = Modifier.weight(1f), enabled = !state.busy, contentPadding = compact)
+            LeafButton("Salvar e próxima", { submit(reviewStatus) }, modifier = Modifier.weight(1.6f), enabled = ready, contentPadding = compact)
         }
     }) {
         item { Text(when (reviewStatus) { "corrected" -> "Corrigir a classe prevista"; "uncertain" -> "Marcar como duvidosa"; "rejected" -> "Rejeitar esta foto"; else -> "Confirmar a previsão" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text("A previsão original será preservada.", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall) }
         state.error?.let { item { AdminNotice(it, error = true); TextButton(onClick = actions.retryPhoto, enabled = !state.busy) { Text(if (state.reviewConflict) "Recarregar revisão" else "Tentar novamente") } } }
         if (reviewStatus == "corrected") item { Choice("Classe revisada", selectedClass, classes.associateWith { catalog.get(it).name }, !state.busy) { selectedClass = it } }
-        item { OutlinedTextField(note, { if (it.length <= 2000) note = it }, label = { Text("Observação (opcional)") }, enabled = !state.busy, minLines = 2, maxLines = 5, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) }
+        item { OutlinedTextField(note, { if (it.length <= 2000) note = it }, label = { Text("Observação (opcional)") }, enabled = !state.busy, minLines = 2, maxLines = 5, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = leafFieldColors()) }
     }
     if (details) AdminSheet("Dados da foto", { details = false }) {
         item { AdminBadge("PREVISÃO ORIGINAL"); Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
@@ -160,7 +161,7 @@ import org.json.JSONObject
             val top3 = row.optJSONArray("top3") ?: JSONArray()
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 repeat(top3.length()) { i -> val p = top3.getJSONObject(i)
-                    Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${"%.1f".format(p.optDouble("confidence") * 100)}%", style = MaterialTheme.typography.bodyMedium)
+                    Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${percent(p.optDouble("confidence").toFloat())}", style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -204,22 +205,43 @@ import org.json.JSONObject
     }
 }
 
-/** Bounded sheet: only fields scroll; system bars and IME are consumed once. */
+/**
+ * Sheet that hugs its content up to [heightFraction] of the window: only the
+ * list scrolls, the header and an optional footer stay put. System bars and
+ * IME are consumed once. The close button in the header is the only close
+ * control unless a footer adds actions.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun AdminSheet(
     title: String, onClose: () -> Unit, dismissEnabled: Boolean = true, heightFraction: Float = .94f,
-    footer: @Composable () -> Unit = { TextButton(onClick = onClose, enabled = dismissEnabled, modifier = Modifier.fillMaxWidth().padding(8.dp)) { Text("Fechar") } },
+    footer: (@Composable () -> Unit)? = null,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = { if (dismissEnabled) onClose() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { dismissEnabled || it != SheetValue.Hidden }),
-        containerColor = LeafColors.Pale, contentWindowInsets = { WindowInsets(0, 0, 0, 0) }, dragHandle = null) {
-        Column(Modifier.fillMaxWidth().fillMaxHeight(heightFraction).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).navigationBarsPadding().imePadding()) {
-            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                IconButton(onClick = onClose, enabled = dismissEnabled) { Icon(Icons.Outlined.Close, "Fechar painel") }
-            }
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
-            Surface(color = Color.White, shadowElevation = 6.dp) { footer() }
+        containerColor = LeafColors.Pale, contentColor = LeafColors.Text, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }, dragHandle = null) {
+        Column(Modifier.fillMaxWidth().maxHeightFraction(heightFraction).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).navigationBarsPadding().imePadding()) {
+            AdminSheetHeader(title, onClose, dismissEnabled)
+            LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth(), contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+            footer?.let { Surface(color = Color.White, shadowElevation = 6.dp) { it() } }
         }
     }
+}
+
+/** Sheet header: grab handle, title and close button in one compact block. */
+@Composable internal fun AdminSheetHeader(title: String, onClose: () -> Unit, enabled: Boolean = true) {
+    Column(Modifier.fillMaxWidth()) {
+        Box(Modifier.padding(top = 8.dp).size(width = 32.dp, height = 4.dp).background(LeafColors.Border, RoundedCornerShape(2.dp)).align(Alignment.CenterHorizontally))
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, Modifier.weight(1f).semantics { heading() }, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+            IconButton(onClick = onClose, enabled = enabled) { Icon(Icons.Outlined.Close, "Fechar painel") }
+        }
+    }
+}
+
+/** Caps the height at a fraction of the incoming maximum without forcing it. */
+internal fun Modifier.maxHeightFraction(fraction: Float) = layout { measurable, constraints ->
+    val max = if (constraints.hasBoundedHeight) (constraints.maxHeight * fraction).toInt() else constraints.maxHeight
+    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = max))
+    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
 }

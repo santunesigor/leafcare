@@ -1,4 +1,4 @@
-"""Contratos RGB uint8 -> float32: aluno atual e bilinear histórico."""
+"""App image contract: decode like Android, then RGB uint8 -> float32 [1,224,224,3]."""
 from pathlib import Path
 from io import BytesIO
 import numpy as np
@@ -34,32 +34,6 @@ def decode_rgb(path):
         return np.asarray(oriented.convert("RGB"), dtype=np.uint8).copy()
 
 
-def resize_rgb(rgb, size=224):
-    """Recorte central; bilinear com coordenadas half-pixel e arredondamento inteiro.
-
-    Nenhum filtro ou normalização implícito de Pillow/Bitmap é utilizado.
-    """
-    if rgb.ndim != 3 or rgb.shape[2] != 3 or rgb.dtype != np.uint8:
-        raise ValueError("Esperado RGB uint8 H×W×3.")
-    height, width, _ = rgb.shape
-    side = min(width, height)
-    if side < 1 or size < 1:
-        raise ValueError("Imagem vazia.")
-    left, top = (width - side) // 2, (height - side) // 2
-    cropped = rgb[top:top + side, left:left + side].astype(np.int64)
-    denominator = 2 * size
-    positions = np.clip((2 * np.arange(size) + 1) * side - size, 0, (side - 1) * denominator)
-    lo, fraction = positions // denominator, positions % denominator
-    hi = np.minimum(lo + 1, side - 1)
-    wx = fraction[None, :, None]
-    wy = fraction[:, None, None]
-    upper = cropped[lo[:, None], lo[None, :]] * (denominator - wx) + cropped[lo[:, None], hi[None, :]] * wx
-    lower = cropped[hi[:, None], lo[None, :]] * (denominator - wx) + cropped[hi[:, None], hi[None, :]] * wx
-    divisor = denominator * denominator
-    result = (upper * (denominator - wy) + lower * wy + divisor // 2) // divisor
-    return result.astype(np.float32)
-
-
 DISTILLED_RESIZE = "resize_shorter_256_bicubic_center_crop_224_v1"
 
 
@@ -77,10 +51,5 @@ def resize_distilled_rgb(rgb):
     return np.asarray(image.crop((left, top, left + 224, top + 224)), dtype=np.float32).copy()
 
 
-def preprocess(path, size=224, resize="center_crop_bilinear_integer_v1"):
-    rgb = decode_rgb(path)
-    if resize == DISTILLED_RESIZE and size == 224:
-        return resize_distilled_rgb(rgb)[None, ...]
-    if resize != "center_crop_bilinear_integer_v1":
-        raise ValueError("Contrato de preprocessing não suportado.")
-    return resize_rgb(rgb, size)[None, ...]
+def preprocess(path):
+    return resize_distilled_rgb(decode_rgb(path))[None, ...]

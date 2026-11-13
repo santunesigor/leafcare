@@ -95,12 +95,12 @@ class AuthBackButtonTest {
         // to signup and neither screen launches a browser or consent flow.
         vm.setScreen(AuthScreen.TermsOfUse)
         compose.onNodeWithText("Termos de Uso").assertIsDisplayed()
-        compose.onNodeWithText("Voltar ao cadastro").performClick()
+        compose.onNodeWithText("Voltar").performClick()
         compose.onNodeWithText("Crie sua conta").assertIsDisplayed()
 
         vm.setScreen(AuthScreen.PrivacyPolicy)
         compose.onNodeWithText("Política de Privacidade").assertIsDisplayed()
-        compose.onNodeWithText("Voltar ao cadastro").performClick()
+        compose.onNodeWithText("Voltar").performClick()
         compose.onNodeWithText("Crie sua conta").assertIsDisplayed()
     }
 
@@ -178,7 +178,7 @@ class AuthBackButtonTest {
         }
         compose.onNodeWithContentDescription("Voltar").performClick()
         compose.onNodeWithText("Cancelar recuperação?").assertExists().assertIsDisplayed()
-        compose.onNodeWithText("Continuar recuperação").assertExists()
+        compose.onNodeWithText("Continuar").assertExists()
         compose.onNodeWithText("Sair").assertExists()
     }
 
@@ -188,7 +188,7 @@ class AuthBackButtonTest {
             LeafCareTheme { NewPasswordScreen(vm, {}, confirmCancelRecovery = true) }
         }
         compose.onNodeWithContentDescription("Voltar").performClick()
-        compose.onNodeWithText("Continuar recuperação").performClick()
+        compose.onNodeWithText("Continuar").performClick()
         compose.onNodeWithText("Cancelar recuperação?").assertDoesNotExist()
         compose.onNodeWithText("Nova senha").assertExists()
     }
@@ -261,7 +261,7 @@ class AuthBackButtonTest {
         compose.waitForIdle()
 
         assert(vm.resetSending.value)
-        compose.onNodeWithText("Enviando...").assertExists().assertIsDisplayed()
+        compose.onNodeWithText("Enviando…").assertExists().assertIsDisplayed()
     }
 
     @Test fun forgotPassword_composeAlone_sendsNoRequest() {

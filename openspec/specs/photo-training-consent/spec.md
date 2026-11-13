@@ -6,75 +6,23 @@ Permitir que cada pessoa escolha, de forma informada e revogável, se fotos espe
 
 ## Requirements
 
-### Requirement: Coleta opcional e separada do histórico
-
-O app SHALL exigir aceite explícito dos documentos atuais, consentimento geral opcional e autorização individual antes de coletar cada foto. A opção SHALL ficar desmarcada por padrão e SHALL NOT surgir do cadastro ou do envio ao histórico. A falta de CNPJ, endereço institucional ou substituto do contato SHALL NOT bloquear a coleta. A recusa SHALL manter análise local e histórico disponíveis.
-
-#### Scenario: Primeira utilização
-- **WHEN** a conta ainda não tem consentimento de treinamento
-- **THEN** a opção aparece desmarcada e nenhuma foto é enviada para treinamento
-- **AND** câmera, galeria, análise local e histórico continuam disponíveis
-
-#### Scenario: Informações ainda não publicadas
-- **WHEN** o projeto não possui CNPJ, endereço institucional ou pessoa substituta do contato
-- **THEN** a pessoa ainda pode decidir pelo consentimento opcional após ler os documentos atuais
-- **AND** nenhum dado é enviado sem as escolhas geral e individual
-
-#### Scenario: Aceite explícito e autorização por foto
-- **WHEN** a pessoa aceitou os documentos atuais, ativou a opção geral e autorizou uma foto específica
-- **THEN** o app pode sincronizar aquela foto para o bucket privado após confirmação do servidor
-- **AND** fotos sem as duas escolhas continuam fora da coleta
-
-### Requirement: Consentimento versionado e opcional
-
-O sistema SHALL registrar por conta a decisão explícita, a versão dos termos de treinamento e a data da autorização, gerada pelo servidor. A decisão inicial e qualquer versão de termos ainda não aceita SHALL permanecer negadas, sem impedir a análise normal. Uma concessão SHALL exigir aceite das versões atuais dos Termos e da Política.
-
-#### Scenario: Primeira utilização
-- **WHEN** uma conta ainda não tem decisão registrada
-- **THEN** o app mostra o consentimento como não autorizado
-- **AND** câmera, galeria, classificação e histórico continuam disponíveis
-
-#### Scenario: Consentimento registrado offline
-- **WHEN** a pessoa aceita uma versão dos termos sem conexão
-- **THEN** a decisão e a versão ficam registradas localmente
-- **AND** nenhuma imagem de treinamento é enviada antes da confirmação remota
-
-#### Scenario: Nova versão dos termos
-- **WHEN** a versão apresentada difere da versão aceita
-- **THEN** o sistema suspende novas autorizações de fotos até uma nova escolha explícita
-
 ### Requirement: Reaceite de versões materiais por contas existentes
 
-O app SHALL verificar no servidor se a conta autenticada possui recibo das versões atuais dos Termos e da Política. Quando faltar recibo, SHALL apresentar os documentos no próprio app e exigir confirmação explícita antes de liberar funções conectadas. O recibo SHALL ser criado no servidor somente após essa ação, com timestamp do servidor, e SHALL ser imutável. Falha de rede SHALL NOT criar recibo nem impedir classificação local offline.
+O app SHALL verificar no servidor o recibo das versões atuais dos Termos e da Política e o consentimento de treinamento vigente. Se faltar algum, SHALL apresentar os documentos no app e exigir confirmação explícita antes de liberar o uso. O recibo SHALL ser criado só no servidor, após essa ação, com timestamp do servidor, e SHALL ser imutável. Sem rede, nenhum recibo SHALL ser criado, e o app SHALL funcionar só se o aparelho guardar consentimento vigente da conta.
 
 #### Scenario: Conta existente sem recibo atual
 - **WHEN** uma conta autenticada não tem recibo das versões atuais e há conexão
 - **THEN** os documentos atuais são apresentados dentro do app
-- **AND** o recibo só é criado após confirmação explícita
+- **AND** o recibo e o consentimento só são criados após confirmação explícita
 
 #### Scenario: Reaceite indisponível sem rede
-- **WHEN** a verificação ou o registro de aceite falha por indisponibilidade de rede
-- **THEN** nenhum recibo é criado pelo app
-- **AND** classificação local continua disponível
+- **WHEN** a verificação falha por indisponibilidade de rede e o aparelho guarda consentimento vigente da conta
+- **THEN** classificação local e histórico continuam disponíveis
 - **AND** o app verifica novamente ao retornar ao primeiro plano
 
-### Requirement: Autorização individual de foto
-
-Cada foto elegível SHALL ter uma escolha afirmativa própria vinculada à conta e à versão dos termos aceita. O envio de foto para histórico SHALL NOT constituir autorização para treinamento, e fotos anteriores à autorização SHALL permanecer inelegíveis.
-
-#### Scenario: Foto autorizada
-- **WHEN** a autorização vigente está ativa e a pessoa marca a opção de treinamento para uma foto
-- **THEN** o sistema registra a decisão para aquele identificador de análise
-- **AND** mantém separadas a cópia de histórico e a cópia de treinamento
-
-#### Scenario: Foto sem autorização
-- **WHEN** a opção individual está desmarcada ou a autorização global não está ativa
-- **THEN** nenhum byte da foto é enviado para treinamento
-- **AND** o fluxo comum de análise e histórico continua
-
-#### Scenario: Fotos históricas
-- **WHEN** uma foto foi enviada ao histórico antes do consentimento
-- **THEN** ela não é copiada nem marcada como elegível para treinamento automaticamente
+#### Scenario: Sem rede sem aceite no aparelho
+- **WHEN** a verificação falha por indisponibilidade de rede e o aparelho não guarda consentimento vigente
+- **THEN** o app mantém a tela de aceite e informa que o aceite precisa de conexão
 
 ### Requirement: Confirmação remota antes do envio
 
@@ -91,11 +39,11 @@ O sistema SHALL enviar bytes de treinamento somente após o servidor confirmar a
 
 ### Requirement: Revogação e exclusão de cópias
 
-Uma revogação SHALL bloquear novos envios imediatamente no aparelho e SHALL ser sincronizada antes de qualquer upload de treinamento pendente. Após confirmação remota, o sistema SHALL excluir as cópias de treinamento armazenadas e preservar as fotos de histórico e análises existentes.
+Uma revogação SHALL bloquear novos envios imediatamente no aparelho e SHALL ser sincronizada antes de qualquer upload de treinamento pendente, mesmo sem aceite dos documentos atuais, antes de um novo aceite e, como tentativa, ao sair da conta. O servidor SHALL aceitar revogações com qualquer versão de consentimento. Após confirmação remota, as cópias de treinamento SHALL ser excluídas de fato, preservando histórico e análises. Depois de revogar, o app SHALL exigir um novo aceite.
 
 #### Scenario: Revogação offline
 - **WHEN** a pessoa revoga o consentimento sem conexão
-- **THEN** o estado local fica negado e nenhum upload de treinamento ocorre
+- **THEN** o estado local fica negado, nenhum upload de treinamento ocorre e o app volta para a tela de aceite
 - **AND** a exclusão remota permanece pendente até a conexão retornar
 
 #### Scenario: Sincronização da revogação
@@ -103,55 +51,34 @@ Uma revogação SHALL bloquear novos envios imediatamente no aparelho e SHALL se
 - **THEN** o servidor registra a revogação e bloqueia novos uploads antes de excluir cópias de treinamento
 - **AND** o fluxo não altera o histórico comum
 
+#### Scenario: Novo aceite após revogar
+- **WHEN** a pessoa aceita os documentos atuais depois de revogar
+- **THEN** o servidor registra o consentimento novamente e o app volta a funcionar
+
+### Requirement: Exclusão de cópias com a análise ou a conta
+
+Excluir uma análise SHALL excluir sua cópia de treinamento, inclusive com envios pausados. Excluir a conta SHALL remover as cópias de treinamento antes da conta.
+
+#### Scenario: Análise excluída
+- **WHEN** a pessoa exclui uma análise com cópia de treinamento
+- **THEN** a cópia é removida do Storage quando a exclusão sincroniza, mesmo com envios pausados
+
 ### Requirement: Elegibilidade para o conjunto de treinamento
 
-O pipeline SHALL incluir somente imagens com consentimento vigente, autorização individual confirmada, qualidade aprovada e classe validada por revisão humana. Identificadores e metadados desnecessários SHALL ser removidos antes da exportação.
+O conjunto de treinamento SHALL incluir somente cópias de análises ativas e conclusivas, feitas depois do primeiro aceite dos documentos v1.4 ou v1.5 da conta, com consentimento e autorização 1.2 vigentes, conta fora de exclusão, cópia dentro do prazo aplicável, qualidade aprovada e classe confirmada ou corrigida por revisão humana. O rótulo de treino SHALL ser a classe revisada. Identificadores de conta e de análise e metadados EXIF SHALL ser removidos antes de a foto sair do Supabase.
 
 #### Scenario: Foto aprovada
-- **WHEN** consentimento e escolha individual estão vigentes, a qualidade passa e há classe confirmada ou corrigida por pessoa revisora
-- **THEN** a imagem pode ser exportada sem identificadores de conta
+- **WHEN** todas as condições estão cumpridas e há classe confirmada ou corrigida
+- **THEN** a cópia fica pronta e pode entrar no conjunto com a classe revisada, sem identificadores
 
 #### Scenario: Falta de revisão ou qualidade
-- **WHEN** falta autorização, revisão humana válida ou aprovação de qualidade
-- **THEN** a imagem é excluída da exportação
+- **WHEN** falta revisão humana válida ou aprovação de qualidade
+- **THEN** a imagem fica fora do conjunto
 - **AND** a classe prevista automaticamente não é tratada como rótulo confirmado
 
-### Requirement: Informação transparente e retenção
-
-O app SHALL disponibilizar Termos e Política antes da autorização, explicando finalidade, dados usados, armazenamento, retenção, revogação e limites de remoção após treinamento. O histórico remoto SHALL ser mantido enquanto a conta estiver ativa, salvo exclusão solicitada; cópias de treinamento SHALL expirar em até 90 dias e exportações locais em até 30 dias.
-
-#### Scenario: Consultar informações
-- **WHEN** a pessoa abre as informações sobre uso de fotos
-- **THEN** consegue consultar os termos e o aviso de privacidade sem aceitar o consentimento
-
-#### Scenario: Contato de privacidade no app
-- **WHEN** a pessoa consulta as informações de privacidade
-- **THEN** encontra o endereço de contato publicado no app
-- **AND** pode copiá-lo sem abrir navegador ou site externo
-
-#### Scenario: Retenção do histórico
-- **WHEN** uma conta está ativa e não solicitou exclusão de uma análise
-- **THEN** o histórico e a foto permanecem disponíveis para a finalidade de histórico
-- **AND** a pessoa pode excluir o item ou encerrar a conta
-
-#### Scenario: Expiração de cópia de treinamento
-- **WHEN** uma cópia de treinamento alcança 90 dias desde o upload
-- **THEN** a rotina automática remove o objeto do Storage
-- **AND** uma revogação remove a cópia antes desse prazo
-
-#### Scenario: Expiração de exportação
-- **WHEN** uma exportação local alcança 30 dias desde sua criação
-- **THEN** o processo de manutenção remove a pasta privada da exportação
-
-#### Scenario: Exclusão e backups
-- **WHEN** os dados ativos são excluídos a pedido da pessoa
-- **THEN** os sistemas ativos processam a exclusão em até 30 dias
-- **AND** exportações manuais do banco guardadas pela equipe no Google Drive podem persistir por até 30 dias
-- **AND** a Política informa que exportações SQL não incluem arquivos do Storage
-
-#### Scenario: Modelo já treinado
-- **WHEN** uma cópia de treinamento é excluída após a revogação
-- **THEN** a informação apresentada explica que pesos de modelos já treinados não são automaticamente revertidos
+#### Scenario: Foto anterior ao aceite
+- **WHEN** a análise foi feita antes do primeiro aceite dos documentos v1.4 ou v1.5 da conta
+- **THEN** a cópia não entra no conjunto
 
 ### Requirement: Identificação do projeto e contato
 
@@ -202,3 +129,78 @@ Os Termos de Uso SHALL informar que o LeafCare é destinado a pessoas com 18 ano
 #### Scenario: Termos gerais não autorizam treinamento
 - **WHEN** a pessoa lê ou aceita os termos gerais para criar uma conta
 - **THEN** nenhuma autorização global ou individual para treinamento de fotos é criada
+
+### Requirement: Consentimento de treinamento como condição de uso
+
+O uso do app SHALL exigir o aceite dos Termos de Uso e da Política de Privacidade atuais, que incluem o uso das fotos analisadas para treinamento. O aceite SHALL registrar no servidor, em uma única operação e com timestamp do servidor, o recibo dos documentos e o consentimento de treinamento vigente. O cadastro e a tela de aceite SHALL destacar essa condição fora do texto integral dos documentos.
+
+#### Scenario: Cadastro
+- **WHEN** a pessoa cria a conta com os documentos atuais
+- **THEN** o servidor registra o recibo e o consentimento de treinamento vigente
+
+#### Scenario: Conta sem aceite atual
+- **WHEN** uma conta autenticada não tem recibo dos documentos atuais ou consentimento vigente
+- **THEN** o app apresenta a tela de aceite e não libera câmera, galeria, análise nem histórico
+- **AND** a pessoa pode aceitar ou sair da conta
+
+### Requirement: Autorização automática das análises
+
+Cada análise conclusiva feita por uma conta com consentimento vigente SHALL ser autorizada para treinamento, sem confirmação adicional por foto. Fotos analisadas antes do aceite vigente e fotos de resultados inconclusivos SHALL permanecer fora da coleta. O servidor SHALL aceitar uma cópia de treinamento somente para análise ativa e conclusiva de conta liberada para envio (sem pausa, sem exclusão pendente e após o corte).
+
+#### Scenario: Nova análise
+- **WHEN** a pessoa captura ou escolhe uma foto com consentimento vigente
+- **THEN** a análise começa sem modal de confirmação
+- **AND** a foto é autorizada para treinamento e enviada após a confirmação remota
+
+#### Scenario: Resultado inconclusivo
+- **WHEN** a análise termina como inconclusiva
+- **THEN** nenhuma autorização de treinamento é criada e a foto não é copiada
+
+#### Scenario: Fotos anteriores
+- **WHEN** uma foto foi analisada antes do aceite vigente
+- **THEN** ela não é copiada nem marcada como elegível automaticamente
+
+### Requirement: Informação transparente e retenção do conjunto de treinamento
+
+O app SHALL disponibilizar Termos e Política explicando finalidade, dados usados, armazenamento, retenção, revogação e limites de remoção após o treinamento. O histórico remoto SHALL ser mantido enquanto a conta estiver ativa, salvo exclusão solicitada.
+
+#### Scenario: Consultar informações
+- **WHEN** a pessoa abre as informações sobre uso de fotos
+- **THEN** consegue consultar os termos e o aviso de privacidade sem aceitar o consentimento
+
+#### Scenario: Contato de privacidade no app
+- **WHEN** a pessoa consulta as informações de privacidade
+- **THEN** encontra o endereço de contato publicado no app
+- **AND** pode copiá-lo sem abrir navegador ou site externo
+
+#### Scenario: Retenção do histórico
+- **WHEN** uma conta está ativa e não solicitou exclusão de uma análise
+- **THEN** o histórico e a foto permanecem disponíveis para a finalidade de histórico
+- **AND** a pessoa pode excluir o item ou encerrar a conta
+
+#### Scenario: Exclusão e backups
+- **WHEN** os dados ativos são excluídos a pedido da pessoa
+- **THEN** os sistemas ativos processam a exclusão em até 30 dias
+- **AND** exportações manuais do banco guardadas pela equipe no Google Drive podem persistir por até 30 dias
+- **AND** a Política informa que exportações SQL não incluem arquivos do Storage
+
+#### Scenario: Modelo já treinado
+- **WHEN** uma cópia de treinamento é excluída após a revogação
+- **THEN** a informação apresentada explica que pesos de modelos já treinados não são automaticamente revertidos
+
+### Requirement: Retenção das cópias de treinamento
+
+Cópias de fotos analisadas depois do aceite da v1.5 SHALL ser mantidas no conjunto de treinamento por tempo indeterminado, até a revogação, a exclusão da análise ou a exclusão da conta. Cópias de fotos analisadas sob a v1.4 SHALL expirar em até 90 dias do envio. A cópia local do conjunto SHALL acompanhar o servidor a cada sincronização.
+
+#### Scenario: Cópia permanente
+- **WHEN** uma cópia de foto analisada depois do aceite da v1.5 passa de 90 dias
+- **THEN** ela continua no conjunto de treinamento
+- **AND** uma revogação, exclusão da análise ou exclusão da conta a remove
+
+#### Scenario: Expiração de cópia v1.4
+- **WHEN** uma cópia de foto analisada sob a v1.4 alcança 90 dias desde o upload
+- **THEN** a rotina automática remove o objeto do Storage
+
+#### Scenario: Cópia local
+- **WHEN** uma foto sai do conjunto no servidor
+- **THEN** a sincronização seguinte a apaga da cópia local

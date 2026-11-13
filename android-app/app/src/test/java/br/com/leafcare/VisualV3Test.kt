@@ -10,12 +10,14 @@ import android.graphics.Canvas
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import br.com.leafcare.ui.*
 import br.com.leafcare.data.*
 import coil.imageLoader
 import java.io.File
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -134,6 +136,45 @@ class VisualV3Test {
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         assertTrue(bitmap.width >= 300)
     }
+    @Test fun restoredAnalysisWithoutPhotoExplainsWhereThePhotoIs() {
+        val missing = File(compose.activity.cacheDir, "never-downloaded.img")
+        val inconclusive = AnalysisEntity("inc", "never-downloaded.img", 1791298800000, "brown_spot", "Mancha-marrom", "Alternaria spp.", .28f,
+            """[{"name":"Mancha-marrom","confidence":0.28}]""", true, .5f, 14.0, "fixture", syncStatus = SyncState.SYNCED,
+            photoSyncStatus = PhotoSyncState.LOCAL_ONLY)
+        assertTrue(isPhotoUnavailable(inconclusive, missing))
+        assertFalse(isPhotoUnavailable(inconclusive.copy(photoSyncStatus = PhotoSyncState.REMOTE_ONLY), missing))
+        val present = File(compose.activity.cacheDir, "present.img").apply { writeBytes(byteArrayOf(1)) }
+        assertFalse(isPhotoUnavailable(inconclusive, present))
+        compose.setContent { LeafCareTheme { HistoryContent(listOf(inconclusive), {}, {}, { missing }, null) } }
+        compose.onNodeWithContentDescription("Foto disponível só no aparelho em que a análise foi feita").assertIsDisplayed()
+        capture("historico-foto-so-no-aparelho")
+    }
+    @Test fun restoredInconclusiveResultSaysThePhotoStayedOnTheDevice() {
+        val missing = File(compose.activity.cacheDir, "never-downloaded.img")
+        val inconclusive = AnalysisEntity("inc", "never-downloaded.img", 1791298800000, "brown_spot", "Mancha-marrom", "Alternaria spp.", .28f,
+            """[{"name":"Mancha-marrom","confidence":0.28}]""", true, .5f, 14.0, "fixture", syncStatus = SyncState.SYNCED,
+            photoSyncStatus = PhotoSyncState.LOCAL_ONLY)
+        val disease = DiseaseInfo("Mancha-marrom", "Alternaria spp.", "Doença fúngica.", listOf("Manchas."), "Umidade.", "Procure um técnico.", false)
+        compose.setContent { LeafCareTheme { ResultContent(inconclusive, disease, missing, {}, {}, {}) } }
+        compose.onNodeWithText("Foto não guardada na conta").assertIsDisplayed()
+        compose.onNodeWithText("Fotos de resultados inconclusivos não são enviadas para a conta; ficam só no aparelho em que a análise foi feita. O resultado continua salvo.").assertIsDisplayed()
+        capture("resultado-foto-so-no-aparelho")
+    }
+    @Test fun trainingConditionCardIsReadable() {
+        compose.setContent {
+            LeafCareTheme { Surface { Box(Modifier.fillMaxSize().padding(24.dp)) { br.com.leafcare.ui.auth.TrainingConditionCard() } } }
+        }
+        compose.onNodeWithText("Suas fotos ajudam a treinar o modelo").assertIsDisplayed()
+        compose.onNodeWithText("Ao aceitar, você autoriza esse uso. Ele é condição para usar o LeafCare.").assertIsDisplayed()
+        capture("legal-training-card")
+    }
+    @Test fun profileUsesSharedScaffoldAndButtons() {
+        val vm = br.com.leafcare.auth.AuthViewModel(compose.activity.application,
+            br.com.leafcare.auth.AuthRepository(br.com.leafcare.auth.FakeBackend()), br.com.leafcare.auth.FakeRecoveryPendingStore())
+        compose.setContent { LeafCareTheme { br.com.leafcare.ui.auth.ProfileScreen(vm, {}) } }
+        compose.onNodeWithText("Sair da conta").assertIsDisplayed()
+        capture("perfil-v3")
+    }
     @Test fun helpExamplesAndDismiss() {
         var dismissed = false
         compose.setContent { LeafCareTheme { Surface { HelpContent { dismissed = true } } } }
@@ -152,6 +193,21 @@ class VisualV3Test {
         compose.onNodeWithContentDescription("Abrir galeria").performClick()
         compose.onNodeWithContentDescription("Fotografar").performClick()
         assertTrue(helped && gallery && captured)
+    }
+    @Test fun flashlightShowsItsStateAndToggles() {
+        val on = androidx.compose.runtime.mutableStateOf(false)
+        compose.setContent { LeafCareTheme { CameraContent({}, {}, {}, {}, { on.value = !on.value }, {}, true, true, true, true, on.value, true) {
+            Image(painterResource(R.drawable.v3_example_dark), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } } }
+        compose.onNodeWithContentDescription("Ligar lanterna").assertIsEnabled().performClick()
+        compose.onNodeWithContentDescription("Desligar lanterna").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Ligada"))
+        capture("camera-lanterna-ligada")
+        compose.onNodeWithContentDescription("Desligar lanterna").performClick()
+        compose.onNodeWithContentDescription("Ligar lanterna").assertExists()
+    }
+    @Test fun flashlightIsDisabledWithoutFlashUnit() {
+        compose.setContent { LeafCareTheme { CameraContent({}, {}, {}, {}, {}, {}, true, true, false, true, false, true) {} } }
+        compose.onNodeWithContentDescription("Ligar lanterna").assertIsNotEnabled()
     }
     @Test fun resultDetailsAndNavigation() {
         var navigated = false

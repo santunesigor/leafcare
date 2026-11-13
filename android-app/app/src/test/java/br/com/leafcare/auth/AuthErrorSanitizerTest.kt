@@ -41,6 +41,19 @@ class AuthErrorSanitizerTest {
         assertFalse(message.contains("http"))
     }
 
+    @Test fun rejectedEmailAddress_mapsToInvalidEmail() {
+        // Real GoTrue 400 for a rejected domain, as logged in production.
+        val raw = Exception(
+            "Email address \"produtor@example.com\" is invalid (email_address_invalid)\n" +
+                "URL: https://nhkqfanjfcivcbndivav.supabase.co/auth/v1/signup"
+        )
+
+        val message = AuthRepository.sanitizeError(AuthOperation.SIGN_UP, raw)
+
+        assertEquals("E-mail inválido. Confira o endereço digitado.", message)
+        assertFalse(message.contains("http"))
+    }
+
     @Test fun signupResendRateLimit_mapsToFriendlyMessageWithoutCountdown() {
         val message = AuthRepository.sanitizeError(
             AuthOperation.SIGNUP_RESEND,
@@ -218,6 +231,17 @@ class AuthErrorSanitizerTest {
             RecoveryRateLimit.IndividualLimit,
             AuthRepository.classifyRateLimit(IllegalStateException("429 Too Many Requests"))
         )
+    }
+
+    @Test fun samePassword_mapsToDifferentPasswordMessage() {
+        val raw = Exception(
+            "New password should be different from the old password. (same_password)\n" +
+                "URL: https://nhkqfanjfcivcbndivav.supabase.co/auth/v1/user"
+        )
+
+        val message = AuthRepository.sanitizeError(AuthOperation.UPDATE_PASSWORD, raw)
+
+        assertEquals("A nova senha deve ser diferente da atual.", message)
     }
 
     @Test fun classifyRateLimit_otherAndNull() {

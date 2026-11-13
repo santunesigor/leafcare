@@ -25,14 +25,14 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
     private val repository = app.repository
     private val catalog = app.catalog
 
-    val analyses = repository.all.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    // No replay once stopped: after logout the next account must never see the previous list.
+    val analyses = repository.all.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000, replayExpirationMillis = 0), emptyList())
     private val consentDao = app.database.trainingConsentDao()
     private val _trainingConsent = MutableStateFlow<br.com.leafcare.data.TrainingConsentEntity?>(null)
     val trainingConsent = _trainingConsent.asStateFlow()
     private var localConsentDecision = false
     private var consentUserId: String? = null
     private var consentObserver: Job? = null
-    fun currentConsentUserId(): String? = consentUserId
     private val _ui = MutableStateFlow(UiState())
     val ui = _ui.asStateFlow()
     private val navigation = Channel<String>(Channel.BUFFERED)
@@ -54,27 +54,33 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
     fun error(message: String) { _ui.update { it.copy(error = message) } }
     fun clearError() { _ui.update { it.copy(error = null) } }
 
-    fun setTrainingConsent(granted: Boolean) {
-        if (granted && !TRAINING_UPLOADS_ENABLED) return
+    /**
+     * Withdraws the training consent. The app then requires accepting the
+     * documents again; [onSaved] runs once the local revocation is stored.
+     */
+    fun revokeTrainingConsent(onSaved: () -> Unit) {
         val userId = consentUserId ?: return
         localConsentDecision = true
-        val decision = TrainingConsentEntity(userId = userId, termsVersion = TRAINING_TERMS_VERSION, granted = granted, decidedAt = System.currentTimeMillis())
+        val decision = TrainingConsentEntity(userId = userId, termsVersion = TRAINING_TERMS_VERSION, granted = false, decidedAt = System.currentTimeMillis())
         _trainingConsent.value = decision
         viewModelScope.launch {
             consentDao.save(decision)
             localConsentDecision = false
-            if (!granted) consentDao.revokeAllPhotos(userId)
+            consentDao.revokeAllPhotos(userId)
             app.scheduleSync()
+            onSaved()
         }
     }
 
-    fun analyze(uri: Uri, temporary: File? = null, authorizeTraining: Boolean = false) {
+    /** Accepting the current documents is the training consent: every analysis of a consenting account is authorized. */
+    fun analyze(uri: Uri, temporary: File? = null) {
         if (_ui.value.busy) { temporary?.delete(); return }
         _ui.value = UiState(busy = true)
         viewModelScope.launch {
             try {
                 val id = repository.analyze(uri)
-                if (TRAINING_UPLOADS_ENABLED && authorizeTraining && trainingConsent.value?.userId == consentUserId && trainingConsent.value?.granted == true) {
+                val consent = trainingConsent.value
+                if (TRAINING_UPLOADS_ENABLED && isTrainingEligible(app.database.analysisDao().get(id)) && consent?.userId == consentUserId && consent?.granted == true && consent.termsVersion == TRAINING_TERMS_VERSION) {
                     val userId = requireNotNull(consentUserId)
                     consentDao.savePhoto(TrainingPhotoAuthorizationEntity(userId, id, TRAINING_TERMS_VERSION, true, System.currentTimeMillis()))
                 }
@@ -84,6 +90,7 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
             }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) { this@LeafCareViewModel.error(error.message ?: "Não foi possível analisar a imagem.") }
+            catch (_: OutOfMemoryError) { this@LeafCareViewModel.error("Imagem grande demais para este aparelho. Escolha uma cópia menor.") }
             finally { temporary?.delete(); _ui.update { it.copy(busy = false) } }
         }
     }
@@ -106,3 +113,7 @@ class LeafCareViewModel(application: Application) : AndroidViewModel(application
     fun observeAnalysis(id: String) = repository.observe(id)
     fun getDiseaseInfo(classId: String): DiseaseInfo = catalog.get(classId)
 }
+
+/** Inconclusive photos stay local: only a conclusive analysis is authorized for training. */
+internal fun isTrainingEligible(analysis: AnalysisEntity?): Boolean =
+    analysis != null && !analysis.inconclusive && analysis.confidence >= analysis.threshold

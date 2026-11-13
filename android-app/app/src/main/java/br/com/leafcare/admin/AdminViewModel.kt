@@ -80,6 +80,8 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
                     return@launch
                 } catch (e: CancellationException) { throw e }
                 catch (_: AdminAccessException) { if (revision == generation) deny(); return@launch }
+                // `my_account_policy` answers null (not an object) for an account pending deletion.
+                catch (_: org.json.JSONException) { if (revision == generation) deny(); return@launch }
                 catch (_: Exception) {
                     if (revision != generation) return@launch
                     // A network failure does not revoke a role already verified in this session.

@@ -73,15 +73,18 @@ export function makeHandler({ client }: Dependencies) {
         if (beginning.gone) return json({ pending: false });
         try {
           // Batch deletion is resumable; always list from offset zero after removing a batch.
-          const bucket = client.storage.from('analysis-photos');
-          await command('authorize', { id: payload.id, operation: 'delete' });
-          const { data: objects, error: listingError } = await bucket.list(payload.id, { limit: 100, offset: 0 });
-          if (listingError) throw listingError;
-          if (objects?.length) {
+          // History photos and training copies are both removed before the account.
+          for (const bucketId of ['analysis-photos', 'training-photos']) {
+            const bucket = client.storage.from(bucketId);
             await command('authorize', { id: payload.id, operation: 'delete' });
-            const { error: removeError } = await bucket.remove(objects.map(o => `${payload.id}/${o.name}`));
-            if (removeError) throw removeError;
-            return json({ pending: true });
+            const { data: objects, error: listingError } = await bucket.list(payload.id, { limit: 100, offset: 0 });
+            if (listingError) throw listingError;
+            if (objects?.length) {
+              await command('authorize', { id: payload.id, operation: 'delete' });
+              const { error: removeError } = await bucket.remove(objects.map(o => `${payload.id}/${o.name}`));
+              if (removeError) throw removeError;
+              return json({ pending: true });
+            }
           }
           // Recheck the caller before each destructive service operation.
           await command('authorize', { id: payload.id, operation: 'delete' });

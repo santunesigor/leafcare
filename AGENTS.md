@@ -9,6 +9,8 @@
 - Execute validações proporcionais à mudança e relate somente resultados realmente obtidos.
 - Sempre gere e disponibilize um APK debug ao concluir mudanças; o usuário testa pelo APK.
 - Atualize a versão do app a cada entrega de mudanças: novas funcionalidades incrementam `1.x.0` (minor) e corrigem bugs incrementando `1.x.y` (patch), reiniciando o patch em `0` ao subir o minor. Reserve o primeiro número para mudanças maiores, somente quando explicitamente definido. Incremente também `versionCode` a cada nova versão do APK. Aplique essa regra a partir da versão atual, sem voltar versões.
+- Trabalho por release: enquanto uma release está em preparação (nenhuma no momento; a 1.8.0 foi publicada em 13/11/2026), todas as mudanças entram nela. O `versionName` fica fixo no número da release e só o `versionCode` sobe a cada APK de teste; o CHANGELOG mantém uma única seção da release. A regra de incremento acima vale ao abrir a próxima release.
+- PRs levam o nome da release que entregam, no formato `release X.Y.Z` (ex.: `release 1.8.0`).
 - O usuário autoriza push em branches separadas. Não faça push na `main` sem solicitação explícita.
 - Preserve alterações existentes do usuário.
 
