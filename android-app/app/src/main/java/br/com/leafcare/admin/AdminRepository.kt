@@ -27,7 +27,7 @@ internal class AdminRepository(private val holder: SupabaseClientHolder) : Admin
         JSONObject().put("operation", "photo").put("payload", JSONObject().put("id", id)))
 
     private suspend fun request(path: String, body: JSONObject): ByteArray = withContext(Dispatchers.IO) {
-        val session = holder.auth.currentSessionOrNull() ?: throw AdminAccessException("Entre novamente na sua conta")
+        val session = holder.freshSession() ?: throw AdminAccessException("Entre novamente na sua conta")
         val connection = URL(BuildConfig.SUPABASE_URL + path).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
