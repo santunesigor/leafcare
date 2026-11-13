@@ -93,7 +93,7 @@ internal class LegalAcceptanceRepository(
     }
 
     private suspend fun request(path: String, method: String, body: JSONObject? = null, prefer: String? = null): ByteArray = withContext(Dispatchers.IO) {
-        val session = holder.auth.currentSessionOrNull() ?: error("Sessão indisponível")
+        val session = holder.freshSession() ?: error("Sessão indisponível")
         val connection = URL(BuildConfig.SUPABASE_URL + path).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = method
