@@ -2,7 +2,7 @@
 
 ## [1.9.0] - Em preparação
 
-- O Perfil mostra a versão instalada e o número da compilação.
+- O Perfil mostra a versão instalada e o commit.
 - O cadastro indica como entrar ou recuperar a senha. Confirmações concluídas em outro aparelho oferecem login se o link não gerar uma sessão (#50, #51).
 - Termos e Política usam linguagem de primeiro acesso e mostram o contato de privacidade em uma linha própria (#52, #53).
 - O app restaura as fotos do histórico antes de processar a fila de envios (#54).

@@ -439,7 +439,9 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         internal fun sanitizeError(operation: AuthOperation, e: Exception): String {
             val original = e.message.orEmpty()
             val raw = original.lowercase().replace('_', ' ')
-            if (raw.contains("already registered")) return "Este e-mail já está cadastrado"
+            if (operation == AuthOperation.SIGN_UP &&
+                (raw.contains("already registered") || raw.contains("user already exists"))
+            ) return "Este e-mail já está cadastrado. Entre ou recupere sua senha."
             if (raw.contains("weak password")) return "Senha muito fraca. Use pelo menos 6 caracteres."
             // GoTrue: "same_password" / "New password should be different from the old password."
             if (raw.contains("same password") || raw.contains("different from the old password")) {
@@ -452,9 +454,6 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             if (raw.contains("invalid credentials") || raw.contains("invalid login")) {
                 return "E-mail ou senha incorretos"
             }
-            if (operation == AuthOperation.SIGN_UP &&
-                (raw.contains("user already registered") || raw.contains("user_already_exists"))
-            ) return "Já existe uma conta com este e-mail. Entre ou recupere sua senha."
             if (raw.contains("email not confirmed")) return "Confirme seu e-mail antes de entrar"
             if (raw.contains("invalid or has expired")) {
                 return if (operation == AuthOperation.RECOVERY_VERIFY) {

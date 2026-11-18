@@ -713,7 +713,7 @@ fun ProfileScreen(
         }, secondary = true, danger = true, enabled = !isLoading)
         Spacer(Modifier.height(24.dp))
         Text(
-            "Versão ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            "Versão ${BuildConfig.VERSION_NAME} - ${BuildConfig.GIT_COMMIT}",
             style = MaterialTheme.typography.bodySmall,
             color = LeafColors.Muted
         )
