@@ -252,6 +252,20 @@ class AdminQueueTest {
         assertEquals("frog_eye", api.queries.last().getString("class_id"))
         assertTrue(api.saved.isEmpty())
     }
+    @Test fun editsSavedGalleryReviewWithoutAdvancingQueue() {
+        api.seed(2, "confirmed")
+        api.rows[0].put("review_version", 3)
+        vm.load("gallery")
+        vm.select(vm.state.value.rows[0])
+        vm.action("review", JSONObject().put("id", "photo-0").put("version", 3)
+            .put("status", "corrected").put("class_id", "frog_eye").put("note", "Revisada"))
+        assertEquals(listOf("photo-0"), api.saved)
+        assertEquals(3, api.savedVersion)
+        assertEquals("gallery", vm.state.value.section)
+        assertEquals(0, vm.state.value.reviewedCount)
+        assertNull(vm.state.value.selected)
+        assertEquals("corrected", vm.state.value.rows[0].getString("review_status"))
+    }
     @Test fun galleryCanRetryFailedDetailWithoutLosingSelection() {
         api.seed(1)
         vm.load("gallery")

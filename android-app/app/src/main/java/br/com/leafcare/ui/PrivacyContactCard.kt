@@ -8,13 +8,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,26 +38,30 @@ internal fun PrivacyContactCard(modifier: Modifier = Modifier) {
         border = BorderStroke(1.dp, LeafColors.Border),
         shape = RoundedCornerShape(14.dp)
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Contato de privacidade", style = MaterialTheme.typography.labelSmall, color = LeafColors.Muted)
-                Text(
-                    br.com.leafcare.auth.PRIVACY_CONTACT_EMAIL,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = LeafColors.Text,
-                    fontWeight = FontWeight.SemiBold
-                )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Contato de privacidade", Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall, color = LeafColors.Text)
+                IconButton(onClick = {
+                    clipboardManager.setText(AnnotatedString(br.com.leafcare.auth.PRIVACY_CONTACT_EMAIL))
+                    copied = true
+                }) {
+                    Icon(
+                        if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+                        contentDescription = if (copied) "E-mail copiado" else "Copiar e-mail de privacidade",
+                        tint = LeafColors.Green
+                    )
+                }
             }
-            TextButton(onClick = {
-                clipboardManager.setText(AnnotatedString(br.com.leafcare.auth.PRIVACY_CONTACT_EMAIL))
-                copied = true
-            }) {
-                Icon(Icons.Outlined.ContentCopy, contentDescription = null, tint = LeafColors.Green)
-                Text(if (copied) "Copiado" else "Copiar", color = LeafColors.Green)
-            }
+            Text(
+                br.com.leafcare.auth.PRIVACY_CONTACT_EMAIL,
+                style = MaterialTheme.typography.bodyMedium,
+                color = LeafColors.Text,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }

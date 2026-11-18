@@ -27,10 +27,10 @@ internal fun LazyListScope.triageDashboard(data: JSONObject, catalog: DiseaseCat
     val progress = if (total == 0) 0f else reviewed.toFloat() / total
     item {
         Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = BorderStroke(1.dp, LeafColors.Border)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Column(Modifier.weight(1f)) {
-                        Text("$pending", fontSize = 28.sp, lineHeight = 32.sp, fontWeight = FontWeight.ExtraBold, color = LeafColors.Text)
+                        Text("$pending", fontSize = 24.sp, lineHeight = 28.sp, fontWeight = FontWeight.ExtraBold, color = LeafColors.Text)
                         Text(pendingLabel(total, pending), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
                     }
                     Text("${(progress * 100).toInt()}%", color = LeafColors.Green, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)

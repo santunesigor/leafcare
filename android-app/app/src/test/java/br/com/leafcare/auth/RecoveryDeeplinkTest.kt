@@ -24,6 +24,13 @@ class RecoveryDeeplinkTest {
         assertEquals(AuthDeeplink.ConfirmEmailTokens("at123", "rt123"), link)
     }
 
+    @Test fun usedSignupLink_returnsToLoginWithoutSession() {
+        val expected = AuthDeeplink.ConfirmEmailWithoutSession
+        assertEquals(expected, parseAuthDeeplink("leafcare://auth/confirm-email#error=access_denied&error_code=otp_expired"))
+        assertEquals(expected, parseAuthDeeplink("leafcare://auth/confirm-email"))
+        assertNull(parseAuthDeeplink("leafcare://other/confirm-email#error=access_denied"))
+    }
+
     @Test fun recoveryCodeLink_isAccepted() {
         val link = parseAuthDeeplink("leafcare://auth/reset-password?code=pkce-code-123")
 

@@ -100,7 +100,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
     val statuses = data.optJSONObject("statuses")
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(color = LeafColors.Forest, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.padding(start = 16.dp, end = 12.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text("$pending", color = Color.White, fontSize = 28.sp, lineHeight = 32.sp, fontWeight = FontWeight.ExtraBold)
                     Text(pendingLabel(total, pending), color = LeafColors.OnForest, style = MaterialTheme.typography.bodySmall)
@@ -162,7 +162,7 @@ internal fun shortId(raw: String) = if (raw.length > 14) "${raw.take(8)}…${raw
                 enabled = !busy, onClick = if (awaiting > 0) onReviewTraining else null)
             AdminStatTile("${training.optInt("excluded")}", "Fora do treino", Modifier.weight(1f))
         }
-        Text("Só cópias confirmadas ou corrigidas entram no treino. Cópias enviadas a partir dos Termos v1.5 ficam no conjunto; as da v1.4 são apagadas 90 dias após o envio.",
+        Text("Só cópias confirmadas ou corrigidas entram no treino.",
             Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
     }
 }

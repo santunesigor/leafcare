@@ -104,7 +104,7 @@ import br.com.leafcare.ui.LeafColors
     val shape = RoundedCornerShape(14.dp)
     Column(modifier.clip(shape).background(Color.White).border(1.dp, LeafColors.Border, shape)
         .then(if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier)
-        .padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        .padding(horizontal = 12.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(value, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, color = LeafColors.Text)
         Text(label, style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = LeafColors.Warning, maxLines = 1, overflow = TextOverflow.Ellipsis) }

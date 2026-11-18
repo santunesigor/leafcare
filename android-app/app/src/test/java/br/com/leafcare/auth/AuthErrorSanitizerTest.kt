@@ -8,6 +8,14 @@ import org.junit.Test
  * must never reach the UI. Pure functions, no Android framework.
  */
 class AuthErrorSanitizerTest {
+    @Test fun signupReportsExplicitDuplicateErrors() {
+        for (reason in listOf("User already registered", "user_already_exists")) {
+            assertEquals(
+                "Este e-mail já está cadastrado. Entre ou recupere sua senha.",
+                AuthRepository.sanitizeError(AuthOperation.SIGN_UP, Exception(reason))
+            )
+        }
+    }
 
     private val rawDump = Exception(
         "POST https://nhkqfanjfcivcbndivav.supabase.co/auth/v1/signup " +

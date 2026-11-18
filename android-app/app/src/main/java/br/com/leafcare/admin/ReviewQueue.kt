@@ -70,40 +70,22 @@ import org.json.JSONObject
 @Composable private fun ReviewPage(row: JSONObject, state: AdminState, actions: AdminActions, classes: List<String>, catalog: DiseaseCatalog, index: Int) {
     var edit by remember { mutableStateOf(false) }
     var details by remember { mutableStateOf(false) }
-    var zoom by remember { mutableStateOf(false) }
-    var reviewStatus by rememberSaveable { mutableStateOf(row.optString("review_status").takeIf { it in listOf("confirmed", "corrected", "uncertain", "rejected") } ?: "confirmed") }
-    var selectedClass by rememberSaveable { mutableStateOf(row.optString("reviewed_class").takeIf { it in classes } ?: row.getString("class_id")) }
-    var note by rememberSaveable { mutableStateOf(if (row.isNull("note")) "" else row.optString("note")) }
+    var reviewStatus by remember { mutableStateOf("confirmed") }
     val active = state.photoId == row.getString("id")
     val ready = active && state.bitmap != null && !state.busy && !state.reviewConflict
-    val cancelEdit = {
-        if (!state.busy) {
-            reviewStatus = row.optString("review_status").takeIf { it in listOf("confirmed", "corrected", "uncertain", "rejected") } ?: "confirmed"
-            selectedClass = row.optString("reviewed_class").takeIf { it in classes } ?: row.getString("class_id")
-            note = if (row.isNull("note")) "" else row.optString("note")
-            edit = false
-        }
-    }
-    val submit = { status: String ->
-        actions.action("review", JSONObject().put("id", row.getString("id")).put("version", row.optInt("review_version"))
-            .put("status", status).put("class_id", if (status == "confirmed") row.getString("class_id") else selectedClass).put("note", note.trim()))
-    }
     Surface(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
         shape = RoundedCornerShape(22.dp), color = Color.White, border = BorderStroke(1.dp, LeafColors.Border)) {
         Column {
             Box(Modifier.weight(1f).fillMaxWidth().background(Color(0xFF17241B)), contentAlignment = Alignment.Center) {
                 if (active && state.bitmap != null) {
-                    Image(state.bitmap.asImageBitmap(), "Foto da análise", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                    FilledTonalIconButton(onClick = { zoom = true }, enabled = !state.busy, modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = Color.White, contentColor = LeafColors.Green)) { Icon(Icons.Outlined.ZoomIn, "Ampliar foto") }
+                    ZoomableAdminPhoto(state.bitmap, "Foto da análise", Modifier.fillMaxSize())
                 } else if (state.busy) CircularProgressIndicator(color = Color.White)
                 else TextButton(onClick = actions.retryPhoto) { Text("Carregar foto", color = Color.White) }
                 Surface(Modifier.align(Alignment.BottomStart).padding(12.dp), color = Color.Black.copy(alpha = .6f), shape = RoundedCornerShape(10.dp)) {
                     Text("Foto ${index + 1} de ${state.rows.size}${if (state.queueHasMore) "+" else ""}", Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = Color.White, fontSize = 11.sp)
                 }
             }
-            // Prediction can scroll on short screens while all four decisions stay visible.
-            Column(Modifier.fillMaxWidth().heightIn(max = 138.dp).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("PREVISÃO ORIGINAL", color = LeafColors.Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     TrainingBadge(row); Spacer(Modifier.width(6.dp))
@@ -112,7 +94,6 @@ import org.json.JSONObject
                 Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("${percent(row.optDouble("confidence").toFloat())} de confiança", Modifier.weight(1f), color = LeafColors.Green, style = MaterialTheme.typography.bodySmall)
-                    IconButton(onClick = { reviewStatus = "confirmed"; edit = true }, enabled = ready) { Icon(Icons.Outlined.EditNote, "Adicionar observação", tint = LeafColors.Green) }
                     TextButton(onClick = { details = true }, contentPadding = PaddingValues(horizontal = 8.dp)) { Icon(Icons.Outlined.Info, null, Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Detalhes", style = MaterialTheme.typography.labelMedium) }
                 }
                 if (index == state.photoIndex) {
@@ -123,7 +104,11 @@ import org.json.JSONObject
             }
             Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ReviewActionButton("Confirmar", Icons.Outlined.CheckCircle, LeafColors.Green, ready, Modifier.weight(1f)) { submit("confirmed") }
+                    ReviewActionButton("Confirmar", Icons.Outlined.CheckCircle, LeafColors.Green, ready, Modifier.weight(1f)) {
+                        actions.action("review", JSONObject().put("id", row.getString("id")).put("version", row.optInt("review_version"))
+                            .put("status", "confirmed").put("class_id", row.getString("class_id"))
+                            .put("note", if (row.isNull("note")) "" else row.optString("note")))
+                    }
                     ReviewActionButton("Corrigir", Icons.Outlined.Edit, LeafColors.Green, ready, Modifier.weight(1f)) { reviewStatus = "corrected"; edit = true }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -141,59 +126,104 @@ import org.json.JSONObject
             }
         }
     }
-    if (edit) AdminSheet("Sua avaliação", cancelEdit, dismissEnabled = !state.busy, footer = {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Narrower inner padding keeps both labels on one line at 320dp.
-            val compact = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-            LeafButton("Cancelar", cancelEdit, secondary = true, modifier = Modifier.weight(1f), enabled = !state.busy, contentPadding = compact)
-            LeafButton("Salvar e próxima", { submit(reviewStatus) }, modifier = Modifier.weight(1.6f), enabled = ready, contentPadding = compact)
-        }
-    }) {
-        item { Text(when (reviewStatus) { "corrected" -> "Corrigir a classe prevista"; "uncertain" -> "Marcar como duvidosa"; "rejected" -> "Rejeitar esta foto"; else -> "Confirmar a previsão" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text("A previsão original será preservada.", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall) }
-        state.error?.let { item { AdminNotice(it, error = true); TextButton(onClick = actions.retryPhoto, enabled = !state.busy) { Text(if (state.reviewConflict) "Recarregar revisão" else "Tentar novamente") } } }
-        if (reviewStatus == "corrected") item { Choice("Classe revisada", selectedClass, classes.associateWith { catalog.get(it).name }, !state.busy) { selectedClass = it } }
-        item { OutlinedTextField(note, { if (it.length <= 2000) note = it }, label = { Text("Observação (opcional)") }, enabled = !state.busy, minLines = 2, maxLines = 5, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = leafFieldColors()) }
-    }
+    if (edit && active) ReviewForm(row, reviewStatus, state, classes, catalog, "Salvar e próxima", { edit = false }, actions.retryPhoto, actions.action)
     if (details) AdminSheet("Dados da foto", { details = false }) {
-        item { AdminBadge("PREVISÃO ORIGINAL"); Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         item {
-            val top3 = row.optJSONArray("top3") ?: JSONArray()
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                repeat(top3.length()) { i -> val p = top3.getJSONObject(i)
-                    Text("${i + 1}. ${catalog.get(p.getString("class_id")).name} · ${percent(p.optDouble("confidence").toFloat())}", style = MaterialTheme.typography.bodyMedium)
+            AdminPanel {
+                AdminSectionTitle("Previsão original")
+                Text(catalog.get(row.getString("class_id")).name, style = MaterialTheme.typography.titleLarge)
+                val top3 = row.optJSONArray("top3") ?: JSONArray()
+                repeat(top3.length()) { i ->
+                    val prediction = top3.getJSONObject(i)
+                    Text("${i + 1}. ${catalog.get(prediction.getString("class_id")).name} · ${percent(prediction.optDouble("confidence").toFloat())}")
                 }
             }
         }
-        item { SelectionContainer { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Enviada por: ${row.label("email")}")
-            Text("Data: ${adminDate(row.label("created_at"))}")
-            Text("Modelo de origem: ${shortId(row.label("model_sha256"))}")
-            if (!row.isNull("reviewed_at")) {
+        item {
+            AdminPanel {
+                AdminSectionTitle("Origem da foto")
+                SelectionContainer {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Enviada por: ${row.label("email")}")
+                        Text("Data: ${adminDate(row.label("created_at"))}")
+                        Text("Modelo de origem: ${shortId(row.label("model_sha256"))}")
+                    }
+                }
+            }
+        }
+        if (!row.isNull("reviewed_at")) item {
+            AdminPanel {
+                AdminSectionTitle("Avaliação humana")
+                Text(reviewLabel(row.optString("review_status")))
                 Text("Última revisão: ${adminDate(row.label("reviewed_at"))}")
                 Text("Revisor: ${shortId(row.label("reviewer_id"))}")
-                Text("Classe revisada: ${catalog.get(row.optString("reviewed_class").takeIf { it in classes } ?: row.getString("class_id")).name}")
-                Text("Observação: ${row.label("note")}")
+                if (!row.isNull("reviewed_class")) Text(catalog.get(row.getString("reviewed_class")).name)
+                if (row.optString("note").isNotBlank() && !row.isNull("note")) Text(row.getString("note"))
+                TextButton(onClick = { details = false; actions.history(row.getString("id")) }, enabled = !state.busy) {
+                    Text("Histórico da revisão")
+                }
             }
-        } } }
-        item { TextButton(onClick = { actions.history(row.getString("id")) }, enabled = !state.busy) { Text("Histórico da revisão") } }
-    }
-    if (zoom && active && state.bitmap != null) AdminSheet("Ampliar foto", { zoom = false }) {
-        item {
-            var scale by remember { mutableFloatStateOf(1f) }
-            var panX by remember { mutableFloatStateOf(0f) }
-            var panY by remember { mutableFloatStateOf(0f) }
-            Box(Modifier.fillMaxWidth().height(360.dp).clipToBounds().background(Color(0xFF17241B))) {
-                Image(state.bitmap.asImageBitmap(), "Foto ampliada", Modifier.fillMaxSize().pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoomChange, _ ->
-                        scale = (scale * zoomChange).coerceIn(1f, 5f)
-                        val maxX = size.width * (scale - 1) / 2; val maxY = size.height * (scale - 1) / 2
-                        panX = (panX + pan.x).coerceIn(-maxX, maxX); panY = (panY + pan.y).coerceIn(-maxY, maxY)
-                    }
-                }.graphicsLayer(scaleX = scale, scaleY = scale, translationX = panX, translationY = panY), contentScale = ContentScale.Fit)
-            }
-            TextButton(onClick = { scale = 1f; panX = 0f; panY = 0f }) { Text("Restaurar zoom") }
         }
+    }
+}
+
+@Composable internal fun ReviewForm(
+    row: JSONObject, initialStatus: String, state: AdminState, classes: List<String>, catalog: DiseaseCatalog,
+    saveLabel: String, close: () -> Unit, reload: () -> Unit, action: (String, JSONObject) -> Unit,
+    canChangeStatus: Boolean = false,
+) {
+    var status by rememberSaveable { mutableStateOf(initialStatus) }
+    var selectedClass by rememberSaveable { mutableStateOf(row.optString("reviewed_class").takeIf { it in classes } ?: row.getString("class_id")) }
+    var note by rememberSaveable { mutableStateOf(if (row.isNull("note")) "" else row.optString("note")) }
+    val statuses = remember { reviewStatuses.filterKeys { it in setOf("confirmed", "corrected", "uncertain", "rejected") } }
+    val enabled = !state.busy && !state.reviewConflict
+    AdminSheet("Sua avaliação", close, dismissEnabled = !state.busy, footer = {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val compact = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            LeafButton("Cancelar", close, secondary = true, modifier = Modifier.weight(1f), enabled = !state.busy, contentPadding = compact)
+            LeafButton(saveLabel, {
+                action("review", JSONObject().put("id", row.getString("id")).put("version", row.optInt("review_version"))
+                    .put("status", status).put("class_id", if (status == "confirmed") row.getString("class_id") else selectedClass).put("note", note.trim()))
+            }, modifier = Modifier.weight(1.6f), enabled = enabled, contentPadding = compact)
+        }
+    }) {
+        item {
+            if (canChangeStatus) Choice("Decisão", status, statuses.mapValues { (key, _) -> reviewLabel(key) }, enabled) { status = it }
+            else Text(reviewLabel(status), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("A previsão original será preservada.", color = LeafColors.Muted, style = MaterialTheme.typography.bodySmall)
+        }
+        state.error?.let {
+            item {
+                AdminNotice(it, error = true)
+                if (state.reviewConflict) TextButton(onClick = reload, enabled = !state.busy) { Text("Recarregar revisão") }
+            }
+        }
+        if (status == "corrected") item {
+            Choice("Classe revisada", selectedClass, classes.associateWith { catalog.get(it).name }, enabled) { selectedClass = it }
+        }
+        item {
+            OutlinedTextField(note, { if (it.length <= 2000) note = it }, label = { Text("Observação (opcional)") },
+                enabled = enabled, minLines = 2, maxLines = 5, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = leafFieldColors())
+        }
+    }
+}
+
+@Composable internal fun ZoomableAdminPhoto(bitmap: android.graphics.Bitmap, description: String, modifier: Modifier = Modifier) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var pan by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    Box(modifier.clipToBounds()) {
+        Image(bitmap.asImageBitmap(), description, Modifier.fillMaxSize().pointerInput(Unit) {
+            detectTransformGestures { _, movement, zoom, _ ->
+                scale = (scale * zoom).coerceIn(1f, 5f)
+                val maxX = size.width * (scale - 1) / 2
+                val maxY = size.height * (scale - 1) / 2
+                pan = androidx.compose.ui.geometry.Offset((pan.x + movement.x).coerceIn(-maxX, maxX), (pan.y + movement.y).coerceIn(-maxY, maxY))
+            }
+        }.graphicsLayer(scaleX = scale, scaleY = scale, translationX = pan.x, translationY = pan.y), contentScale = ContentScale.Fit)
+        if (scale > 1f) FilledTonalIconButton(
+            onClick = { scale = 1f; pan = androidx.compose.ui.geometry.Offset.Zero },
+            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+        ) { Icon(Icons.Outlined.Refresh, "Restaurar zoom") }
     }
 }
 
@@ -217,7 +247,9 @@ import org.json.JSONObject
     footer: (@Composable () -> Unit)? = null,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = { if (dismissEnabled) onClose() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { dismissEnabled || it != SheetValue.Hidden }),
+    val currentDismissEnabled by rememberUpdatedState(dismissEnabled)
+    val confirmValueChange: (SheetValue) -> Boolean = remember { { currentDismissEnabled || it != SheetValue.Hidden } }
+    ModalBottomSheet(onDismissRequest = { if (dismissEnabled) onClose() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = confirmValueChange),
         containerColor = LeafColors.Pale, contentColor = LeafColors.Text, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) }, dragHandle = null) {
         Column(Modifier.fillMaxWidth().maxHeightFraction(heightFraction).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).navigationBarsPadding().imePadding()) {

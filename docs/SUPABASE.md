@@ -223,3 +223,10 @@ O JOIN usa o UUID e usuário porque os registros antigos podem ter `photo_path` 
 ## Administração e triagem
 
 Configuração, publicação, bootstrap da primeira conta, pausa de envios e revisão humana: [SUPERADMIN.md](SUPERADMIN.md). As novas migrations e a função devem ser publicadas antes de distribuir o APK 1.3.0; nenhum e-mail ou credencial administrativa vai no aplicativo.
+
+### Reset de fotos na publicação da 1.9.0 (#59)
+
+1. Após aprovar o APK, agende a janela de manutenção e faça um inventário paginado de `analysis-photos` e `training-photos`, cruzando os caminhos com `analyses.photo_path` e `photo_reviews.analysis_id`. Registre as contagens, sem publicar arquivos ou dados de contas.
+2. Durante a janela, impeça envios concorrentes e estabeleça o corte para que filas de aparelhos não reenviem fotos anteriores. Verifique a política também para contas de teste com fotos pendentes. Faça uma passagem em ambiente de teste antes da operação remota.
+3. Remova os objetos por meio da API do Storage, em lotes, e confira cada resposta. Limpe apenas os ponteiros `photo_path` das análises afetadas após confirmar que os objetos foram removidos. Preserve contas, resultados das análises, revisões e auditoria. O painel e o conjunto de treino consultam a existência dos objetos.
+4. Confira as contagens dos buckets e do painel, sincronize o espelho local de treino se existir e valide a restauração em uma instalação limpa. Verifique que o histórico textual continua visível, uma foto antiga pendente não retorna e uma foto nova sincroniza. Só então encerre a janela.

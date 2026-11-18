@@ -360,6 +360,7 @@ internal class AnalysisSyncRunner(
         var failures = 0
 
         dao.getPendingPhotoDownloads().forEach { entity ->
+            if (sessionUserId != null && sessionUserId.invoke() != userId) return SyncRunResult.Completed(failures)
             try {
                 val target = photoFile(entity.photoName)
                 if (target.isFile && target.length() > 0) {
@@ -367,6 +368,7 @@ internal class AnalysisSyncRunner(
                 } else {
                     if (target.isFile) target.delete()
                     val bytes = api.downloadPhoto(remotePhotoPath(userId, entity.id))
+                    if (sessionUserId != null && sessionUserId.invoke() != userId) return SyncRunResult.Completed(failures)
                     require(bytes.isNotEmpty()) { "empty photo payload" }
                     writeAtomically(target, bytes)
                     dao.markPhotoSynced(entity.id)

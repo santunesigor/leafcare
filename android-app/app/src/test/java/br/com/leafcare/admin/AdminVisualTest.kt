@@ -368,10 +368,15 @@ class AdminVisualTest {
         val next = photo().put("id", "photo-2").put("class_id", "healthy")
         val state = mutableStateOf(AdminState(allowed = true, role = "owner", hierarchyVersion = 1, section = "photos", rows = listOf(photo(), next), photoId = "photo-1", bitmap = bitmap))
         compose.setContent { LeafCareTheme { AdminContent(state.value, DiseaseCatalog(compose.activity), classes, actions(action = { _, _ ->
-            state.value = state.value.copy(rows = listOf(next), photoId = "photo-2", reviewedCount = 1)
+            state.value = state.value.copy(busy = true)
         })) } }
         compose.onNodeWithText("Duvidosa").performClick()
         compose.onNodeWithText("Salvar e próxima").performClick()
+        compose.onNodeWithText("Sua avaliação").assertIsDisplayed()
+        compose.onNodeWithText("Salvar e próxima").assertIsNotEnabled()
+        compose.runOnIdle {
+            state.value = state.value.copy(rows = listOf(next), photoId = "photo-2", reviewedCount = 1, busy = false)
+        }
         compose.onNodeWithText("Sua avaliação").assertDoesNotExist()
         compose.onNodeWithText("Folha sem alteração aparente").assertIsDisplayed()
         compose.onNodeWithText("Confirmar").assertIsDisplayed().assertIsEnabled()

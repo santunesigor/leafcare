@@ -1,5 +1,13 @@
 # Changelog — LeafCare
 
+## [1.9.0] - Em preparação
+
+- O Perfil mostra a versão instalada e o commit.
+- O cadastro indica como entrar ou recuperar a senha. Confirmações concluídas em outro aparelho oferecem login se o link não gerar uma sessão (#50, #51).
+- Termos e Política usam linguagem de primeiro acesso e mostram o contato de privacidade em uma linha própria (#52, #53).
+- O app restaura as fotos do histórico antes de processar a fila de envios (#54).
+- A revisão tem zoom direto, controles mais compactos e edição de avaliações pela galeria. O modal fecha ao salvar e a fila avança uma vez (#55–#58).
+
 ## [1.8.1] - 2026-11-13
 
 Correções de bugs sobre a 1.8.0. APK 1.8.1 (versionCode 28).

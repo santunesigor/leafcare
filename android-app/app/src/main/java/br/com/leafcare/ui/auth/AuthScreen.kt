@@ -67,6 +67,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.leafcare.BuildConfig
 import br.com.leafcare.R
 import br.com.leafcare.auth.AuthScreen
 import br.com.leafcare.auth.AuthViewModel
@@ -517,7 +518,7 @@ fun VerifyEmailScreen(viewModel: AuthViewModel) {
         AuthHeader(
             logoSize = 56,
             title = "Verifique seu e-mail",
-            subtitle = "Enviamos um link de confirmação para ${uiState.email}."
+            subtitle = "Se o cadastro for novo, procure o link em ${uiState.email}. Se já tem conta, entre ou recupere sua senha."
         )
 
         AuthMessages(error, infoMessage)
@@ -536,7 +537,8 @@ fun VerifyEmailScreen(viewModel: AuthViewModel) {
         }
         Spacer(Modifier.height(12.dp))
 
-        AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }
+        AuthLinkButton("Entrar na minha conta") { viewModel.setScreen(AuthScreen.Login) }
+        AuthLinkButton("Esqueci minha senha") { viewModel.setScreen(AuthScreen.ForgotPassword) }
     }
 }
 
@@ -592,7 +594,8 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
         )
         Spacer(Modifier.height(12.dp))
 
-        AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }
+        AuthLinkButton("Entrar na minha conta") { viewModel.setScreen(AuthScreen.Login) }
+        AuthLinkButton("Esqueci minha senha") { viewModel.setScreen(AuthScreen.ForgotPassword) }
     }
 }
 
@@ -708,6 +711,12 @@ fun ProfileScreen(
                 if (unsynced > 0) pendingSignOut = unsynced else viewModel.signOut()
             }
         }, secondary = true, danger = true, enabled = !isLoading)
+        Spacer(Modifier.height(24.dp))
+        Text(
+            "Versão ${BuildConfig.VERSION_NAME} - ${BuildConfig.GIT_COMMIT}",
+            style = MaterialTheme.typography.bodySmall,
+            color = LeafColors.Muted
+        )
     }
     pendingSignOut?.let { count ->
         LeafDialog(

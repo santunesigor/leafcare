@@ -133,8 +133,14 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
     fun select(row: JSONObject) {
         if (mutable.value.section == "photos") { movePhoto(mutable.value.rows.indexOfFirst { it.optString("id") == row.optString("id") }); return }
         run {
-            mutable.value = mutable.value.copy(selected = row, bitmap = null)
-            if (mutable.value.section == "gallery") {
+            val current = mutable.value
+            val refreshed = if (current.section == "gallery" && current.reviewConflict) {
+                val response = JSONArray(api.command("photos", JSONObject().put("id", row.getString("id"))))
+                if (response.length() == 0) error("Foto indisponível. Atualize a galeria.")
+                response.getJSONObject(0)
+            } else row
+            mutable.value = current.copy(selected = refreshed, bitmap = null, reviewConflict = false)
+            if (current.section == "gallery") {
                 val bitmap = decodePhoto(api.photo(row.getString("id")), 2048) ?: error("Foto inválida. Tente novamente.")
                 mutable.value = mutable.value.copy(bitmap = bitmap)
             }
@@ -155,7 +161,7 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
             } catch (e: AdminAccessException) { if (revision == generation) deny(); throw e }
         }
     }
-    fun closeDetails() { mutable.value = mutable.value.copy(selected = null, bitmap = null) }
+    fun closeDetails() { mutable.value = mutable.value.copy(selected = null, bitmap = null, reviewConflict = false) }
     private suspend fun showPhoto(index: Int) {
         val row = mutable.value.rows.getOrNull(index) ?: return
         val id = row.getString("id")
@@ -212,9 +218,17 @@ internal class AdminViewModel(application: Application, private val api: AdminAp
     }
     private suspend fun saveReview(payload: JSONObject) {
         val before = mutable.value
-        val row = before.rows.getOrNull(before.photoIndex) ?: return
-        if (before.bitmap == null || before.reviewConflict || payload.optString("id") != row.getString("id")) return
+        val gallery = before.section == "gallery"
+        val row = (if (gallery) before.selected else before.rows.getOrNull(before.photoIndex)) ?: return
+        if (before.reviewConflict || payload.optString("id") != row.getString("id")) return
+        if (!gallery && before.bitmap == null) return
         api.command("review", payload)
+        if (gallery) {
+            mutable.value = mutable.value.copy(selected = null, bitmap = null, message = "Revisão atualizada.")
+            val data = JSONArray(api.command("photos", JSONObject(filters.toString()).put("page", before.page)))
+            mutable.value = mutable.value.copy(rows = List(data.length()) { data.getJSONObject(it) })
+            return
+        }
         reviewedIds += row.getString("id")
         val remaining = before.rows.filterNot { it.getString("id") == row.getString("id") }
         val index = before.photoIndex.coerceAtMost((remaining.size - 1).coerceAtLeast(0))

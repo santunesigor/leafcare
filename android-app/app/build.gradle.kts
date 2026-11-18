@@ -23,6 +23,12 @@ val supabasePublishableKey =
         ?: System.getenv("SUPABASE_PUBLISHABLE_KEY")
         ?: "YOUR_PUBLISHABLE_KEY_HERE"
 
+val buildCommit = providers.exec {
+    workingDir(rootProject.projectDir)
+    commandLine("git", "rev-parse", "--short=7", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.trim().ifBlank { "sem-git" } }
+
 android {
     namespace = "br.com.leafcare"
     compileSdk = 35
@@ -30,8 +36,9 @@ android {
         applicationId = "br.com.leafcare"
         minSdk = 26
         targetSdk = 35
-        versionCode = 28
-        versionName = "1.8.1"
+        versionCode = 31
+        versionName = "1.9.0"
+        buildConfigField("String", "GIT_COMMIT", "\"${buildCommit.get()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // BuildConfig fields for Supabase configuration (from local.properties)
         buildConfigField("String", "SUPABASE_URL", "\"https://nhkqfanjfcivcbndivav.supabase.co\"")
@@ -55,13 +62,8 @@ android {
 }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
-val debugApkCommit = providers.exec {
-    workingDir(rootProject.projectDir)
-    commandLine("git", "rev-parse", "--short=7", "HEAD")
-    isIgnoreExitValue = true
-}.standardOutput.asText.map { it.trim().ifBlank { "sem-git" } }
 val debugVersionName = android.defaultConfig.versionName
-val debugApkFileName = debugApkCommit.map { "leafcare-$debugVersionName-$it.apk" }
+val debugApkFileName = buildCommit.map { "leafcare-$debugVersionName-$it.apk" }
 
 val distributeDebugApk by tasks.registering(Sync::class) {
     group = "build"
