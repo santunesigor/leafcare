@@ -67,6 +67,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.leafcare.BuildConfig
 import br.com.leafcare.R
 import br.com.leafcare.auth.AuthScreen
 import br.com.leafcare.auth.AuthViewModel
@@ -710,6 +711,12 @@ fun ProfileScreen(
                 if (unsynced > 0) pendingSignOut = unsynced else viewModel.signOut()
             }
         }, secondary = true, danger = true, enabled = !isLoading)
+        Spacer(Modifier.height(24.dp))
+        Text(
+            "Versão ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            style = MaterialTheme.typography.bodySmall,
+            color = LeafColors.Muted
+        )
     }
     pendingSignOut?.let { count ->
         LeafDialog(
