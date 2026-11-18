@@ -517,7 +517,7 @@ fun VerifyEmailScreen(viewModel: AuthViewModel) {
         AuthHeader(
             logoSize = 56,
             title = "Verifique seu e-mail",
-            subtitle = "Enviamos um link de confirmação para ${uiState.email}."
+            subtitle = "Se o cadastro for novo, procure o link em ${uiState.email}. Se já tem conta, entre ou recupere sua senha."
         )
 
         AuthMessages(error, infoMessage)
@@ -536,7 +536,8 @@ fun VerifyEmailScreen(viewModel: AuthViewModel) {
         }
         Spacer(Modifier.height(12.dp))
 
-        AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }
+        AuthLinkButton("Entrar na minha conta") { viewModel.setScreen(AuthScreen.Login) }
+        AuthLinkButton("Esqueci minha senha") { viewModel.setScreen(AuthScreen.ForgotPassword) }
     }
 }
 
@@ -592,7 +593,8 @@ fun ForgotPasswordScreen(viewModel: AuthViewModel) {
         )
         Spacer(Modifier.height(12.dp))
 
-        AuthLinkButton("Voltar para entrar") { viewModel.setScreen(AuthScreen.Login) }
+        AuthLinkButton("Entrar na minha conta") { viewModel.setScreen(AuthScreen.Login) }
+        AuthLinkButton("Esqueci minha senha") { viewModel.setScreen(AuthScreen.ForgotPassword) }
     }
 }
 

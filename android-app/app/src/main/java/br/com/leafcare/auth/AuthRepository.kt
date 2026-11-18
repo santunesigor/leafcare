@@ -160,7 +160,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             } else {
                 // Confirmation pending: the user taps the email link, which
                 // returns through the deep link handled by completeEmailLink().
-                _infoMessage.value = "Enviamos um link de confirmação para seu e-mail."
+                _infoMessage.value = "Confira seu e-mail ou entre se já tiver uma conta."
                 Result.failure(SignupWithoutSessionException())
             }
         } catch (e: Exception) {
@@ -286,6 +286,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
         _infoMessage.value = null
 
         val operation = when (link) {
+            AuthDeeplink.ConfirmEmailWithoutSession,
             is AuthDeeplink.ConfirmEmailCode,
             is AuthDeeplink.ConfirmEmailTokens -> AuthOperation.SIGNUP_CONFIRM
             is AuthDeeplink.RecoveryCode,
@@ -294,6 +295,7 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
 
         return try {
             when (link) {
+                AuthDeeplink.ConfirmEmailWithoutSession -> return Result.failure(AuthException("Link sem sessão de acesso."))
                 is AuthDeeplink.ConfirmEmailCode -> backend.exchangeLinkCode(link.code)
                 is AuthDeeplink.ConfirmEmailTokens ->
                     backend.importLinkTokens(link.accessToken, link.refreshToken)
@@ -450,6 +452,9 @@ class AuthRepository internal constructor(private val backend: AuthBackend) {
             if (raw.contains("invalid credentials") || raw.contains("invalid login")) {
                 return "E-mail ou senha incorretos"
             }
+            if (operation == AuthOperation.SIGN_UP &&
+                (raw.contains("user already registered") || raw.contains("user_already_exists"))
+            ) return "Já existe uma conta com este e-mail. Entre ou recupere sua senha."
             if (raw.contains("email not confirmed")) return "Confirme seu e-mail antes de entrar"
             if (raw.contains("invalid or has expired")) {
                 return if (operation == AuthOperation.RECOVERY_VERIFY) {

@@ -127,20 +127,18 @@ class SyncAnalysesWorker(
             val failed = (revocation?.failures ?: 0) > 0
             return if (!failed || runAttemptCount >= MAX_ATTEMPTS) Result.success() else Result.retry()
         }
-        val pushFailures = when (val push = runner.syncOnce(userId)) {
-            is SyncRunResult.SkippedNoAuth -> return Result.success()
-            is SyncRunResult.Completed -> push.failures
-        }
-        // Account switch or logout mid-pass: abort instead of restoring or
-        // downloading as the wrong user (or logged out).
-        if (auth.currentUserOrNull()?.id != userId) return Result.success()
-        // Same pass, same retry policy: push first, then restore remote rows
-        // into Room, then cache their photos.
+        // Restore the history before processing the upload backlog. The Room
+        // photo state updates on each download, so images appear as they arrive.
         val restoreFailures =
             (runner.restoreOnce(userId) as? SyncRunResult.Completed)?.failures ?: 0
         if (auth.currentUserOrNull()?.id != userId) return Result.success()
         val downloadFailures =
             (runner.downloadOnce(userId) as? SyncRunResult.Completed)?.failures ?: 0
+        if (auth.currentUserOrNull()?.id != userId) return Result.success()
+        val pushFailures = when (val push = runner.syncOnce(userId)) {
+            is SyncRunResult.SkippedNoAuth -> return Result.success()
+            is SyncRunResult.Completed -> push.failures
+        }
         val failures = pushFailures + restoreFailures + downloadFailures
         return if (failures == 0 || runAttemptCount >= MAX_ATTEMPTS) {
             Result.success()

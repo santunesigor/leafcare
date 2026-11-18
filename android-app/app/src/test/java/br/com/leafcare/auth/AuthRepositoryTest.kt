@@ -192,7 +192,7 @@ class AuthRepositoryTest {
         assertTrue(result.exceptionOrNull() is SignupWithoutSessionException)
         assertNull(repository.session.value)
         assertFalse(repository.hasPersistedSession())
-        assertEquals("Enviamos um link de confirmação para seu e-mail.", repository.infoMessage.value)
+        assertEquals("Confira seu e-mail ou entre se já tiver uma conta.", repository.infoMessage.value)
     }
 
     @Test fun restoreMarksSessionChecked() = runTest(testDispatcher) {

@@ -81,7 +81,7 @@ interface AnalysisDao {
 
     // Photo download queue: remote-only rows whose analysis is visible.
     // Tombstones never download; missing states stay retryable downstream.
-    @Query("SELECT * FROM analyses WHERE photoSyncStatus = 'REMOTE_ONLY' AND deletedAt IS NULL")
+    @Query("SELECT * FROM analyses WHERE photoSyncStatus = 'REMOTE_ONLY' AND deletedAt IS NULL ORDER BY createdAt DESC")
     suspend fun getPendingPhotoDownloads(): List<AnalysisEntity>
 
     @Query("SELECT COUNT(*) FROM analyses")

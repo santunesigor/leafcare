@@ -3,7 +3,6 @@ package br.com.leafcare.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,7 +19,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -37,23 +35,21 @@ internal fun PrivacyContactCard(modifier: Modifier = Modifier) {
         border = BorderStroke(1.dp, LeafColors.Border),
         shape = RoundedCornerShape(14.dp)
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Contato de privacidade", style = MaterialTheme.typography.labelSmall, color = LeafColors.Muted)
-                Text(
-                    br.com.leafcare.auth.PRIVACY_CONTACT_EMAIL,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = LeafColors.Text,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+            Text("Contato de privacidade", style = MaterialTheme.typography.labelSmall, color = LeafColors.Muted)
+            Text(
+                br.com.leafcare.auth.PRIVACY_CONTACT_EMAIL,
+                style = MaterialTheme.typography.bodyMedium,
+                color = LeafColors.Text,
+                fontWeight = FontWeight.SemiBold
+            )
             TextButton(onClick = {
                 clipboardManager.setText(AnnotatedString(br.com.leafcare.auth.PRIVACY_CONTACT_EMAIL))
                 copied = true
-            }) {
+            }, modifier = Modifier.align(androidx.compose.ui.Alignment.End)) {
                 Icon(Icons.Outlined.ContentCopy, contentDescription = null, tint = LeafColors.Green)
                 Text(if (copied) "Copiado" else "Copiar", color = LeafColors.Green)
             }

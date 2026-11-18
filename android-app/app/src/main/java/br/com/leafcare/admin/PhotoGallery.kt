@@ -3,7 +3,6 @@ package br.com.leafcare.admin
 import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -19,13 +18,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +62,7 @@ import org.json.JSONObject
                         if (query.optString("from").isNotBlank() || query.optString("until").isNotBlank()) Text("Período UTC: ${query.optString("from").ifBlank { "início" }} até ${query.optString("until").ifBlank { "hoje" }}", style = MaterialTheme.typography.bodySmall)
                         if (query.optString("user_id").isNotBlank()) Text("Conta: ${shortId(query.getString("user_id"))}", style = MaterialTheme.typography.bodySmall)
                         state.error?.let { AdminNotice(it, error = true) }
+                    state.message?.let { AdminNotice(it) }
                     }
                 }
                 items(state.rows, key = { it.getString("id") }) { row ->
@@ -79,7 +76,15 @@ import org.json.JSONObject
         }
     }
     if (filtersOpen) PhotoFilterSheet(state, classes, catalog, { filtersOpen = false }) { actions.load("gallery", it) }
-    state.selected?.let { row -> GalleryPhotoDetails(row, state, actions, catalog) }
+    state.selected?.let { row ->
+        key(row.getString("id")) {
+            var editing by rememberSaveable { mutableStateOf(false) }
+            if (editing) key(row.optInt("review_version")) {
+                ReviewForm(row, row.getString("review_status"), state, classes, catalog, "Salvar alterações",
+                    { editing = false }, { actions.select(row) }, actions.action, canChangeStatus = true)
+            } else GalleryPhotoDetails(row, state, actions, catalog) { editing = true }
+        }
+    }
 }
 
 @Composable private fun GalleryCard(row: JSONObject, catalog: DiseaseCatalog, enabled: Boolean, thumbnail: suspend (String) -> Bitmap?, onClick: () -> Unit) {
@@ -116,26 +121,15 @@ import org.json.JSONObject
     }
 }
 
-@Composable private fun GalleryPhotoDetails(row: JSONObject, state: AdminState, actions: AdminActions, catalog: DiseaseCatalog) {
-    var scale by remember(row) { mutableFloatStateOf(1f) }
-    var panX by remember(row) { mutableFloatStateOf(0f) }
-    var panY by remember(row) { mutableFloatStateOf(0f) }
+@Composable private fun GalleryPhotoDetails(row: JSONObject, state: AdminState, actions: AdminActions, catalog: DiseaseCatalog, edit: () -> Unit) {
     AdminSheet("Consulta da foto", actions.closeDetails, dismissEnabled = !state.busy) {
         item {
-            Box(Modifier.fillMaxWidth().height(300.dp).clipToBounds().background(LeafColors.Border), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().height(300.dp).background(LeafColors.Border), contentAlignment = Alignment.Center) {
                 val image = state.bitmap
-                if (image != null) Image(image.asImageBitmap(), "Foto ampliada", Modifier.fillMaxSize().pointerInput(row.getString("id")) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 5f)
-                        panX = (panX + pan.x).coerceIn(-size.width * (scale - 1) / 2, size.width * (scale - 1) / 2)
-                        panY = (panY + pan.y).coerceIn(-size.height * (scale - 1) / 2, size.height * (scale - 1) / 2)
-                    }
-                }.graphicsLayer(scaleX = scale, scaleY = scale, translationX = panX, translationY = panY), contentScale = ContentScale.Fit)
+                if (image != null) ZoomableAdminPhoto(image, "Foto da análise", Modifier.fillMaxSize())
                 else if (state.busy) CircularProgressIndicator()
                 else TextButton(onClick = { actions.select(row) }) { Text("Tentar carregar foto") }
             }
-            Text("Use dois dedos para ampliar.", style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
-            if (scale > 1f) TextButton(onClick = { scale = 1f; panX = 0f; panY = 0f }) { Text("Restaurar zoom") }
         }
         state.error?.let { item { AdminNotice(it, error = true) } }
         item {
@@ -167,6 +161,9 @@ import org.json.JSONObject
                         row.optString("reviewer_id").takeIf { !row.isNull("reviewer_id") }?.let { "Revisor: ${shortId(it)}" },
                     )
                     if (meta.isNotEmpty()) Text(meta.joinToString("  ·  "), style = MaterialTheme.typography.bodySmall, color = LeafColors.Muted)
+                    if (row.optInt("review_version") > 0) {
+                        TextButton(onClick = edit, enabled = !state.busy) { Text("Editar revisão") }
+                    }
                 }
             }
         }

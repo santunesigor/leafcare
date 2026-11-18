@@ -446,6 +446,11 @@ class AuthViewModel internal constructor(
         processDeeplink(link, wasPending)
     }
 
+    private fun showConfirmationLogin() {
+        setScreen(AuthScreen.Login)
+        authRepository.setInfo("Se você já confirmou o e-mail, entre com sua senha. Caso contrário, use um link de confirmação válido.")
+    }
+
     private fun processDeeplink(link: AuthDeeplink, wasPending: Boolean) {
         viewModelScope.launch {
             if (wasPending) {
@@ -455,9 +460,19 @@ class AuthViewModel internal constructor(
                 clearRecoveryPending()
                 _bootstrap.value = AuthBootstrapState.PROCESSING_DEEPLINK
             }
+            if (link == AuthDeeplink.ConfirmEmailWithoutSession) {
+                showConfirmationLogin()
+                _bootstrap.value = AuthBootstrapState.READY
+                return@launch
+            }
             val result = authRepository.completeEmailLink(link)
             if (!result.isSuccess) {
                 _bootstrap.value = AuthBootstrapState.READY
+                if (link is AuthDeeplink.ConfirmEmailCode || link is AuthDeeplink.ConfirmEmailTokens) {
+                    setScreen(AuthScreen.Login, clearMessages = false)
+                    authRepository.setInfo("Se você já confirmou o e-mail em outro aparelho, entre com sua senha.")
+                    return@launch
+                }
                 // Used/expired links may carry a live cooldown: surface the
                 // remainder so the user knows when a new link is allowed.
                 val remaining = refreshCooldown()
@@ -474,6 +489,7 @@ class AuthViewModel internal constructor(
             isolateCurrentUser()
             clearForms()
             when (link) {
+                AuthDeeplink.ConfirmEmailWithoutSession,
                 is AuthDeeplink.ConfirmEmailCode,
                 is AuthDeeplink.ConfirmEmailTokens -> {
                     _bootstrap.value = AuthBootstrapState.READY
@@ -642,6 +658,7 @@ enum class AuthScreen {
  * Anything else is ignored. The two flows are never confused.
  */
 internal sealed interface AuthDeeplink {
+    data object ConfirmEmailWithoutSession : AuthDeeplink
     data class ConfirmEmailCode(val code: String) : AuthDeeplink
     data class ConfirmEmailTokens(val accessToken: String, val refreshToken: String) : AuthDeeplink
     data class RecoveryCode(val code: String) : AuthDeeplink
@@ -655,7 +672,7 @@ internal sealed interface AuthDeeplink {
 internal fun parseAuthDeeplink(url: String): AuthDeeplink? {
     return try {
         val uri = java.net.URI(url)
-        if (uri.scheme != "leafcare") return null
+        if (uri.scheme != "leafcare" || uri.host != "auth") return null
         fun params(raw: String?): Map<String, String> {
             if (raw.isNullOrBlank()) return emptyMap()
             return raw.split("&").mapNotNull { part ->
@@ -666,7 +683,8 @@ internal fun parseAuthDeeplink(url: String): AuthDeeplink? {
                 key to value
             }.toMap()
         }
-        val code = params(uri.rawQuery)["code"]?.takeIf { it.isNotBlank() }
+        val query = params(uri.rawQuery)
+        val code = query["code"]?.takeIf { it.isNotBlank() }
         val fragment = params(uri.rawFragment)
         val accessToken = fragment["access_token"]
         val refreshToken = fragment["refresh_token"]
@@ -677,6 +695,9 @@ internal fun parseAuthDeeplink(url: String): AuthDeeplink? {
                 !accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank() &&
                     (type == null || type == "signup") ->
                     AuthDeeplink.ConfirmEmailTokens(accessToken, refreshToken)
+                "error" in fragment || "error" in query ||
+                    (uri.rawQuery.isNullOrEmpty() && uri.rawFragment.isNullOrEmpty()) ->
+                    AuthDeeplink.ConfirmEmailWithoutSession
                 else -> null
             }
             "/reset-password" -> when {
